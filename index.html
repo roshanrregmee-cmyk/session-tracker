@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Session Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--tx:#1b2430;--mut:#6b7686;--bd:#e2e6ec;--ac:#0f766e;--pos:#15803d;--neg:#dc2626;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f141a;--card:#18202a;--tx:#e8edf3;--mut:#93a0b0;--bd:#2a3542;--ac:#2dd4bf;--pos:#4ade80;--neg:#f87171}}
+:root[data-theme="dark"]{--bg:#0f141a;--card:#18202a;--tx:#e8edf3;--mut:#93a0b0;--bd:#2a3542;--ac:#2dd4bf;--pos:#4ade80;--neg:#f87171}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+main{max-width:980px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:0 0 4px}.mut{color:var(--mut)}
+.bar{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+button,.btn{font:inherit;border:1px solid var(--bd);background:var(--card);color:var(--tx);padding:8px 14px;border-radius:8px;cursor:pointer}
+button:disabled{opacity:.45;cursor:default}
+.pri{background:var(--ac);color:#fff;border-color:var(--ac);font-weight:600}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--bd);margin-bottom:14px}
+.tabs button{border:0;border-bottom:3px solid transparent;border-radius:0;background:none;padding:10px 10px;white-space:nowrap}.tabs{overflow-x:auto}.row select{max-width:120px}.row input[type=checkbox]{width:22px;height:22px}.res{min-width:62px;text-align:right}
+.tabs .on{border-color:var(--ac);font-weight:600}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:14px}
+.sc{overflow-x:auto;background:var(--card);border:1px solid var(--bd);border-radius:12px}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:7px 10px;border-bottom:1px solid var(--bd);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:var(--card)}
+th{font-weight:600;font-size:13px;vertical-align:bottom}
+tfoot td{font-weight:700}
+input{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:6px 8px}
+input.c{width:78px;text-align:right}th input{font-size:12px;width:128px;display:block;margin-top:2px}
+.lb{font-size:12px;color:var(--mut);min-height:16px}
+.x{padding:0 6px;border:0;background:none;color:var(--mut)}
+.pos{color:var(--pos)}.neg{color:var(--neg)}
+.row{display:flex;gap:8px;align-items:center;margin:6px 0}.row span{flex:1}.row input{width:130px;text-align:right}
+.sum{margin:12px 0;font-weight:600}.warn{color:var(--neg)}.ok{color:var(--pos)}
+.kp{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px}
+.kp div{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px}
+.kp small{color:var(--mut)}.kp b{display:block;font-size:20px}
+.t{fill:var(--tx);font-size:13px}
+.g2{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px}.pw{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:8px}.lg{display:flex;align-items:center;gap:6px}.lg i{width:10px;height:10px;border-radius:2px;display:inline-block}
+
+select{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:5px 8px;max-width:190px}
+.nogrp .bar,.nogrp .tabs,.nogrp #gbar{display:none}
+.chip{display:flex;align-items:center;gap:6px;border:1px solid var(--bd);border-radius:20px;padding:5px 12px;cursor:pointer}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:10px 16px;border-radius:8px;display:none}
+</style></head><body><main>
+<h1>🃏 Session Tracker</h1>
+<div class="mut">Upload last time's Excel, add the new session, export. Positive = winning, negative = losing.</div>
+<div class="bar">
+ <label class="btn pri" for="up">Upload Excel</label><input id="up" type="file" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
+ <button id="xl">Export Excel</button><button id="pdf">Export Dashboard PDF</button><button id="jpg">Share as image</button>
+</div>
+<div class="pw" id="gbar" style="margin:0 0 10px"></div>
+<div class="tabs"><button data-t="hist">History</button><button data-t="add">New session</button><button data-t="loans">Loans</button><button data-t="dash">Dashboard</button></div>
+<div id="v"></div></main><div id="toast"></div>
+<script>
+const $=s=>document.querySelector(s),E=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let aiFn,aiTips={},aiKey='',aiBusy=false,aiMsg='',excl={},game=null,gc=false,finals={},plays={},initLoan=500,loans=[],loanDraft={},ld=new Date().toLocaleDateString('en-CA'),hsort='desc',hpl='file',ALLP=[],PERIOD={a:0,b:-1,N:0},rf=0,rt=-1,players=[],sessions=[],draft={},tab='hist',dd=new Date().toLocaleDateString('en-CA');
+const num=v=>typeof v==='number'&&isFinite(v),f=n=>num(n)?n.toLocaleString():'',cls=n=>n>0?'pos':n<0?'neg':'';
+const iso2ser=d=>Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10))/864e5+25569;
+const ser2iso=n=>new Date(Math.round((n-25569)*864e5)).toISOString().slice(0,10);
+const tot=p=>sessions.reduce((a,s)=>a+(s.v[p]||0),0),nm=(s,i)=>s.date||s.label||'Session '+(i+1);
+const net=s=>players.reduce((a,p)=>a+(s.v[p]||0),0);
+function sortS(){let k='';sessions=sessions.map((x,i)=>{if(x.date)k=x.date;return{x,k,i}}).sort((a,b)=>a.k<b.k?-1:a.k>b.k?1:a.i-b.i).map(o=>o.x)}
+const sOrd=a=>hsort=='desc'?[...a].reverse():a,pOrd=a=>hpl=='name'?[...a].sort((x,y)=>x.localeCompare(y)):hpl=='total'?[...a].sort((x,y)=>tot(y)-tot(x)):a;
+function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',3500)}
+const avgOf=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
+function stats(){return players.map(p=>{const v=sessions.map(s=>s.v[p]).filter(num),t=v.reduce((a,b)=>a+b,0);return{p,t,n:v.length,w:v.filter(x=>x>0).length,l:v.filter(x=>x<0).length,aw:avgOf(v.filter(x=>x>0)),al:avgOf(v.filter(x=>x<0)),best:v.length?Math.max(...v):0,worst:v.length?Math.min(...v):0,avg:v.length?t/v.length:0}}).sort((a,b)=>b.t-a.t)}
+function kpis(){const st=stats();let b=null;sessions.forEach((s,i)=>players.forEach(p=>{const x=s.v[p];if(num(x)&&(!b||x>b.x))b={p,x,n:nm(s,i)}}));
+ const a=st[0],z=st[st.length-1];return[['Sessions',sessions.length,players.length+' players'],['Leader',a.p,f(a.t)],['Trailing',z.p,f(z.t)],['Best single session',b?b.p:'-',b?'+'+f(b.x)+' · '+b.n:'']]}
+function render0(){
+ $('#v').innerHTML=tab=='hist'?hist():tab=='add'?entry():tab=='loans'?loansTab():dash();
+ document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t==tab));
+ $('#xl').disabled=!sessions.length;$('#jpg').disabled=$('#pdf').disabled=!sessions.length||!players.length||!Object.values(sel).some(Boolean)||players.every(p=>excl[p]);upd()}
+function hist(){
+ if(!players.length)return'<p class="mut">No data yet. Upload your Excel, or add players in “New session”.</p>';
+ const si=sOrd(sessions.map((_,i)=>i)),ps=pOrd(players),o=(v,l,c)=>`<option value="${v}" ${c==v?'selected':''}>${l}</option>`;
+ let h=`<div class="pw" style="margin:0 0 10px"><label>Sessions <select data-hs>${o('desc','Newest first',hsort)}${o('asc','Oldest first',hsort)}</select></label><label>Players <select data-hp>${o('file','As in file',hpl)}${o('name','A–Z',hpl)}${o('total','Highest total first',hpl)}</select></label></div><div class="sc"><table><thead><tr><th>Player</th>`+si.map(i=>{const s=sessions[i];return`<th><div class="lb">${E(s.date?'':s.label||'Session '+(i+1))}<button class="x" data-del="${i}" title="Delete session">✕</button></div><input type="date" data-d="${i}" value="${s.date}"></th>`}).join('')+'<th>Total</th></tr></thead><tbody>';
+ ps.forEach(p=>h+=`<tr><td>${E(p)}</td>`+si.map(i=>{const s=sessions[i];return`<td><input class="c ${cls(s.v[p])}" inputmode="decimal" data-p="${E(p)}" data-s="${i}" value="${num(s.v[p])?s.v[p]:''}"></td>`}).join('')+`<td class="${cls(tot(p))}"><b>${f(tot(p))}</b></td></tr>`);
+ return h+'</tbody><tfoot><tr><td>Net</td>'+si.map(i=>`<td>${f(net(sessions[i]))}</td>`).join('')+`<td>${f(players.reduce((a,p)=>a+tot(p),0))}</td></tr></tfoot></table></div><p class="mut">Tap any cell to correct it. Blank = didn't play. Sessions are kept in date order; undated ones stay beside the session before them.</p>`}
+function loanRows(P){return P.map(p=>{let bank=0,bor=0,len=0;loans.forEach(l=>{if(l.done)return;if(l.who==p){if(l.src)bor+=l.amt;else bank+=l.amt}if(l.src==p)len+=l.amt});return{p,init:initLoan,bank,bor,len,cur:initLoan+bank+bor-len}})}
+const ng=n=>n?-n:0;
+function loantable(P){const r=loanRows(P).map(x=>({p:x.p,i:ng(x.init),b:ng(x.bank),n:ng(x.bor-x.len),c:ng(x.cur)})),S=k=>r.reduce((a,x)=>a+x[k],0),td=v=>`<td class="${cls(v)}">${v>0?'+':''}${f(v)}</td>`;
+ return'<div class="sc"><table><thead><tr><th>Player</th><th>Initial</th><th>From bank</th><th>From/to players</th><th>Current standing</th></tr></thead><tbody>'+r.map(x=>`<tr><td>${E(x.p)}</td>${td(x.i)}${td(x.b)}${td(x.n)}<td class="${cls(x.c)}"><b>${f(x.c)}</b></td></tr>`).join('')+`</tbody><tfoot><tr><td>Total</td>${td(S('i'))}${td(S('b'))}${td(S('n'))}<td>${f(S('c'))}</td></tr></tfoot></table></div>`}
+function loglist(){const log=loans.map((l,i)=>({l,i})).sort((a,b)=>a.l.date<b.l.date?1:a.l.date>b.l.date?-1:b.i-a.i);
+ return'<p><b>Loan log</b></p>'+(log.length?'<div class="sc"><table><tbody>'+log.map(o=>`<tr><td>${o.l.date}</td><td>${E(o.l.who)}</td><td class="${cls(ng(o.l.amt))}">${o.l.amt>0?'−':'+'}${f(Math.abs(o.l.amt))}</td><td>${o.l.amt<0?'repaid to ':'borrowed from '}${o.l.src?E(o.l.src):'Bank'}</td><td>${o.l.done?'<span class="mut">settled</span>':`<button class="x" data-ldel="${o.i}" title="Delete">✕</button>`}</td></tr>`).join('')+'</tbody></table></div>':'<p class="mut">No fresh loans yet.</p>')}
+function joinCard(){const out=players.filter(p=>!game.players.includes(p));
+ return`<div class="card"><b>Add a player to this game</b><div class="mut">For someone joining late. Type a new name, or pick someone who sat out. They start with the initial loan (${f(initLoan)}).</div><div class="row"><input id="jn" list="jl" placeholder="Player name" style="text-align:left;flex:1"><button id="jb">Add to game</button></div><datalist id="jl">${out.map(p=>`<option value="${E(p)}">`).join('')}</datalist></div>`}
+function gcPanel(P,cur){return`<div class="card"><b>Game completion</b><div class="mut">Enter what each player finished with. Result = final amount + current standing (standing is negative while a loan is owed). Saved results go to the History tab.</div>
+ ${P.map(p=>`<div class="row"><span>${E(p)} <small class="mut">(${f(ng(cur[p]))})</small></span><input inputmode="decimal" placeholder="final amount" data-fa="${E(p)}" value="${E(finals[p]===undefined?'':finals[p])}"><b class="res" data-rp="${E(p)}"></b></div>`).join('')}
+ <div class="sum" id="gsum"></div><button class="pri" id="gfin" style="width:100%">Complete game &amp; save to History</button></div>`}
+function loansTab(){
+ if(!game)return`<div class="card"><b>No game in progress</b><p class="mut">Start one in “New session” by choosing who is playing. Loans and Game completion work on that game.</p></div>`+loglist();
+ const P=game.players,cur=Object.fromEntries(loanRows(P).map(r=>[r.p,r.cur])),opts=p=>'<option value="">Bank (borrow)</option><option value="__repay" '+((loanDraft[p]||{}).src=='__repay'?'selected':'')+'>Repay bank</option>'+P.filter(q=>q!=p).map(q=>`<option value="${E(q)}" ${(loanDraft[p]||{}).src==q?'selected':''}>${E(q)}</option>`).join('');
+ return`<div class="card"><label><b>Initial loan per player</b> <input type="number" data-il value="${initLoan}" style="width:110px;text-align:right"></label><div class="mut">Every player starts the game with this loan. You can change it any time; standings update.</div></div>
+ ${joinCard()}
+ <div class="card"><b>Fresh loan</b> <span class="mut">· game on ${game.date}</span><label style="display:block;margin:8px 0">Date <input type="date" id="ld" value="${ld}"></label>
+ ${P.map(p=>`<div class="row" style="flex-wrap:wrap"><span>${E(p)}</span><input inputmode="decimal" placeholder="amount" style="width:90px" data-la="${E(p)}" value="${E((loanDraft[p]||{}).amt||'')}"><button data-lsg="${E(p)}" title="Switch + / −">±</button><select data-ls="${E(p)}">${opts(p)}</select></div>`).join('')}
+ <div class="mut">Bank: adds to the player's loan. Repay bank: reduces it. Another player: the borrower's loan goes up and the lender's goes down (a negative amount does the reverse). Standing shows negative while a loan is owed.</div>
+ <button class="pri" id="lsave" style="width:100%;margin-top:10px">Save fresh loans</button></div>
+ <p style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>Current standing</b><span style="display:flex;gap:6px"><button id="sxl">⬇ Export session</button><button class="pri" id="gcb">${gc?'Hide game completion':'Game completion'}</button></span></p><div class="mut" style="margin:-6px 0 8px">Export now and then. If this page closes, load the file from the New session tab.</div>${loantable(P)}${gc?gcPanel(P,cur):''}${loglist()}`}
+function entry(){
+ if(game)return`<div class="card"><b>Game in progress</b><div class="mut">${game.date} · ${game.players.length} playing: ${game.players.map(E).join(', ')}</div><p>Add loans and finish the game from the Loans tab. The final results are saved to History.</p><button class="pri" data-t="loans">Go to Loans</button> <button id="gdisc">Discard game</button></div>${joinCard()}`;
+ return`<div class="card"><label>Date played <input type="date" id="nd" value="${dd}"></label>
+ <div style="margin-top:10px">${players.map(p=>`<label class="row"><span>${E(p)}</span><input type="checkbox" data-pl="${E(p)}" ${plays[p]===false?'':'checked'}> Playing</label>`).join('')||'<p class="mut">Add your first player below.</p>'}</div>
+ <div class="row"><input id="np" placeholder="New player name" style="text-align:left;flex:1"><button id="ap">Add player</button></div></div>
+ <button class="pri" id="save" style="width:100%">Start game</button>
+ <div class="card" style="margin-top:14px"><b>Resume a saved session</b><div class="mut" style="margin:4px 0 10px">Nothing is stored online. If you exported your session from the Loans tab, load that file here to carry on. Upload your history Excel first so earlier sessions are kept.</div><label class="btn" for="lg">📂 Load existing session</label><input id="lg" type="file" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"></div>`}
+function upd(){const el=$('#gsum');if(!el||!game)return;const cur=Object.fromEntries(loanRows(game.players).map(r=>[r.p,r.cur]));let t=0,all=1;
+ document.querySelectorAll('[data-rp]').forEach(c=>{const p=c.dataset.rp,a=parseFloat(finals[p]);if(isNaN(a)){all=0;c.textContent='';return}const r=a-cur[p];t+=r;c.textContent=(r>0?'+':'')+f(Math.round(r*100)/100);c.className='res '+cls(r)});
+ t=Math.round(t*100)/100;el.className='sum '+(all&&t?'warn':'ok');el.textContent=all?(t?`Results net to ${t.toLocaleString()} (should be 0)`:'Results net to 0 ✓'):"Enter every player's final amount"}
+function hbar(items,o={}){const neg=items.some(i=>i.v<0),rh=30,cx=neg?350:120,mx=Math.max(1,...items.map(i=>Math.abs(i.v))),sc=(neg?170:420)/mx,H=items.length*rh+10,fm=o.fm||f;
+ let g=`<svg viewBox="0 0 600 ${H}" width="100%">`;
+ items.forEach((s,i)=>{const y=i*rh+5,w=Math.abs(s.v)*sc,p=s.v>=0,c=o.c||`var(--${p?'pos':'neg'})`;g+=`<text x="0" y="${y+17}" class="t">${E(s.p)}</text><rect x="${p?cx:cx-w}" y="${y+3}" width="${w}" height="20" rx="3" fill="${c}"/><text x="${p?cx+w+6:cx-w-6}" y="${y+17}" text-anchor="${p?'start':'end'}" class="t">${fm(s.v)}</text>`});
+ return g+`<line x1="${cx}" x2="${cx}" y1="0" y2="${H}" stroke="var(--bd)"/></svg>`}
+const chart=st=>hbar(st.map(s=>({p:s.p,v:s.t})));
+function sumtable(){const si=sOrd(sessions.map((_,i)=>i)),ps=pOrd(players);
+ return'<div class="sc"><table><thead><tr><th>Player</th>'+si.map(i=>`<th style="text-align:center">${E(nm(sessions[i],i))}</th>`).join('')+'<th>Total</th></tr></thead><tbody>'+ps.map(p=>`<tr><td>${E(p)}</td>`+si.map(i=>{const v=sessions[i].v[p];return`<td class="${cls(v)}">${num(v)?f(v):'–'}</td>`}).join('')+`<td class="${cls(tot(p))}"><b>${f(tot(p))}</b></td></tr>`).join('')+'</tbody><tfoot><tr><td>Net</td>'+si.map(i=>`<td>${f(net(sessions[i]))}</td>`).join('')+`<td>${f(players.reduce((a,p)=>a+tot(p),0))}</td></tr></tfoot></table></div>`}
+function recbars(st){const rh=30,mx=Math.max(1,...st.map(s=>s.n)),sc=330/mx,H=st.length*rh+10;let g=`<svg viewBox="0 0 600 ${H}" width="100%">`;
+ st.forEach((s,i)=>{const y=i*rh+5,z=s.n-s.w-s.l;let x=120;g+=`<text x="0" y="${y+17}" class="t">${E(s.p)}</text>`;
+  [[s.w,'var(--pos)'],[z,'#94a3b8'],[s.l,'var(--neg)']].forEach(q=>{if(q[0]){g+=`<rect x="${x}" y="${y+3}" width="${q[0]*sc}" height="20" fill="${q[1]}"/>`;x+=q[0]*sc}});
+  g+=`<text x="${x+6}" y="${y+17}" class="t">${s.w}W ${z}B ${s.l}L</text>`});return g+'</svg>'}
+function cols(vals){const W=600,H=260,l=50,b=30,t=15,mx=Math.max(1,...vals),step=(W-l-10)/vals.length,bw=Math.min(50,step*.7);
+ let g=`<svg viewBox="0 0 ${W} ${H}" width="100%"><line x1="${l}" x2="${W-10}" y1="${H-b}" y2="${H-b}" stroke="var(--bd)"/>`;
+ vals.forEach((v,i)=>{const h=(H-b-t-15)*v/mx,x=l+step*i+(step-bw)/2;g+=`<rect x="${x}" y="${H-b-h}" width="${bw}" height="${h}" rx="3" fill="var(--ac)"/><text x="${x+bw/2}" y="${H-b-h-5}" text-anchor="middle" class="t" style="font-size:11px">${f(v)}</text><text x="${x+bw/2}" y="${H-b+16}" text-anchor="middle" class="t" style="font-size:11px">${PERIOD.idx[i]+1}</text>`});return g+'</svg>'}
+function series(){const st=stats(),n=sessions.length;let lastS=sessions[n-1];if(lastS)sessions.forEach(x=>{if(x.date&&(!lastS.date||x.date>=lastS.date))lastS=x});return{avg:st.map(s=>({p:s.p,v:Math.round(s.avg)})).sort((a,b)=>b.v-a.v),wrI:[...st].sort((a,b)=>wp(b)-wp(a)).map(s=>({p:s.p,v:Math.round(wp(s))})),lastS,latestI:lastS?players.filter(p=>num(lastS.v[p])).map(p=>({p,v:lastS.v[p]})).sort((a,b)=>b.v-a.v):[],turn:sessions.map(s=>players.reduce((a,p)=>a+Math.max(0,s.v[p]||0),0))}}
+const PAL=['#0f766e','#2563eb','#d97706','#7c3aed','#db2777','#65a30d','#dc2626','#0891b2','#ca8a04','#9333ea'],col=p=>PAL[(ALLP.length?ALLP:players).indexOf(p)%PAL.length],wp=s=>s.n?100*s.w/s.n:0;
+function rng(st){const lo=Math.min(0,...st.map(s=>s.t)),hi=Math.max(0,...st.map(s=>s.t)),p=(hi-lo||1)*.08;return[lo-p,hi+p]}
+const split=st=>[st.filter(s=>s.t>0).map(s=>({p:s.p,v:s.t})),st.filter(s=>s.t<0).map(s=>({p:s.p,v:-s.t}))];
+function pie(items,title,hole){const T=items.reduce((a,b)=>a+b.v,0);let g='',a=-Math.PI/2;
+ items.forEach(it=>{const th=it.v/T*2*Math.PI,P=k=>[80+70*Math.cos(k),80+70*Math.sin(k)],[x1,y1]=P(a),[x2,y2]=P(a+th);
+  g+=items.length==1?`<circle cx="80" cy="80" r="70" fill="${it.c||col(it.p)}"/>`:`<path d="M80 80L${x1} ${y1}A70 70 0 ${th>Math.PI?1:0} 1 ${x2} ${y2}Z" fill="${it.c||col(it.p)}" stroke="var(--card)" stroke-width="1.5"/>`;a+=th});
+ return`<div class="card"><b>${title}</b>`+(T?`<div class="pw"><svg viewBox="0 0 160 160" width="150" height="150">${g}${hole?`<circle cx="80" cy="80" r="42" fill="var(--card)"/><text x="80" y="87" text-anchor="middle" class="t" style="font-size:20px;font-weight:700">${T}</text>`:''}</svg><div>`+items.map(it=>`<div class="lg"><i style="background:${it.c||col(it.p)}"></i>${E(it.p)} <b>${Math.round(100*it.v/T)}%</b> <span class="mut">${f(it.v)}</span></div>`).join('')+'</div></div>':'<p class="mut">None</p>')+'</div>'}
+function scatter(st){const W=600,H=320,l=60,r=20,t=15,b=40,[lo,hi]=rng(st),X=v=>l+v/100*(W-l-r),Y=v=>t+(hi-v)/(hi-lo)*(H-t-b);
+ let g=`<svg viewBox="0 0 ${W} ${H}" width="100%"><rect x="${l}" y="${t}" width="${W-l-r}" height="${H-t-b}" fill="none" stroke="var(--bd)"/>`;
+ [0,25,50,75,100].forEach(v=>g+=`<text x="${X(v)}" y="${H-b+16}" text-anchor="middle" class="t" style="font-size:11px">${v}%</text>`);
+ for(let i=0;i<5;i++){const v=lo+(hi-lo)*i/4;g+=`<text x="${l-6}" y="${Y(v)+4}" text-anchor="end" class="t" style="font-size:11px">${f(Math.round(v))}</text>`}
+ g+=`<line x1="${l}" x2="${W-r}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--mut)" stroke-dasharray="4 3"/><text x="${(l+W-r)/2}" y="${H-4}" text-anchor="middle" class="t">Win %</text><text transform="translate(12 ${H/2}) rotate(-90)" text-anchor="middle" class="t">Total balance</text>`;
+ st.forEach(s=>{const x=X(wp(s)),y=Y(s.t),rad=4+s.n*1.2,left=x>W-110;g+=`<circle cx="${x}" cy="${y}" r="${rad}" fill="${col(s.p)}" fill-opacity=".8"/><text x="${left?x-rad-4:x+rad+4}" y="${y+4}" text-anchor="${left?'end':'start'}" class="t" style="font-size:12px">${E(s.p)}</text>`});
+ return g+'</svg>'}
+const sh=(s,i)=>s.date?s.date.slice(2):(s.label||'S'+(i+1));
+function cum(){return players.map(p=>{let a=0;return{p,y:sessions.map(s=>a+=(s.v[p]||0))}})}
+function line(){const W=600,H=300,l=60,r=20,t=15,b=35,C=cum(),all=C.flatMap(c=>c.y).concat(0),n=sessions.length,lo0=Math.min(...all),hi0=Math.max(...all),pd=(hi0-lo0||1)*.08,lo=lo0-pd,hi=hi0+pd,
+ X=i=>l+(n>1?i/(n-1):.5)*(W-l-r),Y=v=>t+(hi-v)/(hi-lo)*(H-t-b);
+ let g=`<svg viewBox="0 0 ${W} ${H}" width="100%"><rect x="${l}" y="${t}" width="${W-l-r}" height="${H-t-b}" fill="none" stroke="var(--bd)"/>`;
+ for(let i=0;i<5;i++){const v=lo+(hi-lo)*i/4;g+=`<text x="${l-6}" y="${Y(v)+4}" text-anchor="end" class="t" style="font-size:11px">${f(Math.round(v))}</text>`}
+ sessions.forEach((s,i)=>{if(n<=14||i%2==0)g+=`<text x="${X(i)}" y="${H-b+16}" text-anchor="middle" class="t" style="font-size:11px">${PERIOD.idx[i]+1}</text>`});
+ g+=`<line x1="${l}" x2="${W-r}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--mut)" stroke-dasharray="4 3"/>`;
+ C.forEach(c=>{g+=`<polyline fill="none" stroke="${col(c.p)}" stroke-width="2.5" stroke-linejoin="round" points="${c.y.map((v,i)=>X(i)+','+Y(v)).join(' ')}"/><circle cx="${X(n-1)}" cy="${Y(c.y[n-1])}" r="4" fill="${col(c.p)}"/>`});
+ return g+'</svg><div class="pw">'+C.map(c=>`<div class="lg"><i style="background:${col(c.p)}"></i>${E(c.p)}</div>`).join('')+'</div><div class="mut">X-axis = session number, in History order</div>'}
+function heat(){const mx=Math.max(1,...sessions.flatMap(s=>players.map(p=>Math.abs(s.v[p]||0))));
+ return'<div class="sc"><table><thead><tr><th>Player</th>'+sessions.map((s,i)=>`<th style="text-align:center">${E(sh(s,i))}</th>`).join('')+'</tr></thead><tbody>'+players.map(p=>`<tr><td>${E(p)}</td>`+sessions.map(s=>{const v=s.v[p];if(!num(v))return'<td class="mut" style="text-align:center">–</td>';const a=.12+.7*Math.abs(v)/mx;return`<td style="text-align:center;background:${v>0?`rgba(21,128,61,${a})`:v<0?`rgba(220,38,38,${a})`:'transparent'}">${f(v)}</td>`}).join('')+'</tr>').join('')+'</tbody></table></div>'}
+const OPTS=[['kpi','Summary cards'],['bars','Balance bars'],['pieW','Winnings pie'],['pieL','Losses pie'],['table','Stats table'],['trends','Trend Comments'],['ai','Suggestions (tips)'],['loantbl','Current standing table']];
+let sel={kpi:1,bars:1,pieW:1,pieL:1,table:1,trends:1,ai:0,loantbl:1};
+function recs(){const vs=sessions.flatMap(s=>players.map(p=>s.v[p]).filter(num));return[{p:'Wins',v:vs.filter(x=>x>0).length,c:'#15803d'},{p:'Losses',v:vs.filter(x=>x<0).length,c:'#dc2626'},{p:'Break-even',v:vs.filter(x=>x===0).length,c:'#94a3b8'}].filter(i=>i.v)}
+function trends(){const sg=n=>(n>0?'+':'')+Math.round(n).toLocaleString(),av=a=>a.reduce((x,y)=>x+y,0)/a.length;
+ return stats().map(s=>{const v=sessions.map(x=>x.v[s.p]).filter(num),n=v.length;
+  if(n<2)return{p:s.p,n,last:n?v[0]:null,st:0,dir:0,w:'New',txt:n?`only 1 session so far (${sg(v[0])})`:'no sessions in this period'};
+  const k=Math.min(3,Math.floor(n/2)),ar=av(v.slice(-k)),ao=av(v.slice(0,n-k)),d=ar-ao,thr=.15*av(v.map(Math.abs)),dir=d>thr?1:d<-thr?-1:0,last=v[n-1];
+  let st=0;if(last!==0){st=1;while(st<n&&Math.sign(v[n-1-st])===Math.sign(last))st++}
+  return{p:s.p,n,k,ar,ao,last,st,dir,w:dir>0?'Improving':dir<0?'Slipping':'Steady',txt:`last ${k} avg ${sg(ar)} vs ${sg(ao)} before · latest ${sg(last)} (prev ${sg(v[n-2])})`+(st>=2?` · ${st}-${last>0?'win':'loss'} streak`:'')}})}
+const fmtN=n=>Math.round(n).toLocaleString();
+function ruleTips(){const T=trends(),o={};
+ stats().forEach(s=>{const t=T.find(x=>x.p==s.p)||{},v=sessions.map(x=>x.v[s.p]).filter(num),n=v.length,wr=wp(s);let m;
+  if(n<2)m='Play a few more sessions to build a trend. Start with steady, selective play.';
+  else{const lo=v.filter(x=>x<0),wi=v.filter(x=>x>0),aL=lo.length?Math.abs(lo.reduce((a,b)=>a+b,0)/lo.length):0,aW=wi.length?wi.reduce((a,b)=>a+b,0)/wi.length:0,last=v[n-1];
+   let st=0;if(last!==0){st=1;while(st<n&&Math.sign(v[n-1-st])===Math.sign(last))st++}
+   if(last<0&&st>=2)m='Losing streak: slow down, play tighter, and do not try to win it all back at once.';
+   else if(lo.length&&aL>aW*1.3)m=`Losses (avg ${fmtN(aL)}) outweigh wins (avg ${fmtN(aW)}): cut bad sessions short and protect your wins.`;
+   else if(s.t>0&&t.dir>=0)m='Good form: keep the same disciplined approach and stay focused after wins.';
+   else if(s.t>0)m='Still ahead overall but slipping lately: revisit what worked earlier and stay selective.';
+   else if(wr<35)m='Few wins so far: be more selective, wait for strong spots and aim for small, steady gains.';
+   else if(t.dir>0)m='Recent form is improving: stay consistent and build on what is working.';
+   else m='Close to break-even: steadier decisions and fewer big swings can tip it your way.'}
+  o[s.p]=m});return o}
+const tipLbl=p=>tipsAreAI()&&aiTips[p]?'AI tip':'Auto tip';
+function tipsAreAI(){if(!sel.ai)return false;const sig=trends().map(t=>t.p+t.txt).join('|');return aiKey===sig&&Object.keys(aiTips).length>0}
+function aiTipsNow(){if(!sel.ai)return null;return tipsAreAI()?Object.assign(ruleTips(),aiTips):ruleTips()}
+function normTips(r){const o={},add=(k,v)=>{if(typeof v=='string'&&k!=null)o[String(k).trim().toLowerCase()]=v};
+ if(Array.isArray(r))r.forEach(x=>x&&add(x.player||x.name,x.tip||x.suggestion));
+ else if(r&&typeof r=='object'){const vs=Object.values(r);if(vs.length==1&&vs[0]&&typeof vs[0]=='object')return normTips(vs[0]);Object.entries(r).forEach(e=>add(e[0],e[1]&&typeof e[1]=='object'?(e[1].tip||e[1].suggestion):e[1]))}
+ const res={};ALLP.forEach(p=>{const v=o[p.toLowerCase()];if(v)res[p]=v.slice(0,220)});return res}
+function trendHtml(){const tp=aiTipsNow(),T=trends();
+ const bar='';
+ return bar+T.map(t=>`<div style="padding:6px 0;border-bottom:1px solid var(--bd)"><b>${E(t.p)}</b> <b class="${t.dir>0?'pos':t.dir<0?'neg':'mut'}">${t.w}</b> <span class="mut">— ${E(t.txt)}</span>${tp&&tp[t.p]?`<div style="padding-top:3px;font-size:14px">${tipLbl(t.p)=='AI tip'?'💡':'📊'} ${tipLbl(t.p)}: ${E(tp[t.p])}</div>`:''}</div>`).join('')+(tp?`<div class="mut" style="padding-top:6px;font-size:12px">${tipsAreAI()?'AI-generated tips based only on these results, just for fun.':'Built-in tips based on these results.'}</div>`:'')}
+function dash0(){
+ const pick=`<div class="card"><b>Choose visualizations</b> <span class="mut">— applies to this view, the PDF and the image</span><div class="pw">${OPTS.map(o=>`<label class="chip"><input type="checkbox" data-v="${o[0]}" ${sel[o[0]]?'checked':''}> ${o[1]}</label>`).join('')}</div><div class="pw"><button data-all="1">Select all</button><button data-all="0">Clear</button></div></div>`;
+ if(!sessions.length||!players.length)return pick+'<p class="mut">Nothing to show yet. Check the period and the players shown.</p>';
+ const st=stats(),[win,loss]=split(st),c=(t,x)=>`<div class="card"><b>${t}</b>${x}</div>`;let h=pick;
+ if(sel.kpi)h+='<div class="kp">'+kpis().map(k=>`<div><small>${k[0]}</small><b>${E(k[1])}</b><small>${E(k[2])}</small></div>`).join('')+'</div>';
+ if(sel.bars)h+=c('Total balance by player',chart(st));
+ const ps=[sel.pieW&&pie(win,'Share of total winnings'),sel.pieL&&pie(loss,'Share of total losses')].filter(Boolean);
+ if(ps.length)h+='<div class="g2">'+ps.join('')+'</div>';
+ if(sel.table){const TR=Object.fromEntries(trends().map(t=>[t.p,t])),sg=n=>n==null?'–':(n>0?'+':'')+fmtN(n);
+  h+=`<div class="sc"><table><thead><tr><th>Player</th><th>Total</th><th>Played</th><th>Win %</th><th>Best</th><th>Worst</th><th>Avg<br><small class="mut" style="font-weight:400">${PERIOD.sh}</small></th><th>Avg win<br><small class="mut" style="font-weight:400">${PERIOD.sh}</small></th><th>Avg loss<br><small class="mut" style="font-weight:400">${PERIOD.sh}</small></th><th>Trend</th><th>Recent avg<br><small class="mut" style="font-weight:400">last ≤3 sess</small></th><th>Earlier avg<br><small class="mut" style="font-weight:400">rest of ${PERIOD.sh}</small></th><th>Latest</th><th>Streak</th></tr></thead><tbody>`+st.map(s=>{const t=TR[s.p]||{};return`<tr><td>${E(s.p)}</td><td class="${cls(s.t)}"><b>${f(s.t)}</b></td><td>${s.n}</td><td>${Math.round(wp(s))}%</td><td>${f(s.best)}</td><td>${f(s.worst)}</td><td>${f(Math.round(s.avg))}</td><td class="pos">${s.aw==null?'–':'+'+fmtN(s.aw)}</td><td class="neg">${s.al==null?'–':fmtN(s.al)}</td><td class="${t.dir>0?'pos':t.dir<0?'neg':'mut'}"><b>${t.w||''}</b></td><td>${t.k?sg(t.ar):'–'}</td><td>${t.k?sg(t.ao):'–'}</td><td>${sg(t.last)}</td><td>${t.st>=2?t.st+(t.last>0?' wins':' losses'):'–'}</td></tr>`}).join('')+'</tbody></table></div><div class="mut" style="font-size:12px;padding:4px 2px 10px">Period: '+E(PERIOD.txt)+'. Avg, Avg win and Avg loss cover that period (win / loss = average of the winning / losing sessions). Recent avg = average of the latest sessions (up to 3) compared with Earlier avg. Streak = current run of wins or losses.</div>'}
+ if(sel.trends||sel.ai)h+=c('Trend Comments',trendHtml());
+ if(sel.loantbl)h+='<p><b>Current standing</b> <span class="mut">(game in progress)</span></p>'+(gp().length?loantable(gp()):'<p class="mut">No game in progress.</p>')+'<div style="height:14px"></div>';
+ if(!Object.values(sel).some(Boolean))h+='<p class="mut">Select at least one visualization.</p>';
+ return h}
+let mode='all',pn=3;
+const ix=N=>{let a=Math.min(rf,N-1),b=rt<0?N-1:Math.min(rt,N-1);if(a>b)[a,b]=[b,a];return[Math.max(a,0),b]};
+function view(S){const N=S.length,all=[...S.keys()],k=Math.max(1,pn|0);
+ if(mode=='sess')return{idx:all.slice(-k),txt:`last ${k} session${k>1?'s':''}`,sh:`last ${Math.min(k,N)} sess`};
+ if(mode=='mon'){const ds=S.map(x=>x.date).filter(Boolean).sort();if(!ds.length)return{idx:[],txt:'no dated sessions',sh:'no dated sess'};
+  const end=ds[ds.length-1],e=new Date(end+'T00:00');e.setMonth(e.getMonth()-k);const from=e.toLocaleDateString('en-CA');
+  return{idx:all.filter(i=>S[i].date&&S[i].date>from&&S[i].date<=end),txt:`last ${k} month${k>1?'s':''}: ${from} to ${end}`,sh:`last ${k} mo`}}
+ if(mode=='custom'){const [a,b]=ix(N);return{idx:all.slice(a,b+1),txt:`sessions ${a+1}-${b+1}`,sh:`sess ${a+1}-${b+1}`}}
+ return{idx:all,txt:'all sessions',sh:'all sess'}}
+const gp=()=>game?game.players.filter(p=>!excl[p]):[];
+function withView(fn){const S=sessions,P=players,v=view(S);ALLP=P;sessions=v.idx.map(i=>S[i]);players=P.filter(p=>!excl[p]&&sessions.some(s=>num(s.v[p])));PERIOD={idx:v.idx,txt:v.txt,sh:v.sh,N:S.length};
+ try{return fn()}finally{sessions=S;players=P}}
+function dash(){let ui='';const N=sessions.length;
+ if(N){const v=view(sessions),[a,b]=ix(N),opt=x=>sessions.map((s,i)=>`<option value="${i}" ${i==x?'selected':''}>${i+1}. ${E(nm(s,i))}</option>`).join(''),
+  M=[['all','All sessions'],['sess','Last N sessions'],['mon','Last N months'],['custom','Custom range']],Q=[['sess',3,'Last 3 sessions'],['sess',6,'Last 6 sessions'],['sess',10,'Last 10'],['mon',1,'Last month'],['mon',3,'Last 3 months'],['mon',6,'Last 6 months'],['all',0,'All']];
+  ui=`<div class="card"><b>Analysis period</b> <span class="mut">— ${v.idx.length} of ${N} sessions · ${E(v.txt)}</span>
+  <div class="pw">${Q.map(q=>`<button data-q="${q[0]}:${q[1]}">${q[2]}</button>`).join('')}</div>
+  <div class="pw"><label>Show <select data-mode>${M.map(o=>`<option value="${o[0]}" ${mode==o[0]?'selected':''}>${o[1]}</option>`).join('')}</select></label>
+  ${mode=='sess'||mode=='mon'?`<label>N <input type="number" min="1" max="99" value="${pn}" data-pn style="width:70px"></label>`:''}
+  ${mode=='custom'?`<label>From <select data-rf>${opt(a)}</select></label><label>To <select data-rt>${opt(b)}</select></label>`:''}</div>
+  ${mode=='mon'?'<div class="mut">Counted back from the most recent dated session; undated sessions are skipped.</div>':''}</div>`}
+ if(players.length)ui+=`<div class="card"><b>Players shown</b> <span class="mut">— untick to exclude from the dashboard and exports</span><div class="pw">${players.map(p=>`<label class="chip"><input type="checkbox" data-x="${E(p)}" ${excl[p]?'':'checked'}> ${E(p)}</label>`).join('')}</div>${Object.keys(excl).length?'<div class="pw"><button data-xall="1">Include everyone</button></div>':''}</div>`;
+ return ui+withView(dash0)}
+function drawDash(d){withView(()=>{if(!sessions.length||!players.length){d.setFontSize(12).setTextColor(110).text('Nothing to show for this period / player selection',10,20);return}drawDash0(d)})}
+// ---- import / export ----
+function readLoans(ws,openOnly){const out=[];XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null}).slice(1).forEach(r=>{
+ const d=num(r[0])?ser2iso(r[0]):(typeof r[0]=='string'?r[0].slice(0,10):''),a=Number(r[2]),w=typeof r[1]=='string'?r[1].trim():'',sr=typeof r[3]=='string'?r[3].trim():'';
+ if(!(w&&a!==0&&isFinite(a)&&d))return;const open=/^open/i.test(String(r[5]||''));if(openOnly&&!open)return;
+ out.push({date:d,who:w,amt:a,src:sr&&!/^bank$/i.test(sr)?sr:null,g:num(r[4])?ser2iso(r[4]):'',done:!open})});return out}
+function sessionBuf(){const P=game.players,lr=loanRows(P),op=loans.filter(l=>!l.done),L=XLSX.utils.encode_col;
+ const sw=XLSX.utils.aoa_to_sheet([['Player','Initial loan','From bank','Borrowed from players','Lent to players','Current standing'],...lr.map(r=>[r.p,ng(r.init),ng(r.bank),ng(r.bor),r.len,ng(r.cur)])]);
+ lr.forEach((r,i)=>{sw['F'+(i+2)].f=`B${i+2}+C${i+2}+D${i+2}+E${i+2}`});sw['!cols']=[{wch:16},{wch:12},{wch:12},{wch:20},{wch:16},{wch:16}];
+ const lw=XLSX.utils.aoa_to_sheet([['Date','Borrower','Amount (+ borrowed / - repaid)','From (Bank or player)','Game','Status'],...op.map(l=>[iso2ser(l.date),l.who,l.amt,l.src||'Bank',iso2ser(l.g||game.date),'Open'])]);
+ op.forEach((l,i)=>{['A','E'].forEach(c=>{const x=lw[c+(i+2)];if(x)x.z='dd-mmm-yyyy'})});lw['!cols']=[{wch:13},{wch:16},{wch:10},{wch:22},{wch:13},{wch:10}];
+ const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,sw,'Current Standing');XLSX.utils.book_append_sheet(wb,lw,'Loans');
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['File type','Current session'],['Game in progress',game.date,P.join(',')],['Initial loan',initLoan]]),'Info');
+ return XLSX.write(wb,{type:'array',bookType:'xlsx'})}
+async function loadSessionFile(file){
+ const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}),ir=wb.Sheets.Info?XLSX.utils.sheet_to_json(wb.Sheets.Info,{header:1}):[],gr=ir.find(r=>/^game in progress/i.test(String(r[0])));
+ if(!gr||!gr[1]||typeof gr[2]!='string')return toast('No game in progress found in that file');
+ if(game&&!confirm('Replace the game in progress with the one in this file?'))return;
+ const il=ir.find(r=>/^initial loan/i.test(String(r[0]))),gp=gr[2].split(',').map(x=>x.trim()).filter(Boolean);
+ if(il&&num(il[1])&&il[1]>=0)initLoan=il[1];gp.forEach(q=>{if(!players.includes(q))players.push(q)});
+ const op=wb.Sheets.Loans?readLoans(wb.Sheets.Loans,true):[];loans=loans.filter(l=>l.done).concat(op);
+ game={date:String(gr[1]).slice(0,10),players:gp};gc=false;finals={};loanDraft={};ld=game.date;tab='loans';render();toast(`Session of ${game.date} loaded: ${gp.length} players, ${op.length} loan entries`)}
+async function importXlsx(file){
+ const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}),rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:true,defval:null}),head=rows[0]||[],cols=[];
+ if(wb.Sheets.Info&&XLSX.utils.sheet_to_json(wb.Sheets.Info,{header:1}).some(r=>/^file type/i.test(String(r[0]))&&/current session/i.test(String(r[1]))))return toast('That is a saved session file. Use “Load existing session” on the New session tab.');
+ head.forEach((h,i)=>{if(i&&h!=null&&!/^total$/i.test(String(h).trim()))cols.push(i)});
+ sessions=cols.map(i=>{const h=head[i],d=num(h)&&h>20000?ser2iso(h):'';return{date:d,label:d?'':String(h),v:{}}});players=[];
+ rows.slice(1).forEach(r=>{const n=typeof r[0]==='string'?r[0].trim():'';if(!n||/^(positive|total)/i.test(n))return;players.push(n);cols.forEach((c,j)=>{if(num(r[c]))sessions[j].v[n]=r[c]})});
+ const ir=wb.Sheets.Info?XLSX.utils.sheet_to_json(wb.Sheets.Info,{header:1}):[],info=ir[0],ds=sessions.filter(x=>x.date),desc=info?/newest/i.test(String(info[1])):(ds.length>1&&ds[0].date>ds[ds.length-1].date);
+ if(desc)sessions.reverse();if(info)hsort=desc?'desc':'asc';
+ loans=[];loanDraft={};excl={};initLoan=500;const il=ir.find(r=>/^initial loan/i.test(String(r[0])));if(il&&num(il[1])&&il[1]>=0)initLoan=il[1];
+ if(wb.Sheets.Loans)XLSX.utils.sheet_to_json(wb.Sheets.Loans,{header:1,raw:true,defval:null}).slice(1).forEach(r=>{const d=num(r[0])?ser2iso(r[0]):(typeof r[0]=='string'?r[0].slice(0,10):''),a=Number(r[2]),w=typeof r[1]=='string'?r[1].trim():'',sr=typeof r[3]=='string'?r[3].trim():'';
+  if(w&&a!==0&&isFinite(a)&&d)loans.push({date:d,who:w,amt:a,src:sr&&!/^bank$/i.test(sr)?sr:null,g:num(r[4])?ser2iso(r[4]):'',done:!/^open/i.test(String(r[5]||''))})});
+ game=null;gc=false;finals={};plays={};const gr=ir.find(r=>/^game in progress/i.test(String(r[0])));
+ if(gr&&gr[1]&&typeof gr[2]=='string'){const gp=gr[2].split(',').map(x=>x.trim()).filter(x=>players.includes(x));if(gp.length)game={date:String(gr[1]).slice(0,10),players:gp}}
+ sortS();draft={};rf=0;rt=-1;mode='all';tab='hist';render();toast(`Loaded ${sessions.length} sessions, ${players.length} players`)}
+function xlsxBuf(){
+ const si=sOrd(sessions.map((_,i)=>i)),ps=pOrd(players),n=si.length,R=ps.length,L=XLSX.utils.encode_col;
+ const rows=[['Player',...si.map(i=>{const s=sessions[i];return s.date?iso2ser(s.date):(s.label||'Session '+(i+1))}),'Total'],
+  ...ps.map(p=>[p,...si.map(i=>num(sessions[i].v[p])?sessions[i].v[p]:null),tot(p)]),
+  ['Positive = winning balance; Negative = losing balance',...si.map(i=>net(sessions[i])),players.reduce((a,p)=>a+tot(p),0)]];
+ const ws=XLSX.utils.aoa_to_sheet(rows);
+ ps.forEach((p,i)=>{ws[L(n+1)+(i+2)].f=`SUM(B${i+2}:${L(n)}${i+2})`});
+ for(let j=1;j<=n+1;j++)ws[L(j)+(R+2)].f=`SUM(${L(j)}2:${L(j)}${R+1})`;
+ for(let r=0;r<R+2;r++)for(let c=1;c<=n+1;c++){const x=ws[L(c)+(r+1)];if(!x)continue;x.z=r==0?'dd-mmm-yyyy':'#,##0_);[Red](#,##0)'}
+ ws['!cols']=[{wch:34},...si.map(()=>({wch:13})),{wch:12}];
+ const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Summary');
+ const lr=loanRows(game?game.players:[]),sw=XLSX.utils.aoa_to_sheet([['Player','Initial loan','From bank','Borrowed from players','Lent to players','Current standing'],...lr.map(r=>[r.p,ng(r.init),ng(r.bank),ng(r.bor),r.len,ng(r.cur)])]);
+ lr.forEach((r,i)=>{sw['F'+(i+2)].f=`B${i+2}+C${i+2}+D${i+2}+E${i+2}`});sw['!cols']=[{wch:16},{wch:12},{wch:12},{wch:20},{wch:16},{wch:14}];XLSX.utils.book_append_sheet(wb,sw,'Current Standing');
+ const lw=XLSX.utils.aoa_to_sheet([['Date','Borrower','Amount (+ borrowed / - repaid)','From (Bank or player)','Game','Status'],...loans.map(l=>[iso2ser(l.date),l.who,l.amt,l.src||'Bank',l.g?iso2ser(l.g):null,l.done?'Settled':'Open'])]);
+ loans.forEach((l,i)=>{const c=lw['A'+(i+2)];if(c)c.z='dd-mmm-yyyy';const e=lw['E'+(i+2)];if(e)e.z='dd-mmm-yyyy'});lw['!cols']=[{wch:13},{wch:16},{wch:10},{wch:22},{wch:13},{wch:10}];XLSX.utils.book_append_sheet(wb,lw,'Loans');
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Column order',hsort=='desc'?'newest first':'oldest first'],['Initial loan',initLoan],...(game?[['Game in progress',game.date,game.players.join(',')]]:[])]),'Info');
+ return XLSX.write(wb,{type:'array',bookType:'xlsx'})}
+function pdfPie(d,items,cx,cy,r,x,y,sp){const T=items.reduce((a,b)=>a+b.v,0);if(!T){d.setFontSize(8).setTextColor(110).text('None',cx,cy,{align:'center'});return}
+ const cc=it=>it.c||col(it.p);let a=-Math.PI/2;items.forEach(it=>{const th=it.v/T*2*Math.PI,n=Math.max(2,Math.ceil(th/.05));d.setFillColor(cc(it));d.setDrawColor(cc(it));
+  for(let k=0;k<n;k++){const s=a+th*k/n,e=a+th*(k+1)/n;d.triangle(cx,cy,cx+r*Math.cos(s),cy+r*Math.sin(s),cx+r*Math.cos(e),cy+r*Math.sin(e),'FD')}a+=th});
+ items.forEach((it,i)=>{d.setFillColor(cc(it)).rect(x,y+i*sp-2.4,2.6,2.6,'F');d.setFontSize(Math.min(7,sp*2.1)).setTextColor(40).text(`${it.p} ${Math.round(100*it.v/T)}%`,x+4,y+i*sp)})}
+const TT={trends:'Trend Comments',loans:'Current standing',loantbl:'Current standing (table)',sum:'Summary table',avg:'Average per session played',wr:'Win rate ranking',rec:'Win / loss record',latest:'Latest session',turn:'Money moved per session',bars:'Total balance by player',pieW:'Share of winnings',pieL:'Share of losses',donut:'Overall results',scatter:'Win % vs total balance',line:'Cumulative balance by session',heat:'Session-by-session results',table:'Player stats'};
+function drawDash0(d){
+ const st=stats(),k=kpis(),ds=sessions.map(s=>s.date).filter(Boolean).sort(),[win,loss]=split(st),[lo,hi]=rng(st),C=cum(),n=sessions.length,rc=recs();
+ const sr=series(),per=PERIOD.N>n?` of ${PERIOD.N} (${PERIOD.txt})`:'';
+ const T=(t,x,y)=>{d.setFont('helvetica','bold').setFontSize(9).setTextColor(20).text(t,x,y);d.setFont('helvetica','normal')};
+ const box=(x,y,w,h)=>d.setDrawColor(215).setLineWidth(.3).roundedRect(x,y,w,h,2,2);
+ const axes=(X0,X1,Y0,Y1,l,h,xt)=>{d.setDrawColor(210).setLineWidth(.2).rect(X0,Y0,X1-X0,Y1-Y0);d.setFontSize(6).setTextColor(110);
+  for(let i=0;i<4;i++){const v=l+(h-l)*i/3;d.text(Math.round(v).toLocaleString(),X0-1,Y1-(v-l)/(h-l)*(Y1-Y0)+1,{align:'right'})}
+  xt.forEach(q=>d.text(q[0],X0+q[1]*(X1-X0),Y1+4,{align:'center'}));const zy=Y1-(0-l)/(h-l)*(Y1-Y0);d.setDrawColor(130).line(X0,zy,X1,zy)};
+ const pp=(items,x,y,w,h,hole)=>{const r=Math.min(h/2,w*.38,40),cx=x+r+1,cy=y+h/2,sp=Math.min(4.5,h/Math.max(1,items.length));
+  pdfPie(d,items,cx,cy,r,x+2*r+5,y+Math.max(0,(h-items.length*sp)/2)+3,sp);
+  if(hole&&items.length){d.setFillColor(255,255,255).circle(cx,cy,r*.55,'F');d.setFontSize(9).setTextColor(20).text(String(items.reduce((a,b)=>a+b.v,0)),cx,cy+1.5,{align:'center'})}};
+ const hb=(x,y,w,h,it,fm,clr)=>{fm=fm||(v=>v.toLocaleString());const neg=it.some(i=>i.v<0),nw=Math.min(22,w*.3),vw=16,iw=w-nw-vw,cx=neg?x+nw+iw/2:x+nw,mx=Math.max(1,...it.map(i=>Math.abs(i.v))),sc=(neg?iw/2-1:iw-1)/mx,rh=Math.min(9,h/Math.max(1,it.length)),fs=Math.min(9,rh*2);
+  it.forEach((s,i)=>{const yy=y+i*rh,bw=Math.abs(s.v)*sc,p=s.v>=0;d.setFontSize(fs).setTextColor(40).text(s.p,x,yy+rh*.7);d.setFillColor(...(clr||(p?[21,128,61]:[220,38,38]))).rect(p?cx:cx-bw,yy+rh*.15,Math.max(bw,.3),rh*.65,'F');d.text(fm(s.v),x+w,yy+rh*.7,{align:'right'})});
+  d.setDrawColor(170).line(cx,y-1,cx,y+it.length*rh)};
+ const DR={
+  sum(x,y,w,h){const si=sOrd(sessions.map((_,i)=>i)),ps=pOrd(players),rows=ps.length+2,cw=w/(n+2),sz=Math.max(3.8,Math.min(7,(h/rows-1.2)/(.3528*1.15),cw/(6*.19)));
+   const body=ps.map(p=>[p,...si.map(i=>{const v=sessions[i].v[p];return num(v)?v.toLocaleString():'-'}),tot(p).toLocaleString()]);
+   body.push(['Net',...si.map(i=>net(sessions[i]).toLocaleString()),players.reduce((a,p)=>a+tot(p),0).toLocaleString()]);
+   d.autoTable({startY:y,margin:{left:x,right:297-x-w},head:[['Player',...si.map(i=>sh(sessions[i],i)),'Total']],body,headStyles:{fillColor:[15,118,110],halign:'center'},styles:{fontSize:sz,cellPadding:.6,halign:'center'},columnStyles:{0:{halign:'left'}},
+    didParseCell:q=>{if(q.section!='body')return;const j=q.column.index,r=q.row.index;if(r==body.length-1){q.cell.styles.fontStyle='bold';return}if(j==0)return;
+     const raw=j==n+1?tot(ps[r]):sessions[si[j-1]].v[ps[r]];if(num(raw))q.cell.styles.textColor=raw<0?[220,38,38]:raw>0?[21,128,61]:[40,40,40];if(j==n+1)q.cell.styles.fontStyle='bold'}})},
+  loans(x,y,w,h){if(!game){d.setFontSize(8).setTextColor(110).text('No game in progress',x,y+4);return}hb(x,y,w,h,loanRows(game.players).map(r=>({p:r.p,v:ng(r.cur)})))},
+  loantbl(x,y,w,h){if(!gp().length){d.setFontSize(8).setTextColor(110).text('No game in progress',x,y+4);return}
+   const r=loanRows(gp()).map(z=>({p:z.p,i:ng(z.init),b:ng(z.bank),n:ng(z.bor-z.len),c:ng(z.cur)})),sg=m=>(m>0?'+':'')+m.toLocaleString(),S=k=>r.reduce((a,z)=>a+z[k],0),sz=Math.max(4,Math.min(7,(h/(r.length+2)-1.4)/(.3528*1.15)));
+   const body=r.map(z=>[z.p,sg(z.i),sg(z.b),sg(z.n),sg(z.c)]);body.push(['Total',sg(S('i')),sg(S('b')),sg(S('n')),sg(S('c'))]);
+   d.autoTable({startY:y,margin:{left:x,right:297-x-w},head:[['Player','Initial','From bank','From/to players','Current standing']],body,headStyles:{fillColor:[217,119,6]},styles:{fontSize:sz,cellPadding:.7},columnStyles:{4:{fontStyle:'bold'}},
+    didParseCell:q=>{if(q.section!='body')return;const i=q.row.index;if(i==body.length-1){q.cell.styles.fontStyle='bold';return}const j=q.column.index;if(j>0){const v=[0,r[i].i,r[i].b,r[i].n,r[i].c][j];q.cell.styles.textColor=v<0?[220,38,38]:v>0?[21,128,61]:[40,40,40]}}})},
+  trends(x,y,w,h){const T2=trends(),tp=aiTipsNow(),rh=Math.min(tp?7:8,h/Math.max(1,T2.length)),nw=Math.min(22,w*.2),c1=(w-nw)*.45;
+   T2.forEach((t,i)=>{const yy=y+i*rh+rh*.7,l1=t.w+': '+t.txt,fs=Math.max(3.5,Math.min(7,rh*2,(tp?c1:w-nw)/(l1.length*.19)));
+    d.setFontSize(Math.min(7,rh*2)).setTextColor(40).text(t.p,x,yy,{maxWidth:nw-1});d.setFontSize(fs).setTextColor(...(t.dir>0?[21,128,61]:t.dir<0?[220,38,38]:[110,110,110])).text(l1,x+nw,yy);
+    if(tp&&tp[t.p]){const l2=tipLbl(t.p)+': '+tp[t.p],c2=w-nw-c1-2,f2=Math.max(3.2,Math.min(6.5,rh*1.8,c2/(l2.length*.19)));d.setFontSize(f2).setTextColor(70).text(l2,x+nw+c1+2,yy)}})},
+  avg(x,y,w,h){hb(x,y,w,h,sr.avg)},wr(x,y,w,h){hb(x,y,w,h,sr.wrI,v=>v+'%',[15,118,110])},latest(x,y,w,h){hb(x,y,w,h,sr.latestI)},
+  rec(x,y,w,h){const nw=Math.min(22,w*.3),iw=w-nw-24,mx=Math.max(1,...st.map(s=>s.n)),sc=iw/mx,rh=Math.min(9,h/st.length),fs=Math.min(9,rh*2);
+   st.forEach((s,i)=>{const yy=y+i*rh,z=s.n-s.w-s.l;let xx=x+nw;d.setFontSize(fs).setTextColor(40).text(s.p,x,yy+rh*.7);
+    [[s.w,[21,128,61]],[z,[148,163,184]],[s.l,[220,38,38]]].forEach(q=>{if(q[0]){d.setFillColor(...q[1]).rect(xx,yy+rh*.15,q[0]*sc,rh*.65,'F');xx+=q[0]*sc}});
+    d.setTextColor(40).text(`${s.w}W ${z}B ${s.l}L`,x+w,yy+rh*.7,{align:'right'})})},
+  turn(x,y,w,h){const vals=sr.turn,mx=Math.max(1,...vals),step=(w-8)/n,bw=Math.min(14,step*.7),H=h-8;d.setDrawColor(190).line(x+6,y+H,x+w,y+H);
+   vals.forEach((v,i)=>{const bh=(H-6)*v/mx,xx=x+8+step*i+(step-bw)/2;d.setFillColor(15,118,110).rect(xx,y+H-bh,bw,bh,'F');d.setFontSize(Math.min(6,step*1.6)).setTextColor(40).text(v.toLocaleString(),xx+bw/2,y+H-bh-1,{align:'center'});d.setTextColor(110).text(String(PERIOD.idx[i]+1),xx+bw/2,y+H+4,{align:'center'})})},
+  bars(x,y,w,h){hb(x,y,w,h,st.map(s=>({p:s.p,v:s.t})))},
+  bars_old(x,y,w,h){const nw=Math.min(22,w*.3),vw=14,iw=w-nw-vw,cx=x+nw+iw/2,mx=Math.max(1,...st.map(s=>Math.abs(s.t))),sc=(iw/2-1)/mx,rh=Math.min(9,h/st.length),fs=Math.min(9,rh*2);
+   st.forEach((s,i)=>{const yy=y+i*rh,bw=Math.abs(s.t)*sc,p=s.t>=0;d.setFontSize(fs).setTextColor(40).text(s.p,x,yy+rh*.7);
+    d.setFillColor(...(p?[21,128,61]:[220,38,38])).rect(p?cx:cx-bw,yy+rh*.15,Math.max(bw,.3),rh*.65,'F');d.text(s.t.toLocaleString(),x+w,yy+rh*.7,{align:'right'})});
+   d.setDrawColor(170).line(cx,y-1,cx,y+st.length*rh)},
+  pieW(x,y,w,h){pp(win,x,y,w,h)},pieL(x,y,w,h){pp(loss,x,y,w,h)},donut(x,y,w,h){pp(rc,x,y,w,h,1)},
+  line(x,y,w,h){const all=C.flatMap(c=>c.y).concat(0),l0=Math.min(...all),h0=Math.max(...all),pd=(h0-l0||1)*.08,cl=l0-pd,ch=h0+pd,X0=x+10,X1=x+w,Y0=y,Y1=y+h-8,
+   px=i=>X0+(n>1?i/(n-1):.5)*(X1-X0),py=v=>Y1-(v-cl)/(ch-cl)*(Y1-Y0),xt=[];
+   sessions.forEach((s,i)=>{if(n<=8||i%Math.ceil(n/8)==0)xt.push([String(PERIOD.idx[i]+1),n>1?i/(n-1):.5])});axes(X0,X1,Y0,Y1,cl,ch,xt);
+   C.forEach(c=>{d.setDrawColor(col(c.p)).setFillColor(col(c.p)).setLineWidth(.5);c.y.forEach((v,i)=>{if(i)d.line(px(i-1),py(c.y[i-1]),px(i),py(v))});d.circle(px(n-1),py(c.y[n-1]),.9,'F')});
+   d.setFontSize(6).setTextColor(110).text('session #',(X0+X1)/2,Y1+8,{align:'center'})},
+  scatter(x,y,w,h){const X0=x+10,X1=x+w,Y0=y,Y1=y+h-8,py=v=>Y1-(v-lo)/(hi-lo)*(Y1-Y0),px=v=>X0+v/100*(X1-X0);axes(X0,X1,Y0,Y1,lo,hi,[['0%',0],['50%',.5],['100%',1]]);
+   st.forEach(s=>{const xx=px(wp(s)),yy=py(s.t),rad=1+s.n*.3,lf=xx>X1-20;d.setFillColor(col(s.p)).circle(xx,yy,rad,'F');d.setFontSize(6).setTextColor(40).text(s.p,lf?xx-rad-.8:xx+rad+.8,yy+.8,{align:lf?'right':'left'})});
+   d.setFontSize(6).setTextColor(110).text('bubble = sessions played',(X0+X1)/2,Y1+8,{align:'center'})},
+  heat(x,y,w,h){const nw=Math.min(20,w*.22),cw=(w-nw)/n,rh=Math.min(6,h/(players.length+1)),ml=Math.max(...sessions.flatMap(s=>players.map(p=>f(s.v[p]).length)),4),fs=Math.max(3.5,Math.min(6.5,rh*2.2,cw/(ml*.19))),mx=Math.max(1,...sessions.flatMap(s=>players.map(p=>Math.abs(s.v[p]||0))));
+   sessions.forEach((s,j)=>d.setFontSize(fs).setTextColor(110).text(sh(s,j),x+nw+cw*(j+.5),y+rh*.7,{align:'center',maxWidth:cw}));
+   players.forEach((p,i)=>{const yy=y+(i+1)*rh;d.setFontSize(fs).setTextColor(40).text(p,x,yy+rh*.7,{maxWidth:nw-1});
+    sessions.forEach((s,j)=>{const v=s.v[p],xx=x+nw+j*cw;if(!num(v)){d.setTextColor(150).text('-',xx+cw/2,yy+rh*.7,{align:'center'});return}
+     if(v){const a=.12+.7*Math.abs(v)/mx;d.setFillColor(...[v>0?[21,128,61]:[220,38,38]][0].map(q=>Math.round(255-(255-q)*a))).rect(xx+.2,yy+.2,cw-.4,rh-.4,'F')}
+     d.setTextColor(30).text(v.toLocaleString(),xx+cw/2,yy+rh*.7,{align:'center'})})})},
+  table(x,y,w,h){const sz=Math.max(4,Math.min(7,(h/(players.length+1)-1.4)/(.3528*1.15))),TR=Object.fromEntries(trends().map(t=>[t.p,t])),sg=m=>m==null?'-':(m>0?'+':'')+fmtN(m);
+   d.autoTable({startY:y,margin:{left:x,right:297-x-w},head:[['#','Player','Total','Sessions','Win %','Best','Worst','Avg ('+PERIOD.sh+')','Avg win ('+PERIOD.sh+')','Avg loss ('+PERIOD.sh+')','Trend','Recent avg (last ≤3 sess)','Earlier avg (rest of '+PERIOD.sh+')','Latest','Streak']],
+    body:st.map((s,i)=>{const t=TR[s.p]||{};return[i+1,s.p,s.t.toLocaleString(),s.n,Math.round(wp(s))+'%',s.best.toLocaleString(),s.worst.toLocaleString(),Math.round(s.avg).toLocaleString(),s.aw==null?'-':'+'+fmtN(s.aw),s.al==null?'-':fmtN(s.al),t.w||'',t.k?sg(t.ar):'-',t.k?sg(t.ao):'-',sg(t.last),t.st>=2?t.st+(t.last>0?' wins':' losses'):'-']}),
+    headStyles:{fillColor:[15,118,110]},styles:{fontSize:sz,cellPadding:.7},columnStyles:{2:{fontStyle:'bold'},10:{fontStyle:'bold'}},
+    didParseCell:q=>{if(q.section!='body')return;const i=q.row.index,j=q.column.index;if(j==2)q.cell.styles.textColor=st[i].t<0?[220,38,38]:[21,128,61];if(j==8)q.cell.styles.textColor=[21,128,61];if(j==9)q.cell.styles.textColor=[220,38,38];if(j==10){const t=TR[st[i].p]||{};q.cell.styles.textColor=t.dir>0?[21,128,61]:t.dir<0?[220,38,38]:[110,110,110]}}})}};
+ d.setFont('helvetica','bold').setFontSize(16).setTextColor(20).text('Session Dashboard',10,13);d.setFont('helvetica','normal');
+ d.setFontSize(9).setTextColor(110).text(`${n} sessions${per} · ${players.length} players${Object.keys(excl).filter(q=>ALLP.includes(q)).length?` (${Object.keys(excl).filter(q=>ALLP.includes(q)).length} excluded)`:''}`+(ds.length?` · ${ds[0]} to ${ds[ds.length-1]}`:''),287,13,{align:'right'});
+ let top=20;const others=['bars','pieW','pieL','table','trends','loantbl'].filter(q=>(sel[q]||(q=='trends'&&sel.ai))&&!(q=='loantbl'&&!gp().length)).length>0;
+ if(sel.kpi&&others){top=31;const fit=(t,w,m)=>Math.max(4,Math.min(m,w/(String(t).length*.19)));
+  k.forEach((c,i)=>{const x=10+i*70.3,lab=c[0]=='Best single session'?'Best session':c[0],val=String(c[1])+(c[2]?(i==0?' · ':' ')+c[2]:''),lw=lab.length*1.25+3;
+   box(x,18,66,9);d.setFontSize(6.5).setTextColor(110).text(lab,x+3,23.6);d.setFontSize(fit(val,62-lw,8.5)).setTextColor(20).text(val,x+3+lw,23.8)})}
+ if(sel.kpi&&!others){top=42;k.forEach((c,i)=>{const x=10+i*70.3;box(x,18,66,20);d.setFontSize(7).setTextColor(110).text(c[0],x+3,23);d.setFontSize(12).setTextColor(20).text(String(c[1]),x+3,30,{maxWidth:60});d.setFontSize(7).setTextColor(110).text(String(c[2]),x+3,35,{maxWidth:60})})}
+ let keys=['bars','pieW','pieL','table','trends','loantbl'].filter(q=>(sel[q]||(q=='trends'&&sel.ai))&&!(q=='loantbl'&&!gp().length));const tipsOn=aiTipsNow(),g=4,wideKeys=['table'].concat(tipsOn?['trends']:[]).filter(q=>keys.includes(q));keys=keys.filter(q=>!wideKeys.includes(q));
+ const N=keys.length,Hall=200-top,np=Math.max(1,players.length),want=wideKeys.map(q=>q=='table'?Math.max(34,(np+1)*4.6+13):Math.max(40,np*5.6+16)),wsum=want.reduce((a,b)=>a+b,0)+g*wideKeys.length,room=N?Hall-72:Hall+g,sc=wsum>room?room/wsum:1,hw=want.map(v=>v*sc),H=N?Hall-hw.reduce((a,b)=>a+b,0)-g*wideKeys.length:0;
+ if(N){let best=1,bs=9;for(let c=1;c<=4;c++){const r=Math.ceil(N/c),q=Math.abs(Math.log(((277-g*(c-1))/c)/((H-g*(r-1))/r)/1.7));if(q<bs){bs=q;best=c}}
+  const rows=Math.ceil(N/best),ch=(H-g*(rows-1))/rows;
+  keys.forEach((q,i)=>{const r=Math.floor(i/best),ir=Math.min(best,N-r*best),cw=(277-g*(ir-1))/ir,x=10+(i%best)*(cw+g),y=top+r*(ch+g);box(x,y,cw,ch);T(TT[q],x+3,y+6);DR[q](x+3,y+10,cw-6,ch-13)})}
+ else if(!sel.kpi&&!wideKeys.length)d.setFontSize(10).setTextColor(110).text('No visualizations selected',148,100,{align:'center'});
+ if(wideKeys.length){let y=top+(N?H+g:0);wideKeys.forEach((q,i)=>{box(10,y,277,hw[i]);T(q=='trends'?(tipsAreAI()?'Trend Comments · AI suggestions':'Trend Comments · Suggestions'):TT[q],13,y+6);DR[q](13,y+10,271,hw[i]-13);y+=hw[i]+g})}
+ d.setFontSize(7).setTextColor(130).text('Generated '+new Date().toLocaleDateString('en-CA')+' · Positive = winning balance, negative = losing balance',10,205)}
+function pdfBuf(){const d=new jspdf.jsPDF({orientation:'landscape'});drawDash(d);return d.output('arraybuffer')}
+function canvasDoc(S=12){
+ const cv=document.createElement('canvas');cv.width=297*S;cv.height=210*S;const x=cv.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,cv.width,cv.height);
+ const C=(a,b,c)=>b===undefined?(typeof a=='string'?a:`rgb(${a},${a},${a})`):`rgb(${a},${b},${c})`;
+ let fs=7,bold=false,fill='#000',stroke='#000',tc='#000',lw=.2;
+ const d={cv,setFont(n,st){bold=st=='bold';return d},setFontSize(v){fs=v;return d},setTextColor(a,b,c){tc=C(a,b,c);return d},setDrawColor(a,b,c){stroke=C(a,b,c);return d},setFillColor(a,b,c){fill=C(a,b,c);return d},setLineWidth(v){lw=v;return d},
+  paint(m){if(m&&m.includes('F')){x.fillStyle=fill;x.fill()}if(!m||m=='S'||m.includes('D')){x.strokeStyle=stroke;x.lineWidth=lw*S;x.stroke()}},
+  rect(a,b,w,h,m){x.beginPath();x.rect(a*S,b*S,w*S,h*S);d.paint(m);return d},
+  roundedRect(a,b,w,h,r){x.beginPath();if(x.roundRect)x.roundRect(a*S,b*S,w*S,h*S,r*S);else x.rect(a*S,b*S,w*S,h*S);d.paint();return d},
+  line(a,b,c,e){x.beginPath();x.moveTo(a*S,b*S);x.lineTo(c*S,e*S);d.paint();return d},
+  circle(a,b,r,m){x.beginPath();x.arc(a*S,b*S,r*S,0,7);d.paint(m);return d},
+  triangle(a,b,c,e,f,g,m){x.beginPath();x.moveTo(a*S,b*S);x.lineTo(c*S,e*S);x.lineTo(f*S,g*S);x.closePath();d.paint(m);return d},
+  text(t,a,b,o={}){x.font=`${bold?'700 ':''}${fs*.3528*S}px Helvetica,Arial,sans-serif`;x.fillStyle=tc;x.textAlign=o.align=='right'?'right':o.align=='center'?'center':'left';x.fillText(String(t),a*S,b*S,o.maxWidth?o.maxWidth*S:undefined);return d},
+  autoTable(o){const L=o.margin.left,W=297-L-o.margin.right,sz=o.styles.fontSize,pd=o.styles.cellPadding,rh=sz*.3528+2*pd+.8,
+   cs=o.head[0].map((_,j)=>Math.max(...[o.head[0][j],...o.body.map(r=>r[j])].map(v=>String(v).length))+2),tw=cs.reduce((a,b)=>a+b,0),ws=cs.map(c=>c/tw*W);let y=o.startY;
+   const row=(cells,bg,sec,ri)=>{let xx=L;cells.forEach((v,j)=>{if(bg)d.setFillColor(...bg).rect(xx,y,ws[j],rh,'F');let colr=sec=='head'?[255,255,255]:[40,40,40],fb=false;
+    if(sec=='body'&&o.didParseCell){const h={section:'body',column:{index:j},row:{index:ri},cell:{styles:{}}};o.didParseCell(h);if(h.cell.styles.textColor)colr=h.cell.styles.textColor;fb=h.cell.styles.fontStyle=='bold'}
+    const al=((o.columnStyles||{})[j]||{}).halign||(sec=='head'&&o.headStyles.halign)||o.styles.halign,ct=al=='center';
+    d.setFont('helvetica',sec=='head'||fb||((o.columnStyles||{})[j]||{}).fontStyle=='bold'?'bold':'normal').setFontSize(sz).setTextColor(...colr).text(v,ct?xx+ws[j]/2:xx+pd,y+rh/2+sz*.3528*.35,{align:ct?'center':'left'});xx+=ws[j]});y+=rh};
+   row(o.head[0],o.headStyles.fillColor,'head');o.body.forEach((r,i)=>row(r,i%2?[245,247,250]:null,'body',i))}};
+ return d}
+async function shareImg(){
+ const d=canvasDoc();drawDash(d);const blob=await new Promise(r=>d.cv.toBlob(r,'image/jpeg',.92)),name=`Session_Dashboard_${last()}.jpg`,file=new File([blob],name,{type:'image/jpeg'});
+ try{if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'Session Dashboard'});return}}catch(e){if(e.name=='AbortError')return}
+ await save(name,blob)}
+async function save(name,data){
+ let dl=null;try{dl=window.claude?await window.claude.use('downloads'):null}catch(e){}
+ if(dl){try{await dl.save({filename:name,data});toast('Saved '+name)}catch(e){if(e.code!=='declined')toast('Could not save: '+(e.message||e.code))}return}
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data]));a.download=name;a.click()}
+const last=()=>(sessions.map(s=>s.date).filter(Boolean).sort().pop()||dd);
+// ---- events ----
+document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']');
+ if(g('data-t')){tab=g('data-t').dataset.t;render();upd()}
+ else if(g('data-all')){const v=+g('data-all').dataset.all;OPTS.forEach(o=>sel[o[0]]=v);render()}
+ else if(g('data-q')){const q=g('data-q').dataset.q.split(':');mode=q[0];if(+q[1])pn=+q[1];render()}
+ else if(g('data-xall')){excl={};render()}
+ else if(g('data-del')){const i=+g('data-del').dataset.del;if(confirm('Delete '+nm(sessions[i],i)+'?')){sessions.splice(i,1);render()}}
+ else if(t.id=='ap'){const n=$('#np').value.trim();if(!n)return;if(players.includes(n))return toast('Player already exists');players.push(n);render();upd()}
+ else if(t.id=='save'){const ps=players.filter(p=>plays[p]!==false);if(!dd)return toast('Pick the date played');if(!ps.length)return toast('Select at least one player');
+  game={date:dd,players:ps};gc=false;finals={};loanDraft={};ld=dd;tab='loans';render();toast('Game started — add fresh loans, then tap Game completion')}
+ else if(t.id=='gdisc'){if(confirm('Discard this game and its loans?')){loans=loans.filter(l=>l.done);game=null;gc=false;finals={};loanDraft={};render()}}
+ else if(t.id=='gjoin'){const c=($('#gc_in').value||'').trim();if(!/^[A-Za-z0-9_-]{8,40}$/.test(c))return toast('Use 8 to 40 letters, numbers, - or _');setGroup(c)}
+ else if(t.id=='gnew'){setGroup(randCode());toast('Group created. Tap Copy invite link to share it.')}
+ else if(g('data-gcopy')){copyLink()}
+ else if(g('data-gleave')){if(confirm('Leave this group on this device? The shared data stays in the cloud.'))leaveGroup()}
+ else if(t.id=='sxl'){if(!game)return;save(`Current_Session_${game.date}.xlsx`,sessionBuf())}
+ else if(t.id=='gcb'){gc=!gc;render()}
+
+ else if(t.id=='jb'){if(!game)return;let n=($('#jn').value||'').trim();if(!n)return toast('Enter a player name');n=players.find(q=>q.toLowerCase()==n.toLowerCase())||n;
+  if(game.players.includes(n))return toast(n+' is already in this game');if(!players.includes(n))players.push(n);game.players.push(n);plays[n]=true;render();toast(n+' added to the game')}
+ else if(t.id=='gfin'){if(!game)return;const rows=loanRows(game.players),res={};let miss=0;rows.forEach(r=>{const a=parseFloat(finals[r.p]);if(isNaN(a)){miss=1;return}res[r.p]=Math.round((a-r.cur)*100)/100});
+  if(miss)return toast("Enter every player's final amount");const n=Math.round(Object.values(res).reduce((a,b)=>a+b,0)*100)/100;if(n&&!confirm(`Results net to ${n}, not 0. Save anyway?`))return;
+  sessions.push({date:game.date,label:'',v:res});loans.forEach(l=>{if(!l.done){l.done=true;l.g=game.date}});sortS();game=null;gc=false;finals={};loanDraft={};tab='hist';render();toast('Game saved to History — export Excel to keep it')}
+ else if(t.id=='lsave'){const add=[];let bad=0;if(!game)return;game.players.forEach(p=>{const x=loanDraft[p]||{},a=parseFloat(x.amt);if(x.amt===undefined||x.amt==='')return;if(!isFinite(a)||a===0){bad=1;return}add.push({date:ld,who:p,amt:x.src=='__repay'?-Math.abs(a):a,src:x.src=='__repay'?null:(x.src||null),g:game.date,done:false})});
+  if(!ld)return toast('Pick the date');if(bad)return toast('Enter a valid amount that is not 0 (use − for a repayment)');if(!add.length)return toast('Enter at least one amount');
+  loans.push(...add);loanDraft={};render();toast(add.length+(add.length>1?' loans':' loan')+' saved — tap Export session to keep a copy')}
+ else if(g('data-lsg')){const b=g('data-lsg'),p=b.dataset.lsg,x=(loanDraft[p]=loanDraft[p]||{}),v=x.amt||'';x.amt=v[0]=='-'?v.slice(1):(v?'-'+v:'-');b.previousElementSibling.value=x.amt}
+ else if(g('data-ldel')){if(confirm('Delete this loan entry?')){loans.splice(+g('data-ldel').dataset.ldel,1);render()}}
+ else if(t.id=='xl')save(`Session_Balances_${last()}.xlsx`,xlsxBuf());
+ else if(t.id=='jpg')shareImg().catch(e=>toast('Could not create image: '+(e&&e.message||e)));
+ else if(t.id=='pdf')save(`Session_Dashboard_${last()}.pdf`,pdfBuf())});
+document.addEventListener('input',e=>{const t=e.target;if(t.dataset.fa!==undefined){finals[t.dataset.fa]=t.value;upd()}else if(t.id=='nd')dd=t.value;else if(t.dataset.la!==undefined){(loanDraft[t.dataset.la]=loanDraft[t.dataset.la]||{}).amt=t.value}else if(t.id=='ld')ld=t.value});
+document.addEventListener('change',e=>{const t=e.target;
+ if(t.id=='up'&&t.files[0]){if((sessions.length||players.length)&&!confirm('Uploading replaces the shared data for EVERYONE in this group. Continue?')){t.value='';return}importXlsx(t.files[0]).catch(e=>toast('Could not read file: '+(e&&e.message||e)));t.value=''}
+ else if(t.id=='lg'&&t.files&&t.files[0]){loadSessionFile(t.files[0]).catch(e=>toast('Could not read file: '+(e&&e.message||e)));t.value=''}
+ else if(t.dataset.pl!==undefined){plays[t.dataset.pl]=t.checked}
+ else if(t.dataset.ls!==undefined){(loanDraft[t.dataset.ls]=loanDraft[t.dataset.ls]||{}).src=t.value}
+ else if(t.dataset.il!==undefined){const v=+t.value;if(isFinite(v)&&v>=0)initLoan=v;render()}
+ else if(t.dataset.hs!==undefined){hsort=t.value;render()}
+ else if(t.dataset.hp!==undefined){hpl=t.value;render()}
+ else if(t.dataset.mode!==undefined){mode=t.value;render()}
+ else if(t.dataset.pn!==undefined){pn=Math.max(1,Math.min(99,Math.round(+t.value)||1));render()}
+ else if(t.dataset.rf!==undefined){rf=+t.value;render()}
+ else if(t.dataset.rt!==undefined){rt=+t.value;render()}
+ else if(t.dataset.x!==undefined){if(t.checked)delete excl[t.dataset.x];else excl[t.dataset.x]=1;render()}
+ else if(t.dataset.v!==undefined){sel[t.dataset.v]=t.checked?1:0;render()}
+ else if(t.dataset.d!==undefined){sessions[+t.dataset.d].date=t.value;sortS();render()}
+ else if(t.dataset.s!==undefined){const s=sessions[+t.dataset.s],x=t.value.trim()===''?null:Number(t.value);if(x===null)delete s.v[t.dataset.p];else if(isFinite(x))s.v[t.dataset.p]=x;render()}});
+// ---- cloud sync (Firestore) ----
+let gid='',cs='connecting',cloudErr='',synced=false,cloudOn=false,base=null,inflight=0,lastSent='',applying=false,pendingRender=false;
+try{gid=((location.hash||'').match(/g=([A-Za-z0-9_-]{8,40})/)||[])[1]||localStorage.getItem('ptc_group')||''}catch(e){}
+const EMPTY=()=>({players:[],sessions:[],loans:[],initLoan:500,game:null});
+const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
+const canon=x=>JSON.stringify(x,(k,v)=>v&&typeof v=='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(q=>[q,v[q]])):v);
+const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null});
+function getState(){sessions.forEach(x=>{if(!x.id)x.id=uid()});loans.forEach(l=>{if(!l.id)l.id=uid()});
+ return{players:[...players],sessions:sessions.map(x=>({id:x.id,date:x.date||'',label:x.label||'',v:{...x.v}})),loans:loans.map(l=>({id:l.id,date:l.date,who:l.who,amt:l.amt,src:l.src||null,g:l.g||'',done:!!l.done})),initLoan,game:game?{date:game.date,players:[...game.players]}:null}}
+function applyState(S){S=norm(S);players=[...S.players];sessions=S.sessions.map(x=>({...x,v:{...x.v}}));loans=S.loans.map(l=>({...l}));initLoan=S.initLoan;game=S.game?{date:S.game.date,players:[...S.game.players]}:null;if(!game){gc=false;finals={}}sortS()}
+function mergeState(b,l,r){const o=norm(JSON.parse(JSON.stringify(r)));b=norm(b);
+ l.players.forEach(p=>{if(!o.players.includes(p))o.players.push(p)});b.players.forEach(p=>{if(!l.players.includes(p))o.players=o.players.filter(x=>x!==p)});
+ ['sessions','loans'].forEach(k=>{const bm=new Map(b[k].map(x=>[x.id,canon(x)])),lm=new Set(l[k].map(x=>x.id));
+  l[k].forEach(x=>{const i=o[k].findIndex(y=>y.id===x.id),was=bm.get(x.id);if(was===undefined){if(i<0)o[k].push(x)}else if(was!==canon(x)){if(i>=0)o[k][i]=x;else o[k].push(x)}});
+  b[k].forEach(x=>{if(!lm.has(x.id)){const i=o[k].findIndex(y=>y.id===x.id);if(i>=0)o[k].splice(i,1)}})});
+ if(l.initLoan!==b.initLoan)o.initLoan=l.initLoan;if(canon(l.game)!==canon(b.game))o.game=l.game;return o}
+function gbarHtml(){if(!gid)return'';const m={live:['#15803d','Live'],saving:['#d97706','Saving…'],connecting:['#d97706','Connecting…'],offline:['#dc2626','Offline: changes not saved yet'],error:['#dc2626','Connection problem']}[cs]||['#6b7686',''];
+ return`<span style="color:${m[0]}">●</span> ${m[1]} <span class="mut">· group ${E(gid.slice(0,4))}…</span> <button data-gcopy>Copy invite link</button> <button data-gleave>Leave</button>`}
+function setSync(c){cs=c;const g=$('#gbar');if(g)g.innerHTML=gbarHtml()}
+function joinScreen(){return`<div class="card"><b>Join your group</b><div class="mut" style="margin:6px 0 10px">Everyone with the same group code sees the same sessions and loans, live. Keep the code private: anyone who has it can view and edit.</div><div class="row"><input id="gc_in" placeholder="Group code" style="text-align:left;flex:1;width:auto"><button class="pri" id="gjoin">Join</button></div><div style="margin-top:12px"><button id="gnew">Create a new group</button></div></div>`}
+function connectCard(){return`<div class="card"><b>${cs=='error'?'Could not connect':'Connecting…'}</b><div class="mut" style="margin:6px 0">${E(cloudErr)}</div>${cs=='error'?'<p>Check that you are online and that the Firestore rules are published (Database, then Rules, then Publish).</p>':''}<button data-gleave>Use a different group code</button></div>`}
+function render(){document.body.classList.toggle('nogrp',!gid);
+ if(!gid){$('#v').innerHTML=joinScreen();return}
+ if(!synced){$('#v').innerHTML=connectCard();setSync(cs);return}
+ render0();setSync(cs);queueMicrotask(persist)}
+function renderSafe(){const a=document.activeElement;if(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)){pendingRender=true;return}render()}
+function reconcile(S){base=norm(S);lastSent='';if(canon(getState())!==canon(base)){applying=true;applyState(base);applying=false;renderSafe()}setSync(navigator.onLine===false?'offline':'live')}
+async function persist(){if(!cloudOn||!synced||applying||!window.cloud)return;const L=getState(),c=canon(L);if(c===canon(base||EMPTY())||c===lastSent)return;
+ lastSent=c;inflight++;setSync('saving');
+ try{const out=await cloud.commit(gid,rj=>JSON.stringify(mergeState(base||EMPTY(),L,rj?JSON.parse(rj):EMPTY())));base=norm(JSON.parse(out));cs=navigator.onLine===false?'offline':'live'}
+ catch(e){lastSent='';cs='offline';toast('Could not save: '+((e&&e.code)||'offline')+'. It will retry on your next change.')}
+ inflight--;if(!inflight&&cs!='offline')reconcile(base);else setSync(cs)}
+function startCloud(){if(!gid)return;
+ if(!window.cloud){window.addEventListener('cloudready',startCloud,{once:true});setTimeout(()=>{if(!window.cloud){cloudErr='Could not load Google services. Check your internet connection and reload.';cs='error';render()}},15000);return}
+ cloudOn=true;cs='connecting';
+ cloud.listen(gid,json=>{const S=json?norm(JSON.parse(json)):EMPTY();
+  if(!synced){synced=true;cs='live';base=S;lastSent='';applying=true;applyState(S);applying=false;render();return}
+  if(inflight)return;reconcile(S)},e=>{cloudErr=((e&&e.code)||'error')+': '+((e&&e.message)||'');cs='error';synced=synced&&false;render()})}
+function clearLocal(){players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
+function setGroup(code){gid=code;try{localStorage.setItem('ptc_group',code);history.replaceState(null,'','#g='+code)}catch(e){}clearLocal();cs='connecting';startCloud();render()}
+function leaveGroup(){if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;gid='';try{localStorage.removeItem('ptc_group');history.replaceState(null,'',location.pathname)}catch(e){}clearLocal();render()}
+function randCode(){const a='abcdefghjkmnpqrstuvwxyz23456789';let s='';crypto.getRandomValues(new Uint8Array(14)).forEach(x=>{s+=a[x%a.length]});return s}
+function copyLink(){const u=location.origin+location.pathname+'#g='+gid;if(navigator.clipboard)navigator.clipboard.writeText(u).then(()=>toast('Invite link copied')).catch(()=>prompt('Copy this link',u));else prompt('Copy this link',u)}
+document.addEventListener('focusout',()=>{if(pendingRender)setTimeout(()=>{const a=document.activeElement;if(!(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName))){pendingRender=false;render()}},60)});
+window.addEventListener('online',()=>{if(cloudOn){setSync('live');persist()}});window.addEventListener('offline',()=>setSync('offline'));
+if(gid)startCloud();
+render();
+</script>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {initializeFirestore,doc,onSnapshot,runTransaction} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+const firebaseConfig={apiKey:"AIzaSyB-B8LBHwZtBQ5-qzU0YCX9s3Xt90gs2EY",authDomain:"patte-session-tracker.firebaseapp.com",projectId:"patte-session-tracker",storageBucket:"patte-session-tracker.firebasestorage.app",messagingSenderId:"275172572901",appId:"1:275172572901:web:d48c43b803285b23ad5e0c"};
+const app=initializeApp(firebaseConfig),db=initializeFirestore(app,{experimentalAutoDetectLongPolling:true});
+let unsub=null;const ref=g=>doc(db,'groups',g,'app','state');
+window.cloud={
+ listen(g,cb,err){if(unsub)unsub();unsub=onSnapshot(ref(g),s=>cb(s.exists()?s.data().json:null),e=>err(e))},
+ stop(){if(unsub)unsub();unsub=null},
+ commit(g,fn){return runTransaction(db,async tx=>{const r=ref(g),s=await tx.get(r),out=fn(s.exists()?s.data().json:null);tx.set(r,{json:out,updatedAt:Date.now()});return out})}
+};
+window.dispatchEvent(new Event('cloudready'));
+</script></body></html>
