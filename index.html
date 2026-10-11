@@ -53,7 +53,7 @@ select{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--bd
  <button id="xl">Export Excel</button><button id="pdf">Export Dashboard PDF</button><button id="jpg">Share as image</button>
 </div>
 <div class="pw" id="gbar" style="margin:0 0 10px"></div>
-<div class="tabs"><button data-t="hist">History</button><button data-t="add">New session</button><button data-t="loans">Loans</button><button data-t="dash">Dashboard</button><button data-t="backup">Backups</button></div>
+<div class="tabs"><button data-t="hist">History</button><button data-t="add">New session</button><button data-t="loans">Loans</button><button data-t="dash">Dashboard</button><button data-t="backup">Backups</button><button data-t="readme">Readme</button><button data-t="rules">Rules</button></div>
 <div id="v"></div></main><div id="toast"></div>
 <script>
 const $=s=>document.querySelector(s),E=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -71,7 +71,7 @@ function stats(){return players.map(p=>{const v=sessions.map(s=>s.v[p]).filter(n
 function kpis(){const st=stats();let b=null;sessions.forEach((s,i)=>players.forEach(p=>{const x=s.v[p];if(num(x)&&(!b||x>b.x))b={p,x,n:nm(s,i)}}));
  const a=st[0],z=st[st.length-1];return[['Sessions',sessions.length,players.length+' players'],['Leader',a.p,f(a.t)],['Trailing',z.p,f(z.t)],['Best single session',b?b.p:'-',b?'+'+f(b.x)+' · '+b.n:'']]}
 function render0(){
- $('#v').innerHTML=tab=='hist'?hist():tab=='add'?entry():tab=='loans'?loansTab():tab=='backup'?backupTab():dash();
+ $('#v').innerHTML=tab=='hist'?hist():tab=='add'?entry():tab=='loans'?loansTab():tab=='backup'?backupTab():(tab=='readme'||tab=='rules')?notesTab(tab):dash();
  document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t==tab));
  $('#xl').disabled=!sessions.length;$('#jpg').disabled=$('#pdf').disabled=!sessions.length||!players.length||!Object.values(sel).some(Boolean)||players.every(p=>excl[p]);upd()}
 function hist(){
@@ -399,6 +399,10 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(t.id=='save'){const ps=players.filter(p=>plays[p]!==false);if(!dd)return toast('Pick the date played');if(!ps.length)return toast('Select at least one player');
   game={date:dd,players:ps};gc=false;finals={};loanDraft={};ld=dd;tab='loans';render();toast('Game started — add fresh loans, then tap Game completion')}
  else if(t.id=='gdisc'){if(confirm('Discard this game and its loans?')){loans=loans.filter(l=>l.done);game=null;gc=false;finals={};loanDraft={};render()}}
+ else if(g('data-nedit')){const k=g('data-nedit').dataset.nedit;editing[k]=true;notesDraft[k]=k=='readme'?(readme===null?README_DEFAULT:readme):rules;render()}
+ else if(g('data-nsave')){const k=g('data-nsave').dataset.nsave,v=notesDraft[k]===undefined?(k=='readme'?(readme===null?README_DEFAULT:readme):rules):notesDraft[k];if(k=='readme')readme=v.trim()===README_DEFAULT.trim()?null:v;else rules=v;editing[k]=false;delete notesDraft[k];render();toast('Saved for everyone')}
+ else if(g('data-ncancel')){const k=g('data-ncancel').dataset.ncancel;editing[k]=false;delete notesDraft[k];render()}
+ else if(g('data-nreset')){if(confirm('Replace the Readme with the original text?')){readme=null;editing.readme=false;delete notesDraft.readme;render()}}
  else if(t.id=='bkref'){loadBackups()}
  else if(t.id=='orgset'){setPass()}
  else if(t.id=='gencode'){genCode()}
@@ -428,7 +432,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(t.id=='xl')save(`Session_Balances_${last()}.xlsx`,xlsxBuf());
  else if(t.id=='jpg')shareImg().catch(e=>toast('Could not create image: '+(e&&e.message||e)));
  else if(t.id=='pdf')save(`Session_Dashboard_${last()}.pdf`,pdfBuf())});
-document.addEventListener('input',e=>{const t=e.target;if(t.dataset.fa!==undefined){finals[t.dataset.fa]=t.value;upd()}else if(t.id=='nd')dd=t.value;else if(t.dataset.la!==undefined){(loanDraft[t.dataset.la]=loanDraft[t.dataset.la]||{}).amt=t.value}else if(t.id=='ld')ld=t.value});
+document.addEventListener('input',e=>{const t=e.target;if(t.dataset.fa!==undefined){finals[t.dataset.fa]=t.value;upd()}else if(t.id=='nd')dd=t.value;else if(t.dataset.la!==undefined){(loanDraft[t.dataset.la]=loanDraft[t.dataset.la]||{}).amt=t.value}else if(t.id=='ld')ld=t.value;else if(t.dataset.ta!==undefined)notesDraft[t.dataset.ta]=t.value});
 document.addEventListener('change',e=>{const t=e.target;
  if(t.id=='up'&&t.files[0]){if(!canEdit()){t.value='';return toast('View only: enter the edit code first')}const f0=t.files[0];t.value='';guard('upload an Excel file',()=>{if((sessions.length||players.length)&&!confirm('Uploading replaces the shared data for EVERYONE in this group. Continue?'))return;importXlsx(f0).catch(e=>toast('Could not read file: '+(e&&e.message||e)))})}
  else if(t.id=='lg'&&t.files&&t.files[0]){if(!canEdit()){t.value='';return toast('View only: enter the edit code first')}loadSessionFile(t.files[0]).catch(e=>toast('Could not read file: '+(e&&e.message||e)));t.value=''}
@@ -448,19 +452,19 @@ document.addEventListener('change',e=>{const t=e.target;
 // ---- cloud sync (Firestore) ----
 let gid='',cs='connecting',cloudErr='',synced=false,cloudOn=false,base=null,inflight=0,lastSent='',applying=false,pendingRender=false;
 try{gid=((location.hash||'').match(/g=([A-Za-z0-9_-]{8,40})/)||[])[1]||localStorage.getItem('ptc_group')||''}catch(e){}
-const EMPTY=()=>({players:[],sessions:[],loans:[],initLoan:500,game:null});
+const EMPTY=()=>({players:[],sessions:[],loans:[],initLoan:500,game:null,readme:null,rules:''});
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
 const canon=x=>JSON.stringify(x,(k,v)=>v&&typeof v=='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(q=>[q,v[q]])):v);
-const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null});
+const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:''});
 function getState(){sessions.forEach(x=>{if(!x.id)x.id=uid()});loans.forEach(l=>{if(!l.id)l.id=uid()});
- return{players:[...players],sessions:sessions.map(x=>({id:x.id,date:x.date||'',label:x.label||'',v:{...x.v}})),loans:loans.map(l=>({id:l.id,date:l.date,who:l.who,amt:l.amt,src:l.src||null,g:l.g||'',done:!!l.done})),initLoan,game:game?{date:game.date,players:[...game.players]}:null}}
-function applyState(S){S=norm(S);players=[...S.players];sessions=S.sessions.map(x=>({...x,v:{...x.v}}));loans=S.loans.map(l=>({...l}));initLoan=S.initLoan;game=S.game?{date:S.game.date,players:[...S.game.players]}:null;if(!game){gc=false;finals={}}sortS()}
+ return{players:[...players],sessions:sessions.map(x=>({id:x.id,date:x.date||'',label:x.label||'',v:{...x.v}})),loans:loans.map(l=>({id:l.id,date:l.date,who:l.who,amt:l.amt,src:l.src||null,g:l.g||'',done:!!l.done})),initLoan,game:game?{date:game.date,players:[...game.players]}:null,readme,rules}}
+function applyState(S){S=norm(S);players=[...S.players];sessions=S.sessions.map(x=>({...x,v:{...x.v}}));loans=S.loans.map(l=>({...l}));initLoan=S.initLoan;game=S.game?{date:S.game.date,players:[...S.game.players]}:null;readme=S.readme;rules=S.rules;if(!game){gc=false;finals={}}sortS()}
 function mergeState(b,l,r){const o=norm(JSON.parse(JSON.stringify(r)));b=norm(b);
  l.players.forEach(p=>{if(!o.players.includes(p))o.players.push(p)});b.players.forEach(p=>{if(!l.players.includes(p))o.players=o.players.filter(x=>x!==p)});
  ['sessions','loans'].forEach(k=>{const bm=new Map(b[k].map(x=>[x.id,canon(x)])),lm=new Set(l[k].map(x=>x.id));
   l[k].forEach(x=>{const i=o[k].findIndex(y=>y.id===x.id),was=bm.get(x.id);if(was===undefined){if(i<0)o[k].push(x)}else if(was!==canon(x)){if(i>=0)o[k][i]=x;else o[k].push(x)}});
   b[k].forEach(x=>{if(!lm.has(x.id)){const i=o[k].findIndex(y=>y.id===x.id);if(i>=0)o[k].splice(i,1)}})});
- if(l.initLoan!==b.initLoan)o.initLoan=l.initLoan;if(canon(l.game)!==canon(b.game))o.game=l.game;return o}
+ if(l.initLoan!==b.initLoan)o.initLoan=l.initLoan;if(l.readme!==b.readme)o.readme=l.readme;if(l.rules!==b.rules)o.rules=l.rules;if(canon(l.game)!==canon(b.game))o.game=l.game;return o}
 function gbarHtml(){if(!gid)return'';const m={live:['#15803d','Live'],saving:['#d97706','Saving…'],connecting:['#d97706','Connecting…'],offline:['#dc2626','Offline: changes not saved yet'],error:['#dc2626','Connection problem']}[cs]||['#6b7686',''];
  return`<span style="color:${m[0]}">●</span> ${m[1]} <span class="mut">· group ${E(gid.slice(0,4))}…</span> <button data-gcopy>Copy invite link</button> <button data-gleave>Leave</button>${accessLoaded?(canEdit()?(access?' <span class="pos">✏️ Editor</span>':''):' <span class="neg">👁 View only</span> <button class="pri" id="unlock">Enter edit code</button>'):''}`}
 function setSync(c){cs=c;const g=$('#gbar');if(g)g.innerHTML=gbarHtml()}
@@ -509,6 +513,51 @@ async function setPass(){if(!orgInfo&&!canEdit())return toast('Enter the edit co
  try{await cloud.put(gid,'organiser',JSON.stringify({salt,iter,hash}));orgInfo={salt,iter,hash};orgLoaded=true;unlockUntil=Date.now()+600000;render();toast('Organiser passcode saved')}catch(e){toast('Could not save the passcode')}}
 async function removePass(){if(!orgInfo)return;if(!(await checkPass('remove the passcode')))return;if(!confirm('Remove the organiser passcode? Anyone will be able to upload, restore and delete sessions.'))return;
  try{await cloud.put(gid,'organiser','null');orgInfo=null;unlockUntil=0;render();toast('Passcode removed')}catch(e){toast('Could not remove the passcode')}}
+let readme=null,rules='',editing={},notesDraft={};
+const README_DEFAULT=`# Welcome
+This tracker keeps your group's sessions, loans and results in one shared place. Everyone with the link sees the same data live.
+
+## What each tab does
+- **History**: every finished session in a table (players down, sessions across) with totals. Tap a cell to correct it, sort by newest or oldest, and delete a session with the cross (it asks for the organiser passcode if one is set).
+- **New session**: choose the date and who is playing, then tap Start game. You can add a new player here, or carry on a saved game with Load existing session.
+- **Loans**: works on the game in progress. Set the initial loan, record fresh loans, see the Current standing, export the session, add a late joiner and finish with Game completion.
+- **Dashboard**: charts and tables for any period (all sessions, last N sessions, last N months). Choose the players and visualizations, then export a PDF or an image.
+- **Backups**: the automatic backups with restore buttons, the edit code and the organiser passcode.
+- **Readme**: this page. **Rules**: your group's own rules.
+
+## Start to finish
+1. Organiser: open the app link and tap Create a new group, then Copy invite link and send it to the players.
+2. Organiser: on the Backups tab set an organiser passcode, then tap Create an edit code and share the code with the players. Without the code people can only view.
+3. Players: open the link, tap Enter edit code at the top and type the code.
+4. First time only: tap Upload Excel to load your old history, or start fresh by adding players in New session.
+5. Start a game: New session, pick the date, tick the players who are playing and tap Start game.
+6. Someone joins late: use Add a player to this game on the Loans or New session tab.
+7. During the game: Loans tab, enter fresh loans. Bank adds to a player's loan, Repay bank reduces it, and choosing another player moves loan between the two. Standing shows negative while a loan is owed.
+8. Every so often tap Export session on the Loans tab to keep a safety copy.
+9. When the game ends: tap Game completion and enter each player's final amount. Result = final amount + current standing. The results should add up to 0.
+10. Tap Complete game and save to History. The session appears in History and a backup is saved automatically.
+11. Open the Dashboard, pick a period and players, and export a PDF or image to share.
+12. After each game tap Export Excel and keep the file somewhere safe.
+
+## Good to know
+- If you see View only at the top, tap Enter edit code and type the code from the organiser.
+- Upload Excel replaces the shared data for everyone, so only the organiser should use it.
+- If something goes wrong, the Backups tab can restore the last completed game or the last standing.
+- A blank cell means the player did not play. A 0 means they played and broke even.
+- Win % counts only the sessions a player played. A 0 session counts as played but is not a win.
+- To change this page, tap Edit below. Your changes are saved for everyone.
+`;
+const inl=x=>E(x).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
+function mdLite(t){let h='',list=null;const close=()=>{if(list){h+='</'+list+'>';list=null}};
+ t.split('\n').forEach(L=>{const l=L.trimEnd();let m;if(!l.trim()){close();return}
+  if(m=l.match(/^(#{1,3})\s+(.*)/)){close();const n=m[1].length+1;h+=`<h${n} style="margin:14px 0 6px">${inl(m[2])}</h${n}>`;return}
+  if(m=l.match(/^\s*[-•]\s+(.*)/)){if(list!='ul'){close();h+='<ul style="margin:4px 0;padding-left:22px">';list='ul'}h+=`<li style="margin:3px 0">${inl(m[1])}</li>`;return}
+  if(m=l.match(/^\s*\d+[.)]\s+(.*)/)){if(list!='ol'){close();h+='<ol style="margin:4px 0;padding-left:22px">';list='ol'}h+=`<li style="margin:3px 0">${inl(m[1])}</li>`;return}
+  close();h+=`<p style="margin:6px 0">${inl(l)}</p>`});close();return h}
+function notesTab(k){const title=k=='readme'?'Readme':'Rules',txt=k=='readme'?(readme===null?README_DEFAULT:readme):rules;
+ if(editing[k]){const d=notesDraft[k]===undefined?txt:notesDraft[k];
+  return`<div class="card"><b>Editing ${title}</b><div class="mut" style="margin:4px 0 8px">Use # for headings, - for bullets, 1. for numbered steps and **bold**. Saved for everyone.</div><textarea data-ta="${k}" style="width:100%;min-height:340px;font:inherit;color:inherit;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:10px">${E(d)}</textarea><div class="pw" style="margin-top:8px"><button class="pri" data-nsave="${k}">Save</button><button data-ncancel="${k}">Cancel</button>${k=='readme'&&readme!==null?'<button data-nreset="readme">Reset to original</button>':''}</div></div>`}
+ return`<div class="card">${txt.trim()?mdLite(txt):'<p class="mut">No rules written yet. Tap Edit to add your group\'s rules.</p>'}<div class="pw" style="margin-top:10px"><button data-nedit="${k}">✎ Edit</button></div></div>`}
 let bk={full:undefined,standing:undefined,busy:false,err:''},wantFull=false,lastStd='';
 async function saveBackups(){try{
  if(wantFull&&!base.game){await cloud.put(gid,'full',JSON.stringify(base));wantFull=false}
@@ -535,7 +584,7 @@ function startCloud(){if(!gid)return;
  cloud.listen(gid,json=>{const S=json?norm(JSON.parse(json)):EMPTY();
   if(!synced){synced=true;cs='live';base=S;lastSent='';applying=true;applyState(S);applying=false;render();return}
   if(inflight)return;reconcile(S)},e=>{cloudErr=((e&&e.code)||'error')+': '+((e&&e.message)||'');cs='error';synced=synced&&false;render()})}
-function clearLocal(){access=null;accessLoaded=false;lastCode='';players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
+function clearLocal(){readme=null;rules='';editing={};notesDraft={};access=null;accessLoaded=false;lastCode='';players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
 function setGroup(code){gid=code;try{localStorage.setItem('ptc_group',code);history.replaceState(null,'','#g='+code)}catch(e){}clearLocal();cs='connecting';startCloud();render()}
 function leaveGroup(){if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;gid='';try{localStorage.removeItem('ptc_group');history.replaceState(null,'',location.pathname)}catch(e){}clearLocal();render()}
 function randCode(){const a='abcdefghjkmnpqrstuvwxyz23456789';let s='';crypto.getRandomValues(new Uint8Array(14)).forEach(x=>{s+=a[x%a.length]});return s}
