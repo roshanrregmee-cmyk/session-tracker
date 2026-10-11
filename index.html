@@ -42,6 +42,7 @@ input.c{width:78px;text-align:right}th input{font-size:12px;width:128px;display:
 
 select{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:5px 8px;max-width:190px}
 .nogrp .bar,.nogrp .tabs,.nogrp #gbar{display:none}
+.viewonly label[for=up]{opacity:.45;pointer-events:none}
 .chip{display:flex;align-items:center;gap:6px;border:1px solid var(--bd);border-radius:20px;padding:5px 12px;cursor:pointer}
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:10px 16px;border-radius:8px;display:none}
 </style></head><body><main>
@@ -393,14 +394,20 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(g('data-all')){const v=+g('data-all').dataset.all;OPTS.forEach(o=>sel[o[0]]=v);render()}
  else if(g('data-q')){const q=g('data-q').dataset.q.split(':');mode=q[0];if(+q[1])pn=+q[1];render()}
  else if(g('data-xall')){excl={};render()}
- else if(g('data-del')){const i=+g('data-del').dataset.del;if(confirm('Delete '+nm(sessions[i],i)+'?')){sessions.splice(i,1);render()}}
+ else if(g('data-del')){const i=+g('data-del').dataset.del;guard('delete a session',()=>{if(confirm('Delete '+nm(sessions[i],i)+'?')){sessions.splice(i,1);render()}})}
  else if(t.id=='ap'){const n=$('#np').value.trim();if(!n)return;if(players.includes(n))return toast('Player already exists');players.push(n);render();upd()}
  else if(t.id=='save'){const ps=players.filter(p=>plays[p]!==false);if(!dd)return toast('Pick the date played');if(!ps.length)return toast('Select at least one player');
   game={date:dd,players:ps};gc=false;finals={};loanDraft={};ld=dd;tab='loans';render();toast('Game started — add fresh loans, then tap Game completion')}
  else if(t.id=='gdisc'){if(confirm('Discard this game and its loans?')){loans=loans.filter(l=>l.done);game=null;gc=false;finals={};loanDraft={};render()}}
  else if(t.id=='bkref'){loadBackups()}
- else if(t.id=='bkfull'){if(bk.full&&confirm('Replace ALL shared data (sessions, loans, players and any game in progress) with this backup, for everyone?')){applyState(JSON.parse(bk.full.json));tab='hist';render();toast('Backup restored')}}
- else if(t.id=='bkstd'){if(bk.standing&&confirm('Replace the current game and its loans with this saved standing?')){const d=JSON.parse(bk.standing.json);loans=loans.filter(l=>l.done).concat(d.loans.map(l=>({...l})));game={date:d.game.date,players:[...d.game.players]};initLoan=d.initLoan;d.game.players.forEach(q=>{if(!players.includes(q))players.push(q)});gc=false;finals={};loanDraft={};tab='loans';render();toast('Standing restored')}}
+ else if(t.id=='orgset'){setPass()}
+ else if(t.id=='gencode'){genCode()}
+ else if(t.id=='allowall'){allowAll()}
+ else if(t.id=='unlock'){unlockEdit()}
+ else if(t.id=='copycode'){if(navigator.clipboard)navigator.clipboard.writeText(lastCode).then(()=>toast('Code copied'));else prompt('Copy this code',lastCode)}
+ else if(t.id=='orgrm'){removePass()}
+ else if(t.id=='bkfull'){guard('restore a backup',()=>{if(bk.full&&confirm('Replace ALL shared data (sessions, loans, players and any game in progress) with this backup, for everyone?')){applyState(JSON.parse(bk.full.json));tab='hist';render();toast('Backup restored')}})}
+ else if(t.id=='bkstd'){guard('restore the standing',()=>{if(bk.standing&&confirm('Replace the current game and its loans with this saved standing?')){const d=JSON.parse(bk.standing.json);loans=loans.filter(l=>l.done).concat(d.loans.map(l=>({...l})));game={date:d.game.date,players:[...d.game.players]};initLoan=d.initLoan;d.game.players.forEach(q=>{if(!players.includes(q))players.push(q)});gc=false;finals={};loanDraft={};tab='loans';render();toast('Standing restored')}})}
  else if(t.id=='gjoin'){const c=($('#gc_in').value||'').trim();if(!/^[A-Za-z0-9_-]{8,40}$/.test(c))return toast('Use 8 to 40 letters, numbers, - or _');setGroup(c)}
  else if(t.id=='gnew'){setGroup(randCode());toast('Group created. Tap Copy invite link to share it.')}
  else if(g('data-gcopy')){copyLink()}
@@ -423,8 +430,8 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(t.id=='pdf')save(`Session_Dashboard_${last()}.pdf`,pdfBuf())});
 document.addEventListener('input',e=>{const t=e.target;if(t.dataset.fa!==undefined){finals[t.dataset.fa]=t.value;upd()}else if(t.id=='nd')dd=t.value;else if(t.dataset.la!==undefined){(loanDraft[t.dataset.la]=loanDraft[t.dataset.la]||{}).amt=t.value}else if(t.id=='ld')ld=t.value});
 document.addEventListener('change',e=>{const t=e.target;
- if(t.id=='up'&&t.files[0]){if((sessions.length||players.length)&&!confirm('Uploading replaces the shared data for EVERYONE in this group. Continue?')){t.value='';return}importXlsx(t.files[0]).catch(e=>toast('Could not read file: '+(e&&e.message||e)));t.value=''}
- else if(t.id=='lg'&&t.files&&t.files[0]){loadSessionFile(t.files[0]).catch(e=>toast('Could not read file: '+(e&&e.message||e)));t.value=''}
+ if(t.id=='up'&&t.files[0]){if(!canEdit()){t.value='';return toast('View only: enter the edit code first')}const f0=t.files[0];t.value='';guard('upload an Excel file',()=>{if((sessions.length||players.length)&&!confirm('Uploading replaces the shared data for EVERYONE in this group. Continue?'))return;importXlsx(f0).catch(e=>toast('Could not read file: '+(e&&e.message||e)))})}
+ else if(t.id=='lg'&&t.files&&t.files[0]){if(!canEdit()){t.value='';return toast('View only: enter the edit code first')}loadSessionFile(t.files[0]).catch(e=>toast('Could not read file: '+(e&&e.message||e)));t.value=''}
  else if(t.dataset.pl!==undefined){plays[t.dataset.pl]=t.checked}
  else if(t.dataset.ls!==undefined){(loanDraft[t.dataset.ls]=loanDraft[t.dataset.ls]||{}).src=t.value}
  else if(t.dataset.il!==undefined){const v=+t.value;if(isFinite(v)&&v>=0)initLoan=v;render()}
@@ -455,27 +462,59 @@ function mergeState(b,l,r){const o=norm(JSON.parse(JSON.stringify(r)));b=norm(b)
   b[k].forEach(x=>{if(!lm.has(x.id)){const i=o[k].findIndex(y=>y.id===x.id);if(i>=0)o[k].splice(i,1)}})});
  if(l.initLoan!==b.initLoan)o.initLoan=l.initLoan;if(canon(l.game)!==canon(b.game))o.game=l.game;return o}
 function gbarHtml(){if(!gid)return'';const m={live:['#15803d','Live'],saving:['#d97706','Saving…'],connecting:['#d97706','Connecting…'],offline:['#dc2626','Offline: changes not saved yet'],error:['#dc2626','Connection problem']}[cs]||['#6b7686',''];
- return`<span style="color:${m[0]}">●</span> ${m[1]} <span class="mut">· group ${E(gid.slice(0,4))}…</span> <button data-gcopy>Copy invite link</button> <button data-gleave>Leave</button>`}
+ return`<span style="color:${m[0]}">●</span> ${m[1]} <span class="mut">· group ${E(gid.slice(0,4))}…</span> <button data-gcopy>Copy invite link</button> <button data-gleave>Leave</button>${accessLoaded?(canEdit()?(access?' <span class="pos">✏️ Editor</span>':''):' <span class="neg">👁 View only</span> <button class="pri" id="unlock">Enter edit code</button>'):''}`}
 function setSync(c){cs=c;const g=$('#gbar');if(g)g.innerHTML=gbarHtml()}
 function joinScreen(){return`<div class="card"><b>Join your group</b><div class="mut" style="margin:6px 0 10px">Everyone with the same group code sees the same sessions and loans, live. Keep the code private: anyone who has it can view and edit.</div><div class="row"><input id="gc_in" placeholder="Group code" style="text-align:left;flex:1;width:auto"><button class="pri" id="gjoin">Join</button></div><div style="margin-top:12px"><button id="gnew">Create a new group</button></div></div>`}
 function connectCard(){return`<div class="card"><b>${cs=='error'?'Could not connect':'Connecting…'}</b><div class="mut" style="margin:6px 0">${E(cloudErr)}</div>${cs=='error'?'<p>Check that you are online and that the Firestore rules are published (Database, then Rules, then Publish).</p>':''}<button data-gleave>Use a different group code</button></div>`}
 function render(){document.body.classList.toggle('nogrp',!gid);
  if(!gid){$('#v').innerHTML=joinScreen();return}
  if(!synced){$('#v').innerHTML=connectCard();setSync(cs);return}
- render0();setSync(cs);queueMicrotask(persist)}
+ render0();setSync(cs);document.body.classList.toggle('viewonly',!canEdit());if(!canEdit())lockUI();queueMicrotask(persist)}
 function renderSafe(){const a=document.activeElement;if(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)){pendingRender=true;return}render()}
 function reconcile(S){base=norm(S);lastSent='';if(canon(getState())!==canon(base)){applying=true;applyState(base);applying=false;renderSafe()}setSync(navigator.onLine===false?'offline':'live')}
 async function persist(){if(!cloudOn||!synced||applying||!window.cloud)return;const L=getState(),c=canon(L);if(c===canon(base||EMPTY())||c===lastSent)return;
+ if(!canEdit()){applying=true;applyState(base||EMPTY());applying=false;toast('View only: enter the edit code to make changes');renderSafe();return}
  lastSent=c;inflight++;setSync('saving');
  try{const out=await cloud.commit(gid,rj=>JSON.stringify(mergeState(base||EMPTY(),L,rj?JSON.parse(rj):EMPTY())));base=norm(JSON.parse(out));cs=navigator.onLine===false?'offline':'live';saveBackups()}
  catch(e){lastSent='';cs='offline';toast('Could not save: '+((e&&e.code)||'offline')+'. It will retry on your next change.')}
  inflight--;if(!inflight&&cs!='offline')reconcile(base);else setSync(cs)}
+let access=null,accessLoaded=false,lastCode='';
+const editKey=()=>'ptc_edit_'+gid;
+function canEdit(){if(!accessLoaded)return false;if(!access)return true;try{return localStorage.getItem(editKey())===access.hash}catch(e){return false}}
+const normCode=c=>String(c||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+const ALLOW='[data-t],[data-v],[data-x],[data-q],[data-mode],[data-pn],[data-rf],[data-rt],[data-hs],[data-hp],[data-all],[data-xall],#bkref,#sxl,#gencode,#allowall,#orgset,#orgrm,#copycode';
+function lockUI(){document.querySelectorAll('#v input,#v select,#v textarea,#v button,#v label.btn').forEach(el=>{if(!el.matches(ALLOW)){el.disabled=true;el.style.opacity='.5'}});const u=$('#up');if(u)u.disabled=true}
+async function unlockEdit(){if(!access)return;const c=prompt('Enter the edit code from the organiser:');if(c===null)return;
+ const h=await hashPass(normCode(c),access.salt,access.iter);if(h===access.hash){try{localStorage.setItem(editKey(),h)}catch(e){}toast('Editing enabled on this device');render()}else toast('Wrong edit code')}
+async function genCode(){if(!orgInfo){if(!canEdit())return toast('Enter the edit code first, or ask the organiser');if(!confirm('First set an organiser passcode. Only you will be able to create edit codes with it.'))return;await setPass();if(!orgInfo)return}
+ else if(!(await checkPass('generate an edit code')))return;
+ const a='ABCDEFGHJKMNPQRSTUVWXYZ23456789';let c='';crypto.getRandomValues(new Uint8Array(8)).forEach(x=>{c+=a[x%a.length]});
+ const salt=randHex(16),iter=150000,hash=await hashPass(c,salt,iter);
+ try{await cloud.put(gid,'access',JSON.stringify({salt,iter,hash}));access={salt,iter,hash};accessLoaded=true;try{localStorage.setItem(editKey(),hash)}catch(e){}lastCode=c.slice(0,4)+'-'+c.slice(4);render();toast('New edit code created')}catch(e){toast('Could not save the edit code')}}
+async function allowAll(){if(!(await checkPass('let everyone edit')))return;if(!confirm('Remove the edit code? Everyone with the link will be able to edit again.'))return;
+ try{await cloud.put(gid,'access','null');access=null;accessLoaded=true;lastCode='';render();toast('Everyone can edit again')}catch(e){toast('Could not save')}}
+let orgInfo=null,orgLoaded=false,unlockUntil=0;
+const randHex=n=>[...crypto.getRandomValues(new Uint8Array(n))].map(b=>b.toString(16).padStart(2,'0')).join('');
+async function hashPass(pw,saltHex,iter){const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveBits']),bits=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:Uint8Array.from(saltHex.match(/../g).map(h=>parseInt(h,16))),iterations:iter},key,256);return[...new Uint8Array(bits)].map(b=>b.toString(16).padStart(2,'0')).join('')}
+async function loadOrg(){orgLoaded=false;try{const d=await cloud.get(gid,'organiser');orgInfo=d?JSON.parse(d.json):null;orgLoaded=true}catch(e){}return orgLoaded}
+async function checkPass(label){if(Date.now()<unlockUntil)return true;await loadOrg();
+ if(!orgLoaded){toast('Could not check the organiser passcode. Check your connection and try again.');return false}
+ if(!orgInfo)return true;const pw=prompt('Organiser passcode needed to '+label+':');if(pw===null)return false;
+ if(await hashPass(pw,orgInfo.salt,orgInfo.iter)===orgInfo.hash){unlockUntil=Date.now()+600000;return true}toast('Wrong passcode');return false}
+async function guard(label,fn){if(await checkPass(label))fn()}
+async function setPass(){if(!orgInfo&&!canEdit())return toast('Enter the edit code first, or ask the organiser');if(orgInfo&&!(await checkPass('change the passcode')))return;
+ const a=prompt('New organiser passcode (at least 4 characters):');if(a===null)return;if(a.length<4)return toast('Use at least 4 characters');
+ const b=prompt('Type it again to confirm:');if(b!==a)return toast('The two entries did not match');
+ const salt=randHex(16),iter=150000,hash=await hashPass(a,salt,iter);
+ try{await cloud.put(gid,'organiser',JSON.stringify({salt,iter,hash}));orgInfo={salt,iter,hash};orgLoaded=true;unlockUntil=Date.now()+600000;render();toast('Organiser passcode saved')}catch(e){toast('Could not save the passcode')}}
+async function removePass(){if(!orgInfo)return;if(!(await checkPass('remove the passcode')))return;if(!confirm('Remove the organiser passcode? Anyone will be able to upload, restore and delete sessions.'))return;
+ try{await cloud.put(gid,'organiser','null');orgInfo=null;unlockUntil=0;render();toast('Passcode removed')}catch(e){toast('Could not remove the passcode')}}
 let bk={full:undefined,standing:undefined,busy:false,err:''},wantFull=false,lastStd='';
 async function saveBackups(){try{
  if(wantFull&&!base.game){await cloud.put(gid,'full',JSON.stringify(base));wantFull=false}
  if(base.game){const st=JSON.stringify({game:base.game,loans:base.loans.filter(l=>!l.done),initLoan:base.initLoan}),c=canon(JSON.parse(st));if(c!==lastStd){await cloud.put(gid,'standing',st);lastStd=c}}
 }catch(e){}}
-async function loadBackups(){if(!window.cloud||!gid)return;bk.busy=true;bk.err='';render();
+async function loadBackups(){if(!window.cloud||!gid)return;bk.busy=true;bk.err='';render();loadOrg();
  try{bk.full=await cloud.get(gid,'full');bk.standing=await cloud.get(gid,'standing')}catch(e){bk.err=(e&&e.code)||'error'}bk.busy=false;render()}
 function backupTab(){const when=x=>new Date(x.savedAt).toLocaleString();
  if(bk.busy&&bk.full===undefined)return'<p class="mut">Loading backups…</p>';
@@ -486,14 +525,17 @@ function backupTab(){const when=x=>new Date(x.savedAt).toLocaleString();
  else b='<div class="mut">No standing saved yet. It is saved automatically while a game is in progress, and it replaces the previous one.</div>';
  return`<div class="card"><b>Last completed game backup</b><div class="mut" style="margin:4px 0 8px">Everything: sessions, players, loans. Restoring replaces the shared data for everyone.</div>${a}</div>
  <div class="card"><b>Current standing backup</b><div class="mut" style="margin:4px 0 8px">The game in progress and its loans. Restoring brings that game back and leaves your sessions alone.</div>${b}</div>
+ <div class="card"><b>Edit access</b><div class="mut" style="margin:4px 0 8px">${access?'Only people with the edit code can make changes. Everyone else can view and export.':'Everyone with the link can edit. Create an edit code to make the link view-only for everyone else.'} Needs the organiser passcode.</div><button class="pri" id="gencode">${access?'Generate a new edit code':'Create an edit code'}</button>${access?' <button id="allowall">Allow everyone to edit</button>':''}${lastCode?`<div style="margin-top:10px">Share this code with your players (shown once):<div style="font-size:24px;font-weight:700;letter-spacing:2px;margin:4px 0">${lastCode}</div><button id="copycode">Copy code</button></div>`:''}</div>
+ <div class="card"><b>Organiser passcode</b><div class="mut" style="margin:4px 0 8px">${orgInfo?'A passcode is set. It is asked before uploading Excel, restoring a backup or deleting a session.':'Not set. Set one so only the organiser can upload Excel, restore backups or delete sessions. Everyone can still record games and loans.'}</div><button class="pri" id="orgset">${orgInfo?'Change passcode':'Set passcode'}</button>${orgInfo?' <button id="orgrm">Remove</button>':''}</div>
  <button id="bkref">Refresh</button>${bk.err?`<p class="neg">Could not load backups (${E(bk.err)}).</p>`:''}`}
 function startCloud(){if(!gid)return;
  if(!window.cloud){window.addEventListener('cloudready',startCloud,{once:true});setTimeout(()=>{if(!window.cloud){cloudErr='Could not load Google services. Check your internet connection and reload.';cs='error';render()}},15000);return}
- cloudOn=true;cs='connecting';
+ cloudOn=true;cs='connecting';access=null;accessLoaded=false;
+ if(cloud.watch)cloud.watch(gid,'access',json=>{if(json===undefined)return;access=(json&&json!=='null')?JSON.parse(json):null;accessLoaded=true;if(synced)renderSafe()});
  cloud.listen(gid,json=>{const S=json?norm(JSON.parse(json)):EMPTY();
   if(!synced){synced=true;cs='live';base=S;lastSent='';applying=true;applyState(S);applying=false;render();return}
   if(inflight)return;reconcile(S)},e=>{cloudErr=((e&&e.code)||'error')+': '+((e&&e.message)||'');cs='error';synced=synced&&false;render()})}
-function clearLocal(){players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
+function clearLocal(){access=null;accessLoaded=false;lastCode='';players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
 function setGroup(code){gid=code;try{localStorage.setItem('ptc_group',code);history.replaceState(null,'','#g='+code)}catch(e){}clearLocal();cs='connecting';startCloud();render()}
 function leaveGroup(){if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;gid='';try{localStorage.removeItem('ptc_group');history.replaceState(null,'',location.pathname)}catch(e){}clearLocal();render()}
 function randCode(){const a='abcdefghjkmnpqrstuvwxyz23456789';let s='';crypto.getRandomValues(new Uint8Array(14)).forEach(x=>{s+=a[x%a.length]});return s}
@@ -508,10 +550,11 @@ import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase
 import {initializeFirestore,doc,onSnapshot,runTransaction,setDoc,getDoc} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 const firebaseConfig={apiKey:"AIzaSyB-B8LBHwZtBQ5-qzU0YCX9s3Xt90gs2EY",authDomain:"patte-session-tracker.firebaseapp.com",projectId:"patte-session-tracker",storageBucket:"patte-session-tracker.firebasestorage.app",messagingSenderId:"275172572901",appId:"1:275172572901:web:d48c43b803285b23ad5e0c"};
 const app=initializeApp(firebaseConfig),db=initializeFirestore(app,{experimentalAutoDetectLongPolling:true});
-let unsub=null;const ref=g=>doc(db,'groups',g,'app','state');
+let unsub=null;const un={};const ref=g=>doc(db,'groups',g,'app','state');
 window.cloud={
  listen(g,cb,err){if(unsub)unsub();unsub=onSnapshot(ref(g),s=>cb(s.exists()?s.data().json:null),e=>err(e))},
- stop(){if(unsub)unsub();unsub=null},
+ stop(){if(unsub)unsub();unsub=null;Object.keys(un).forEach(k=>{un[k]();delete un[k]})},
+ watch(g,n,cb){if(un[n])un[n]();un[n]=onSnapshot(doc(db,'groups',g,'backup',n),x=>cb(x.exists()?x.data().json:null),()=>cb(undefined))},
  put(g,n,json){return setDoc(doc(db,'groups',g,'backup',n),{json,savedAt:Date.now()})},
  async get(g,n){const x=await getDoc(doc(db,'groups',g,'backup',n));return x.exists()?x.data():null},
  commit(g,fn){return runTransaction(db,async tx=>{const r=ref(g),s=await tx.get(r),out=fn(s.exists()?s.data().json:null);tx.set(r,{json:out,updatedAt:Date.now()});return out})}
