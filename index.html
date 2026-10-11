@@ -52,7 +52,7 @@ select{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--bd
  <button id="xl">Export Excel</button><button id="pdf">Export Dashboard PDF</button><button id="jpg">Share as image</button>
 </div>
 <div class="pw" id="gbar" style="margin:0 0 10px"></div>
-<div class="tabs"><button data-t="hist">History</button><button data-t="add">New session</button><button data-t="loans">Loans</button><button data-t="dash">Dashboard</button></div>
+<div class="tabs"><button data-t="hist">History</button><button data-t="add">New session</button><button data-t="loans">Loans</button><button data-t="dash">Dashboard</button><button data-t="backup">Backups</button></div>
 <div id="v"></div></main><div id="toast"></div>
 <script>
 const $=s=>document.querySelector(s),E=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -70,7 +70,7 @@ function stats(){return players.map(p=>{const v=sessions.map(s=>s.v[p]).filter(n
 function kpis(){const st=stats();let b=null;sessions.forEach((s,i)=>players.forEach(p=>{const x=s.v[p];if(num(x)&&(!b||x>b.x))b={p,x,n:nm(s,i)}}));
  const a=st[0],z=st[st.length-1];return[['Sessions',sessions.length,players.length+' players'],['Leader',a.p,f(a.t)],['Trailing',z.p,f(z.t)],['Best single session',b?b.p:'-',b?'+'+f(b.x)+' · '+b.n:'']]}
 function render0(){
- $('#v').innerHTML=tab=='hist'?hist():tab=='add'?entry():tab=='loans'?loansTab():dash();
+ $('#v').innerHTML=tab=='hist'?hist():tab=='add'?entry():tab=='loans'?loansTab():tab=='backup'?backupTab():dash();
  document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t==tab));
  $('#xl').disabled=!sessions.length;$('#jpg').disabled=$('#pdf').disabled=!sessions.length||!players.length||!Object.values(sel).some(Boolean)||players.every(p=>excl[p]);upd()}
 function hist(){
@@ -389,7 +389,7 @@ async function save(name,data){
 const last=()=>(sessions.map(s=>s.date).filter(Boolean).sort().pop()||dd);
 // ---- events ----
 document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']');
- if(g('data-t')){tab=g('data-t').dataset.t;render();upd()}
+ if(g('data-t')){tab=g('data-t').dataset.t;render();upd();if(tab=='backup')loadBackups()}
  else if(g('data-all')){const v=+g('data-all').dataset.all;OPTS.forEach(o=>sel[o[0]]=v);render()}
  else if(g('data-q')){const q=g('data-q').dataset.q.split(':');mode=q[0];if(+q[1])pn=+q[1];render()}
  else if(g('data-xall')){excl={};render()}
@@ -398,6 +398,9 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(t.id=='save'){const ps=players.filter(p=>plays[p]!==false);if(!dd)return toast('Pick the date played');if(!ps.length)return toast('Select at least one player');
   game={date:dd,players:ps};gc=false;finals={};loanDraft={};ld=dd;tab='loans';render();toast('Game started — add fresh loans, then tap Game completion')}
  else if(t.id=='gdisc'){if(confirm('Discard this game and its loans?')){loans=loans.filter(l=>l.done);game=null;gc=false;finals={};loanDraft={};render()}}
+ else if(t.id=='bkref'){loadBackups()}
+ else if(t.id=='bkfull'){if(bk.full&&confirm('Replace ALL shared data (sessions, loans, players and any game in progress) with this backup, for everyone?')){applyState(JSON.parse(bk.full.json));tab='hist';render();toast('Backup restored')}}
+ else if(t.id=='bkstd'){if(bk.standing&&confirm('Replace the current game and its loans with this saved standing?')){const d=JSON.parse(bk.standing.json);loans=loans.filter(l=>l.done).concat(d.loans.map(l=>({...l})));game={date:d.game.date,players:[...d.game.players]};initLoan=d.initLoan;d.game.players.forEach(q=>{if(!players.includes(q))players.push(q)});gc=false;finals={};loanDraft={};tab='loans';render();toast('Standing restored')}}
  else if(t.id=='gjoin'){const c=($('#gc_in').value||'').trim();if(!/^[A-Za-z0-9_-]{8,40}$/.test(c))return toast('Use 8 to 40 letters, numbers, - or _');setGroup(c)}
  else if(t.id=='gnew'){setGroup(randCode());toast('Group created. Tap Copy invite link to share it.')}
  else if(g('data-gcopy')){copyLink()}
@@ -409,7 +412,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   if(game.players.includes(n))return toast(n+' is already in this game');if(!players.includes(n))players.push(n);game.players.push(n);plays[n]=true;render();toast(n+' added to the game')}
  else if(t.id=='gfin'){if(!game)return;const rows=loanRows(game.players),res={};let miss=0;rows.forEach(r=>{const a=parseFloat(finals[r.p]);if(isNaN(a)){miss=1;return}res[r.p]=Math.round((a-r.cur)*100)/100});
   if(miss)return toast("Enter every player's final amount");const n=Math.round(Object.values(res).reduce((a,b)=>a+b,0)*100)/100;if(n&&!confirm(`Results net to ${n}, not 0. Save anyway?`))return;
-  sessions.push({date:game.date,label:'',v:res});loans.forEach(l=>{if(!l.done){l.done=true;l.g=game.date}});sortS();game=null;gc=false;finals={};loanDraft={};tab='hist';render();toast('Game saved to History — export Excel to keep it')}
+  sessions.push({date:game.date,label:'',v:res});loans.forEach(l=>{if(!l.done){l.done=true;l.g=game.date}});sortS();game=null;gc=false;finals={};loanDraft={};tab='hist';wantFull=true;render();toast('Game saved to History — export Excel to keep it')}
  else if(t.id=='lsave'){const add=[];let bad=0;if(!game)return;game.players.forEach(p=>{const x=loanDraft[p]||{},a=parseFloat(x.amt);if(x.amt===undefined||x.amt==='')return;if(!isFinite(a)||a===0){bad=1;return}add.push({date:ld,who:p,amt:x.src=='__repay'?-Math.abs(a):a,src:x.src=='__repay'?null:(x.src||null),g:game.date,done:false})});
   if(!ld)return toast('Pick the date');if(bad)return toast('Enter a valid amount that is not 0 (use − for a repayment)');if(!add.length)return toast('Enter at least one amount');
   loans.push(...add);loanDraft={};render();toast(add.length+(add.length>1?' loans':' loan')+' saved — tap Export session to keep a copy')}
@@ -464,9 +467,26 @@ function renderSafe(){const a=document.activeElement;if(a&&/^(INPUT|SELECT|TEXTA
 function reconcile(S){base=norm(S);lastSent='';if(canon(getState())!==canon(base)){applying=true;applyState(base);applying=false;renderSafe()}setSync(navigator.onLine===false?'offline':'live')}
 async function persist(){if(!cloudOn||!synced||applying||!window.cloud)return;const L=getState(),c=canon(L);if(c===canon(base||EMPTY())||c===lastSent)return;
  lastSent=c;inflight++;setSync('saving');
- try{const out=await cloud.commit(gid,rj=>JSON.stringify(mergeState(base||EMPTY(),L,rj?JSON.parse(rj):EMPTY())));base=norm(JSON.parse(out));cs=navigator.onLine===false?'offline':'live'}
+ try{const out=await cloud.commit(gid,rj=>JSON.stringify(mergeState(base||EMPTY(),L,rj?JSON.parse(rj):EMPTY())));base=norm(JSON.parse(out));cs=navigator.onLine===false?'offline':'live';saveBackups()}
  catch(e){lastSent='';cs='offline';toast('Could not save: '+((e&&e.code)||'offline')+'. It will retry on your next change.')}
  inflight--;if(!inflight&&cs!='offline')reconcile(base);else setSync(cs)}
+let bk={full:undefined,standing:undefined,busy:false,err:''},wantFull=false,lastStd='';
+async function saveBackups(){try{
+ if(wantFull&&!base.game){await cloud.put(gid,'full',JSON.stringify(base));wantFull=false}
+ if(base.game){const st=JSON.stringify({game:base.game,loans:base.loans.filter(l=>!l.done),initLoan:base.initLoan}),c=canon(JSON.parse(st));if(c!==lastStd){await cloud.put(gid,'standing',st);lastStd=c}}
+}catch(e){}}
+async function loadBackups(){if(!window.cloud||!gid)return;bk.busy=true;bk.err='';render();
+ try{bk.full=await cloud.get(gid,'full');bk.standing=await cloud.get(gid,'standing')}catch(e){bk.err=(e&&e.code)||'error'}bk.busy=false;render()}
+function backupTab(){const when=x=>new Date(x.savedAt).toLocaleString();
+ if(bk.busy&&bk.full===undefined)return'<p class="mut">Loading backups…</p>';
+ let a,b;
+ if(bk.full){const d=norm(JSON.parse(bk.full.json));a=`<div class="mut">Saved ${E(when(bk.full))} · ${d.sessions.length} sessions · ${d.players.length} players</div><button class="pri" id="bkfull" style="margin-top:8px">Restore this backup</button>`}
+ else a='<div class="mut">No backup yet. One is saved automatically each time you complete a game, and it replaces the previous one.</div>';
+ if(bk.standing){const d=JSON.parse(bk.standing.json);b=`<div class="mut">Saved ${E(when(bk.standing))} · game of ${E(d.game.date)} · ${d.game.players.length} players · ${d.loans.length} loan entries</div><button class="pri" id="bkstd" style="margin-top:8px">Restore this standing</button>`}
+ else b='<div class="mut">No standing saved yet. It is saved automatically while a game is in progress, and it replaces the previous one.</div>';
+ return`<div class="card"><b>Last completed game backup</b><div class="mut" style="margin:4px 0 8px">Everything: sessions, players, loans. Restoring replaces the shared data for everyone.</div>${a}</div>
+ <div class="card"><b>Current standing backup</b><div class="mut" style="margin:4px 0 8px">The game in progress and its loans. Restoring brings that game back and leaves your sessions alone.</div>${b}</div>
+ <button id="bkref">Refresh</button>${bk.err?`<p class="neg">Could not load backups (${E(bk.err)}).</p>`:''}`}
 function startCloud(){if(!gid)return;
  if(!window.cloud){window.addEventListener('cloudready',startCloud,{once:true});setTimeout(()=>{if(!window.cloud){cloudErr='Could not load Google services. Check your internet connection and reload.';cs='error';render()}},15000);return}
  cloudOn=true;cs='connecting';
@@ -485,13 +505,15 @@ render();
 </script>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {initializeFirestore,doc,onSnapshot,runTransaction} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {initializeFirestore,doc,onSnapshot,runTransaction,setDoc,getDoc} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 const firebaseConfig={apiKey:"AIzaSyB-B8LBHwZtBQ5-qzU0YCX9s3Xt90gs2EY",authDomain:"patte-session-tracker.firebaseapp.com",projectId:"patte-session-tracker",storageBucket:"patte-session-tracker.firebasestorage.app",messagingSenderId:"275172572901",appId:"1:275172572901:web:d48c43b803285b23ad5e0c"};
 const app=initializeApp(firebaseConfig),db=initializeFirestore(app,{experimentalAutoDetectLongPolling:true});
 let unsub=null;const ref=g=>doc(db,'groups',g,'app','state');
 window.cloud={
  listen(g,cb,err){if(unsub)unsub();unsub=onSnapshot(ref(g),s=>cb(s.exists()?s.data().json:null),e=>err(e))},
  stop(){if(unsub)unsub();unsub=null},
+ put(g,n,json){return setDoc(doc(db,'groups',g,'backup',n),{json,savedAt:Date.now()})},
+ async get(g,n){const x=await getDoc(doc(db,'groups',g,'backup',n));return x.exists()?x.data():null},
  commit(g,fn){return runTransaction(db,async tx=>{const r=ref(g),s=await tx.get(r),out=fn(s.exists()?s.data().json:null);tx.set(r,{json:out,updatedAt:Date.now()});return out})}
 };
 window.dispatchEvent(new Event('cloudready'));
