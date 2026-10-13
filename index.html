@@ -538,16 +538,23 @@ async function allowAll(){if(!(await checkPass('let everyone edit')))return;if(!
 async function allowAllView(){if(!(await checkPass('let everyone view without a code')))return;if(!confirm('Remove the view code? Anyone with the link will be able to view again.'))return;
  try{await cloud.put(gid,'viewaccess','null');viewAccess=null;viewLoaded=true;lastViewCode='';render();toast('Anyone with the link can view again')}catch(e){toast('Could not save')}}
 let orgInfo=null,orgLoaded=false,unlockUntil=0,pendingOrgPass=null,pendingSetGlobal=false;
-const CFG='__config__';
+const CFG='appconfig';
 async function ensureCloud(){if(window.cloud)return true;return new Promise(r=>{const t=setTimeout(()=>r(false),12000);window.addEventListener('cloudready',()=>{clearTimeout(t);r(!!window.cloud)},{once:true})})}
+async function loadCreatePass(){
+ const c=window.cloud;if(!c)return null;
+ try{const meta=await c.get(CFG,'createpass');if(meta&&meta.json&&meta.json!=='null')return JSON.parse(meta.json)}catch(e){}
+ const recent=getRecent();
+ for(const r of recent){try{const d=await c.get(r.code,'organiser');if(d&&d.json&&d.json!=='null'){const info=JSON.parse(d.json);try{await c.put(CFG,'createpass',JSON.stringify(info))}catch(e){}return info}}catch(e){}}
+ return null
+}
 async function createNewGroup(){
  const n=prompt('Name this group (optional, e.g. Friday poker):');if(n===null)return;
  if(!(await ensureCloud()))return toast('Could not connect. Check your internet and try again.');
- let meta=null;try{meta=await cloud.get(CFG,'createpass')}catch(e){return toast('Could not check create access. Try again.')}
- const hasGlobal=meta&&meta.json&&meta.json!=='null';
- const a=prompt(hasGlobal?'Enter the organiser passcode to create a new group:':'No create passcode is set yet. Choose an organiser passcode for this app (at least 4 characters).\nYou will need this same passcode to create more groups later.');
+ let info=null;try{info=await loadCreatePass()}catch(e){return toast('Could not check create access: '+(e&&e.code||e&&e.message||'error'))}
+ const hasGlobal=!!info;
+ const a=prompt(hasGlobal?'Enter the organiser passcode to create a new group:':'No create passcode is set yet. Choose an organiser passcode (at least 4 characters).\nYou will need this same passcode to create more groups later.');
  if(a===null)return;if(a.length<4)return toast('Use at least 4 characters');
- if(hasGlobal){const info=JSON.parse(meta.json);const h=await hashPass(a,info.salt,info.iter);if(h!==info.hash)return toast('Wrong organiser passcode');pendingOrgPass=a;pendingSetGlobal=false}
+ if(hasGlobal){const h=await hashPass(a,info.salt,info.iter);if(h!==info.hash)return toast('Wrong organiser passcode');pendingOrgPass=a;pendingSetGlobal=false}
  else{const b=prompt('Type the organiser passcode again to confirm:');if(b!==a)return toast('The two entries did not match');pendingOrgPass=a;pendingSetGlobal=true}
  setGroup(randCode(),(n||'').trim());toast('Group created. Tap Copy invite link to share it.')}
 const randHex=n=>[...crypto.getRandomValues(new Uint8Array(n))].map(b=>b.toString(16).padStart(2,'0')).join('');
