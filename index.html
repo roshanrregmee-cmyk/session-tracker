@@ -410,10 +410,10 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(t.id=='save'){const ps=players.filter(p=>plays[p]!==false);if(!dd)return toast('Pick the date played');if(!ps.length)return toast('Select at least one player');
   game={date:dd,players:ps};gc=false;finals={};loanDraft={};ld=dd;tab='loans';render();toast('Game started — add fresh loans, then tap Game completion')}
  else if(t.id=='gdisc'){if(confirm('Discard this game and its loans?')){loans=loans.filter(l=>l.done);game=null;gc=false;finals={};loanDraft={};render()}}
- else if(g('data-nedit')){const k=g('data-nedit').dataset.nedit;editing[k]=true;notesDraft[k]=k=='readme'?(readme===null?README_DEFAULT:readme):rules;render()}
- else if(g('data-nsave')){const k=g('data-nsave').dataset.nsave,v=notesDraft[k]===undefined?(k=='readme'?(readme===null?README_DEFAULT:readme):rules):notesDraft[k];if(k=='readme')readme=v.trim()===README_DEFAULT.trim()?null:v;else rules=v;editing[k]=false;delete notesDraft[k];render();toast('Saved for everyone')}
+ else if(g('data-nedit')){const k=g('data-nedit').dataset.nedit;editing[k]=true;notesDraft[k]=k=='readme'?(readme===null?README_DEFAULT:readme):(rules===null||rules==='')?RULES_DEFAULT:rules;render()}
+ else if(g('data-nsave')){const k=g('data-nsave').dataset.nsave,v=notesDraft[k]===undefined?(k=='readme'?(readme===null?README_DEFAULT:readme):(rules===null||rules==='')?RULES_DEFAULT:rules):notesDraft[k];if(k=='readme')readme=v.trim()===README_DEFAULT.trim()?null:v;else rules=v.trim()===RULES_DEFAULT.trim()?null:v;editing[k]=false;delete notesDraft[k];render();toast('Saved for everyone')}
  else if(g('data-ncancel')){const k=g('data-ncancel').dataset.ncancel;editing[k]=false;delete notesDraft[k];render()}
- else if(g('data-nreset')){if(confirm('Replace the Readme with the original text?')){readme=null;editing.readme=false;delete notesDraft.readme;render()}}
+ else if(g('data-nreset')){const k=g('data-nreset').dataset.nreset;if(confirm('Replace the '+k+' with the original text?')){if(k=='readme'){readme=null;editing.readme=false;delete notesDraft.readme}else{rules=null;editing.rules=false;delete notesDraft.rules}render()}}
  else if(t.id=='exadd'){const cand=game?game.players:players,amt=parseFloat(exDraft.amt),paid=exDraft.paid&&players.includes(exDraft.paid)?exDraft.paid:cand[0],sh=cand.filter(p=>exDraft.shared[p]!==false);
   if(!(amt>0))return toast('Enter an amount greater than 0');if(!sh.length)return toast('Choose who shares it');
   expenses.push({date:new Date().toLocaleDateString('en-CA'),desc:(exDraft.desc||'').trim()||'Expense',paidBy:paid,amt,split:sh.length==cand.length?null:sh,g:game?game.date:'',done:false});exDraft={desc:'',amt:'',paid:'',shared:{}};render();toast('Expense added')}
@@ -489,10 +489,10 @@ document.addEventListener('change',e=>{const t=e.target;
 let gid='',cs='connecting',cloudErr='',synced=false,cloudOn=false,base=null,inflight=0,lastSent='',applying=false,pendingRender=false;
 try{gid=((location.hash||'').match(/g=([A-Za-z0-9_-]{8,40})/)||[])[1]||localStorage.getItem('ptc_group')||''}catch(e){}
 const hashGame=((location.hash||'').match(/game=(\d{4}-\d{2}-\d{2})/)||[])[1]||'';
-const EMPTY=()=>({players:[],sessions:[],loans:[],expenses:[],settle:null,initLoan:500,game:null,readme:null,rules:'',groupName:''});
+const EMPTY=()=>({players:[],sessions:[],loans:[],expenses:[],settle:null,initLoan:500,game:null,readme:null,rules:null,groupName:''});
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
 const canon=x=>JSON.stringify(x,(k,v)=>v&&typeof v=='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(q=>[q,v[q]])):v);
-const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],expenses:S.expenses||[],settle:S.settle||null,initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:'',groupName:typeof S.groupName=='string'?S.groupName:''});
+const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],expenses:S.expenses||[],settle:S.settle||null,initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:null,groupName:typeof S.groupName=='string'?S.groupName:''});
 function getState(){sessions.forEach(x=>{if(!x.id)x.id=uid()});loans.forEach(l=>{if(!l.id)l.id=uid()});expenses.forEach(e=>{if(!e.id)e.id=uid()});
  return{players:[...players],sessions:sessions.map(x=>({id:x.id,date:x.date||'',label:x.label||'',v:{...x.v}})),loans:loans.map(l=>({id:l.id,date:l.date,who:l.who,amt:l.amt,src:l.src||null,g:l.g||'',done:!!l.done})),initLoan,game:game?{date:game.date,players:[...game.players]}:null,readme,rules,groupName,expenses:expenses.map(e=>({id:e.id,date:e.date||'',desc:e.desc||'',paidBy:e.paidBy,amt:e.amt,split:e.split&&e.split.length?[...e.split]:null,g:e.g||'',done:!!e.done})),settle:settle?JSON.parse(JSON.stringify(settle)):null}}
 function applyState(S){S=norm(S);players=[...S.players];sessions=S.sessions.map(x=>({...x,v:{...x.v}}));loans=S.loans.map(l=>({...l}));initLoan=S.initLoan;game=S.game?{date:S.game.date,players:[...S.game.players]}:null;readme=S.readme;rules=S.rules;groupName=S.groupName||'';expenses=S.expenses.map(e=>({...e}));settle=S.settle;if(!game){gc=false;finals={}}sortS();if(gid&&groupName)saveRecent(gid,groupName)}
@@ -632,7 +632,38 @@ async function setPass(){if(!orgInfo&&!canEdit())return toast('Enter the edit co
  try{const payload=JSON.stringify({salt,iter,hash});await cloud.put(gid,'organiser',payload);await cloud.put(CFG,'createpass',payload);orgInfo={salt,iter,hash};orgLoaded=true;markOrganiser();render();toast('Organiser passcode saved (also used to create new groups)')}catch(e){toast('Could not save the passcode')}}
 async function removePass(){if(!orgInfo)return;if(!(await checkPass('remove the passcode')))return;if(!confirm('Remove the organiser passcode? Anyone will be able to upload, restore and delete sessions.'))return;
  try{await cloud.put(gid,'organiser','null');orgInfo=null;unlockUntil=0;render();toast('Passcode removed')}catch(e){toast('Could not remove the passcode')}}
-let readme=null,rules='',groupName='',editing={},notesDraft={},expenses=[],settle=null,exDraft={desc:'',amt:'',paid:'',shared:{}};
+let readme=null,rules=null,groupName='',editing={},notesDraft={},expenses=[],settle=null,exDraft={desc:'',amt:'',paid:'',shared:{}};
+const RULES_DEFAULT=`# Teen Patti House Rules
+
+## How to Play
+- Standard **52-card** deck
+- Each player is dealt **3 cards face-down** (until there is a variation game)
+- Players can play **Blind** (without seeing cards) a maximum of **2 times**. **Seen** players (after looking at cards) have **no limit**
+- Betting starts with **ante (boot)**, then rounds of raising or packing
+
+## Hand Rankings (Highest to Lowest)
+1. **Trail / Trio** (Three of a Kind) — e.g. A♠ A♥ A♦ — Highest
+2. **Pure Sequence** (Straight Flush) — e.g. A♠ K♠ Q♠
+3. **Sequence** (Straight) — e.g. A♥ K♦ Q♣
+4. **Colour** (Flush) — e.g. K♠ 9♠ 5♠
+5. **Pair** (Two of a Kind) — e.g. Q♥ Q♦ 8♣
+6. **High Card** — e.g. K♥ 9♠ 4♦ — Lowest
+
+## Suit Ranking (Highest to Lowest)
+1. **Spade** (Black)
+2. **Heart** (Red)
+3. **Diamond** (Red)
+4. **Club** (Black)
+
+## Key Rules
+- Blind player bets **1x**, Seen player bets **2x** the current stake
+- Maximum **2x raises** per round, with a limit of **80 (Blind) / 160 (Seen)**
+- **Showdown**: highest ranking hand wins the pot
+- If only **2 players** remain and one is Blind, the other must put **2x** to request a **Show**
+
+---
+Tap **Edit** below to change these rules for your group. Changes are saved for everyone.
+`;
 const README_DEFAULT=`# Welcome
 This tracker keeps your group's sessions, loans and results in one shared place. Everyone with the link sees the same data live. Use different groups when different sets of players play — each group has its own independent history.
 
@@ -674,9 +705,9 @@ function mdLite(t){let h='',list=null;const close=()=>{if(list){h+='</'+list+'>'
   if(m=l.match(/^\s*[-•]\s+(.*)/)){if(list!='ul'){close();h+='<ul style="margin:4px 0;padding-left:22px">';list='ul'}h+=`<li style="margin:3px 0">${inl(m[1])}</li>`;return}
   if(m=l.match(/^\s*\d+[.)]\s+(.*)/)){if(list!='ol'){close();h+='<ol style="margin:4px 0;padding-left:22px">';list='ol'}h+=`<li style="margin:3px 0">${inl(m[1])}</li>`;return}
   close();h+=`<p style="margin:6px 0">${inl(l)}</p>`});close();return h}
-function notesTab(k){const title=k=='readme'?'Readme':'Rules',txt=k=='readme'?(readme===null?README_DEFAULT:readme):rules;
+function notesTab(k){const title=k=='readme'?'Readme':'Rules',txt=k=='readme'?(readme===null?README_DEFAULT:readme):((rules===null||rules==='')?RULES_DEFAULT:rules);
  if(editing[k]){const d=notesDraft[k]===undefined?txt:notesDraft[k];
-  return`<div class="card"><b>Editing ${title}</b><div class="mut" style="margin:4px 0 8px">Use # for headings, - for bullets, 1. for numbered steps and **bold**. Saved for everyone.</div><textarea data-ta="${k}" style="width:100%;min-height:340px;font:inherit;color:inherit;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:10px">${E(d)}</textarea><div class="pw" style="margin-top:8px"><button class="pri" data-nsave="${k}">Save</button><button data-ncancel="${k}">Cancel</button>${k=='readme'&&readme!==null?'<button data-nreset="readme">Reset to original</button>':''}</div></div>`}
+  return`<div class="card"><b>Editing ${title}</b><div class="mut" style="margin:4px 0 8px">Use # for headings, - for bullets, 1. for numbered steps and **bold**. Saved for everyone.</div><textarea data-ta="${k}" style="width:100%;min-height:340px;font:inherit;color:inherit;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:10px">${E(d)}</textarea><div class="pw" style="margin-top:8px"><button class="pri" data-nsave="${k}">Save</button><button data-ncancel="${k}">Cancel</button>${(k=='readme'&&readme!==null)||(k=='rules'&&rules!==null&&rules!=='')?'<button data-nreset="'+k+'">Reset to original</button>':''}</div></div>`}
  return`<div class="card">${txt.trim()?mdLite(txt):'<p class="mut">No rules written yet. Tap Edit to add your group\'s rules.</p>'}<div class="pw" style="margin-top:10px"><button data-nedit="${k}">✎ Edit</button></div></div>`}
 const fmtA=n=>Number.isInteger(n)?n.toLocaleString():n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 function expenseSplit(P,list){const paid={},share={};list.forEach(e=>{const who=e.split&&e.split.length?e.split:P,tot=Math.round(e.amt*100),k=who.length||1,b=Math.floor(tot/k),rem=tot-b*k;paid[e.paidBy]=(paid[e.paidBy]||0)+tot;who.forEach((p,i)=>{share[p]=(share[p]||0)+b+(i<rem?1:0)})});return{paid,share}}
@@ -752,7 +783,7 @@ function startCloud(){if(!gid)return;
    if(pendingOrgPass){const pw=pendingOrgPass,setG=pendingSetGlobal;pendingOrgPass=null;pendingSetGlobal=false;(async()=>{try{const salt=randHex(16),iter=150000,hash=await hashPass(pw,salt,iter);const payload=JSON.stringify({salt,iter,hash});await cloud.put(gid,'organiser',payload);if(setG)await cloud.put(CFG,'createpass',payload);orgInfo={salt,iter,hash};orgLoaded=true;markOrganiser();render()}catch(e){toast('Could not save organiser passcode — set it on the Backups tab')}})()}
    render();queueMicrotask(persist);return}
   if(inflight)return;reconcile(S)},e=>{cloudErr=((e&&e.code)||'error')+': '+((e&&e.message)||'');cs='error';synced=synced&&false;render()})}
-function clearLocal(){readme=null;rules='';groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
+function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
 function setGroup(code,name){const nm=(name!=null?String(name):'').trim().slice(0,40);gid=code;saveRecent(code,nm||code.slice(0,8));try{localStorage.setItem('ptc_group',code);history.replaceState(null,'','#g='+code)}catch(e){}clearLocal();groupName=nm;cs='connecting';startCloud();render();queueMicrotask(()=>registerGroup(code,nm).catch(()=>{}))}
 function leaveGroup(){if(gid)saveRecent(gid,groupName||gid.slice(0,8));if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;gid='';try{localStorage.removeItem('ptc_group');history.replaceState(null,'',location.pathname)}catch(e){}clearLocal();render()}
 function switchGroupUI(){tab='hist';leaveGroup()}
