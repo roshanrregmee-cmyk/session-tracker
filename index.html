@@ -665,38 +665,47 @@ const RULES_DEFAULT=`# Teen Patti House Rules
 Tap **Edit** below to change these rules for your group. Changes are saved for everyone.
 `;
 const README_DEFAULT=`# Welcome
-This tracker keeps your group's sessions, loans and results in one shared place. Everyone with the link sees the same data live. Use different groups when different sets of players play — each group has its own independent history.
+This tracker keeps your group's sessions, loans and results in one shared place. Everyone with the link sees the same data live. Use **different groups** when different sets of players play — each group has its own independent history and can be named.
+
+## Access levels
+- **View code** (optional): locks the group. Without it, data (and export/upload) stay hidden. Enter it on the lock screen.
+- **Edit code** (optional): required to record games, loans and expenses. Without it you can only view and export.
+- **Organiser passcode**: required to create new groups, edit History, upload Excel, delete sessions/players/groups, restore backups, and create view/edit codes. On a new device, use **Enter organiser passcode** on the lock screen to regain full access.
 
 ## What each tab does
-- **History**: every finished session in a table (players down, sessions across) with totals. Tap a cell to correct it, sort by newest or oldest, and delete a session with the cross (it asks for the organiser passcode if one is set).
-- **New session**: choose the date and who is playing, then tap Start game. You can add a new player here, or carry on a saved game with Load existing session. For a completely different group of players, switch group from the top bar.
-- **Expenses**: record shared costs such as food. Choose **who paid** and **who should share the cost**. Expenses stay completely separate from session results and only count in the settlement.
-- **Loans**: works on the game in progress. Set the initial loan, record fresh loans, see the Current standing, copy a game invite, export the session, add a late joiner and finish with Game completion.
-- **Dashboard**: charts and tables for any period. Open expenses appear in their own card so they stay separate from session balances.
-- **Backups**: the automatic backups with restore buttons, the edit code and the organiser passcode.
-- **Readme**: this page. **Rules**: your group's own rules.
+- **History**: finished sessions in a table (players down, sessions across) with totals. **View-only for everyone except the organiser.** Organisers can edit cells, change dates and delete sessions (organiser passcode). Sort by newest/oldest.
+- **New session**: pick the date and who is playing, then Start game. Add players, delete players from the roster (organiser passcode), or resume a saved session file. Use another group for a different set of players (Switch group).
+- **Expenses**: shared costs (food, etc.). Choose **who paid** and **who should share the cost**. Expenses never mix into History or Dashboard totals; they only affect settlement when the game is completed.
+- **Loans**: for the game in progress. Set initial loan, record fresh loans, see Current standing, **Copy game invite**, export the session, add or **remove a player from this game**, then Game completion.
+- **Dashboard**: charts and stats for any period. Open expenses show in their own card. Export PDF or image.
+- **Backups**: automatic full/standing backups, view code, edit code, organiser passcode, and **All groups (admin)** — open or permanently delete any registered group.
+- **Readme**: this page. **Rules**: Teen Patti house rules by default (editable).
 
 ## Start to finish
-1. Organiser: open the app link and tap Create a new group, then Copy invite link and send it to the players. (Or open a recent group from the list.)
-2. Organiser: on the Backups tab set an organiser passcode, then tap Create an edit code and share the code with the players. Without the code people can only view.
-3. Players: open the link, tap Enter edit code at the top and type the code.
-4. First time only: start fresh by adding players in New session, or resume a saved session file from New session.
-5. Start a game: New session, pick the date, tick the players who are playing and tap Start game.
-6. Someone joins late: use Add a player to this game on the Loans or New session tab.
-7. During the game: Loans tab, enter fresh loans. Bank adds to a player's loan, Repay bank reduces it, and choosing another player moves loan between the two. Standing shows negative while a loan is owed.
-8. Share the game with late joiners: on the Loans tab tap Copy game invite (includes the group + game date). Every so often also tap Export session to keep a safety copy.
-9. When the game ends: tap Game completion and enter each player's final amount. Result = final amount + current standing. The results should add up to 0.
-10. Tap Complete game and save to History. The session appears in History, a backup is saved automatically, and the Settlement at the top of History shows who pays whom, using as few payments as possible, with any expenses included. Tap Share / copy to send it to the group.
-11. Open the Dashboard, pick a period and players, and export a PDF or image to share.
-12. After each game tap Export Excel and keep the file somewhere safe.
+1. Organiser: Create a new group (requires organiser passcode; optional group name), then Copy invite link.
+2. Organiser: on Backups, create a **view code** (to lock the link) and/or an **edit code**, and share them with players as needed.
+3. Players: open the link. If locked, enter the **view code**. To play, enter the **edit code**.
+4. Start a game: New session → date → tick players → Start game.
+5. Late joiner: Add a player on Loans or New session. To drop someone mid-game: Remove on Loans.
+6. During the game: Loans — Bank / Repay bank / player-to-player. Standing is negative while a loan is owed. Copy game invite or Export session for safety.
+7. End: Game completion → each player's final amount → Complete game. Settlement appears at the top of History (includes expenses).
+8. Dashboard: pick period and players, export PDF or image. Export Excel after games if you want a file backup.
+9. Organiser only: Upload Excel (top bar) replaces all shared history — asks for organiser passcode.
+
+## Groups and admin
+- **Switch group** / Recent groups: move between independent tables on this device.
+- **Rename** a group with the ✎ next to the group name (needs edit access).
+- **All groups (admin)** on Backups: after organiser passcode, list every registered group, open any of them, or **delete** a group (history, loans, expenses and backups — permanent).
+- Creating a group always needs the **same organiser passcode** used across the app.
 
 ## Good to know
-- If you see View only at the top, tap Enter edit code and type the code from the organiser.
-- There is no bulk Excel upload; data is entered in the app or resumed from a session export on New session.
-- If something goes wrong, the Backups tab can restore the last completed game or the last standing.
-- A blank cell means the player did not play. A 0 means they played and broke even.
-- Win % counts only the sessions a player played. A 0 session counts as played but is not a win.
-- To change this page, tap Edit below. Your changes are saved for everyone.
+- Locked group: no view of data, no export/upload, until view code or organiser passcode is entered.
+- History is read-only unless the organiser unlocks it on that device.
+- Upload Excel is **organiser-only** and overwrites the whole group.
+- Blank cell = did not play. 0 = played and broke even.
+- Win % counts only sessions a player played.
+- Rules tab ships with Teen Patti house rules; edit anytime.
+- To change this Readme, tap Edit below. Saved for everyone.
 `;
 const inl=x=>E(x).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
 function mdLite(t){let h='',list=null;const close=()=>{if(list){h+='</'+list+'>';list=null}};
