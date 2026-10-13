@@ -47,7 +47,7 @@ select{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--bd
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:10px 16px;border-radius:8px;display:none}
 </style></head><body><main>
 <h1>🃏 Session Tracker</h1>
-<div class="mut">Upload last time's Excel, add the new session, export. Positive = winning, negative = losing.</div>
+<div class="mut">Upload last time's Excel, add the new session, export. Positive = winning, negative = losing. Use different groups for different player sets.</div>
 <div class="bar">
  <label class="btn pri" for="up">Upload Excel</label><input id="up" type="file" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
  <button id="xl">Export Excel</button><button id="pdf">Export Dashboard PDF</button><button id="jpg">Share as image</button>
@@ -100,14 +100,15 @@ function loansTab(){
  ${P.map(p=>`<div class="row" style="flex-wrap:wrap"><span>${E(p)}</span><input inputmode="decimal" placeholder="amount" style="width:90px" data-la="${E(p)}" value="${E((loanDraft[p]||{}).amt||'')}"><button data-lsg="${E(p)}" title="Switch + / −">±</button><select data-ls="${E(p)}">${opts(p)}</select></div>`).join('')}
  <div class="mut">Bank: adds to the player's loan. Repay bank: reduces it. Another player: the borrower's loan goes up and the lender's goes down (a negative amount does the reverse). Standing shows negative while a loan is owed.</div>
  <button class="pri" id="lsave" style="width:100%;margin-top:10px">Save fresh loans</button></div>
- <p style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>Current standing</b><span style="display:flex;gap:6px"><button id="sxl">⬇ Export session</button><button class="pri" id="gcb">${gc?'Hide game completion':'Game completion'}</button></span></p><div class="mut" style="margin:-6px 0 8px">Export now and then. If this page closes, load the file from the New session tab.</div>${loantable(P)}${gc?gcPanel(P,cur):''}${loglist()}`}
+ <p style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><b>Current standing</b><span style="display:flex;gap:6px;flex-wrap:wrap"><button id="ginvite">Copy game invite</button><button id="sxl">⬇ Export session</button><button class="pri" id="gcb">${gc?'Hide game completion':'Game completion'}</button></span></p><div class="mut" style="margin:-6px 0 8px">Copy game invite shares a link for this specific game (group + date). Export the session file as a safety copy. If this page closes, load the file from the New session tab.</div>${loantable(P)}${gc?gcPanel(P,cur):''}${loglist()}`}
 function entry(){
  if(game)return`<div class="card"><b>Game in progress</b><div class="mut">${game.date} · ${game.players.length} playing: ${game.players.map(E).join(', ')}</div><p>Add loans and finish the game from the Loans tab. The final results are saved to History.</p><button class="pri" data-t="loans">Go to Loans</button> <button id="gdisc">Discard game</button></div>${joinCard()}`;
- return`<div class="card"><label>Date played <input type="date" id="nd" value="${dd}"></label>
+ return`<div class="card"><b>Start a new game in this group</b><div class="mut" style="margin:4px 0 8px">This group keeps one continuous history. If a completely different set of players is playing, switch to (or create) another group from the top bar.</div>
+ <label>Date played <input type="date" id="nd" value="${dd}"></label>
  <div style="margin-top:10px">${players.map(p=>`<label class="row"><span>${E(p)}</span><input type="checkbox" data-pl="${E(p)}" ${plays[p]===false?'':'checked'}> Playing</label>`).join('')||'<p class="mut">Add your first player below.</p>'}</div>
  <div class="row"><input id="np" placeholder="New player name" style="text-align:left;flex:1"><button id="ap">Add player</button></div></div>
  <button class="pri" id="save" style="width:100%">Start game</button>
- <div class="card" style="margin-top:14px"><b>Resume a saved session</b><div class="mut" style="margin:4px 0 10px">Nothing is stored online. If you exported your session from the Loans tab, load that file here to carry on. Upload your history Excel first so earlier sessions are kept.</div><label class="btn" for="lg">📂 Load existing session</label><input id="lg" type="file" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"></div>`}
+ <div class="card" style="margin-top:14px"><b>Resume a saved session</b><div class="mut" style="margin:4px 0 10px">If you exported your session from the Loans tab, load that file here to carry on. Upload your history Excel first so earlier sessions are kept.</div><label class="btn" for="lg">📂 Load existing session</label><input id="lg" type="file" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"></div>`}
 function upd(){const el=$('#gsum');if(!el||!game)return;const cur=Object.fromEntries(loanRows(game.players).map(r=>[r.p,r.cur]));let t=0,all=1;
  document.querySelectorAll('[data-rp]').forEach(c=>{const p=c.dataset.rp,a=parseFloat(finals[p]);if(isNaN(a)){all=0;c.textContent='';return}const r=a-cur[p];t+=r;c.textContent=(r>0?'+':'')+f(Math.round(r*100)/100);c.className='res '+cls(r)});
  t=Math.round(t*100)/100;el.className='sum '+(all&&t?'warn':'ok');el.textContent=all?(t?`Results net to ${t.toLocaleString()} (should be 0)`:'Results net to 0 ✓'):"Enter every player's final amount"}
@@ -197,6 +198,9 @@ function dash0(){
   h+=`<div class="sc"><table><thead><tr><th>Player</th><th>Total</th><th>Played</th><th>Win %</th><th>Best</th><th>Worst</th><th>Avg<br><small class="mut" style="font-weight:400">${PERIOD.sh}</small></th><th>Avg win<br><small class="mut" style="font-weight:400">${PERIOD.sh}</small></th><th>Avg loss<br><small class="mut" style="font-weight:400">${PERIOD.sh}</small></th><th>Trend</th><th>Recent avg<br><small class="mut" style="font-weight:400">last ≤3 sess</small></th><th>Earlier avg<br><small class="mut" style="font-weight:400">rest of ${PERIOD.sh}</small></th><th>Latest</th><th>Streak</th></tr></thead><tbody>`+st.map(s=>{const t=TR[s.p]||{};return`<tr><td>${E(s.p)}</td><td class="${cls(s.t)}"><b>${f(s.t)}</b></td><td>${s.n}</td><td>${Math.round(wp(s))}%</td><td>${f(s.best)}</td><td>${f(s.worst)}</td><td>${f(Math.round(s.avg))}</td><td class="pos">${s.aw==null?'–':'+'+fmtN(s.aw)}</td><td class="neg">${s.al==null?'–':fmtN(s.al)}</td><td class="${t.dir>0?'pos':t.dir<0?'neg':'mut'}"><b>${t.w||''}</b></td><td>${t.k?sg(t.ar):'–'}</td><td>${t.k?sg(t.ao):'–'}</td><td>${sg(t.last)}</td><td>${t.st>=2?t.st+(t.last>0?' wins':' losses'):'–'}</td></tr>`}).join('')+'</tbody></table></div><div class="mut" style="font-size:12px;padding:4px 2px 10px">Period: '+E(PERIOD.txt)+'. Avg, Avg win and Avg loss cover that period (win / loss = average of the winning / losing sessions). Recent avg = average of the latest sessions (up to 3) compared with Earlier avg. Streak = current run of wins or losses.</div>'}
  if(sel.trends||sel.ai)h+=c('Trend Comments',trendHtml());
  if(sel.loantbl)h+='<p><b>Current standing</b> <span class="mut">(game in progress)</span></p>'+(gp().length?loantable(gp()):'<p class="mut">No game in progress.</p>')+'<div style="height:14px"></div>';
+ const openEx=expenses.filter(e=>!e.done);
+ if(openEx.length){const cand=game?game.players:players,names=[...new Set([...cand,...openEx.flatMap(e=>[e.paidBy,...(e.split||[])])])],sp=expenseSplit(cand,openEx),tot=k=>names.reduce((a,p)=>a+(sp[k][p]||0),0)/100;
+  h+='<div class="card"><b>Open expenses (separate from session balances)</b><div class="mut" style="margin:4px 0 8px">These never affect History or the totals above. They only count in the settlement when the game is completed.</div><div class="sc"><table><thead><tr><th>Player</th><th>Paid</th><th>Their share</th><th>Net</th></tr></thead><tbody>'+names.map(p=>{const a=(sp.paid[p]||0)/100,b=(sp.share[p]||0)/100,n=Math.round((a-b)*100)/100;return`<tr><td>${E(p)}</td><td>${fmtA(a)}</td><td>${fmtA(b)}</td><td class="${cls(n)}"><b>${n>0?'+':''}${fmtA(n)}</b></td></tr>`}).join('')+`</tbody><tfoot><tr><td>Total</td><td>${fmtA(tot('paid'))}</td><td>${fmtA(tot('share'))}</td><td></td></tr></tfoot></table></div></div>`}
  if(!Object.values(sel).some(Boolean))h+='<p class="mut">Select at least one visualization.</p>';
  return h}
 let mode='all',pn=3;
@@ -255,7 +259,7 @@ async function importXlsx(file){
  loans=[];loanDraft={};excl={};initLoan=500;const il=ir.find(r=>/^initial loan/i.test(String(r[0])));if(il&&num(il[1])&&il[1]>=0)initLoan=il[1];
  if(wb.Sheets.Loans)XLSX.utils.sheet_to_json(wb.Sheets.Loans,{header:1,raw:true,defval:null}).slice(1).forEach(r=>{const d=num(r[0])?ser2iso(r[0]):(typeof r[0]=='string'?r[0].slice(0,10):''),a=Number(r[2]),w=typeof r[1]=='string'?r[1].trim():'',sr=typeof r[3]=='string'?r[3].trim():'';
   if(w&&a!==0&&isFinite(a)&&d)loans.push({date:d,who:w,amt:a,src:sr&&!/^bank$/i.test(sr)?sr:null,g:num(r[4])?ser2iso(r[4]):'',done:!/^open/i.test(String(r[5]||''))})});
- expenses=wb.Sheets.Expenses?readExpenses(wb.Sheets.Expenses,false):[];settle=null;
+ expenses=[];settle=null;
  game=null;gc=false;finals={};plays={};const gr=ir.find(r=>/^game in progress/i.test(String(r[0])));
  if(gr&&gr[1]&&typeof gr[2]=='string'){const gp=gr[2].split(',').map(x=>x.trim()).filter(x=>players.includes(x));if(gp.length)game={date:String(gr[1]).slice(0,10),players:gp}}
  sortS();draft={};rf=0;rt=-1;mode='all';tab='hist';render();toast(`Loaded ${sessions.length} sessions, ${players.length} players`)}
@@ -273,7 +277,7 @@ function xlsxBuf(){
  const lr=loanRows(game?game.players:[]),sw=XLSX.utils.aoa_to_sheet([['Player','Initial loan','From bank','Borrowed from players','Lent to players','Current standing'],...lr.map(r=>[r.p,ng(r.init),ng(r.bank),ng(r.bor),r.len,ng(r.cur)])]);
  lr.forEach((r,i)=>{sw['F'+(i+2)].f=`B${i+2}+C${i+2}+D${i+2}+E${i+2}`});sw['!cols']=[{wch:16},{wch:12},{wch:12},{wch:20},{wch:16},{wch:14}];XLSX.utils.book_append_sheet(wb,sw,'Current Standing');
  const lw=XLSX.utils.aoa_to_sheet([['Date','Borrower','Amount (+ borrowed / - repaid)','From (Bank or player)','Game','Status'],...loans.map(l=>[iso2ser(l.date),l.who,l.amt,l.src||'Bank',l.g?iso2ser(l.g):null,l.done?'Settled':'Open'])]);
- loans.forEach((l,i)=>{const c=lw['A'+(i+2)];if(c)c.z='dd-mmm-yyyy';const e=lw['E'+(i+2)];if(e)e.z='dd-mmm-yyyy'});lw['!cols']=[{wch:13},{wch:16},{wch:10},{wch:22},{wch:13},{wch:10}];XLSX.utils.book_append_sheet(wb,lw,'Loans');XLSX.utils.book_append_sheet(wb,exSheet(false),'Expenses');
+ loans.forEach((l,i)=>{const c=lw['A'+(i+2)];if(c)c.z='dd-mmm-yyyy';const e=lw['E'+(i+2)];if(e)e.z='dd-mmm-yyyy'});lw['!cols']=[{wch:13},{wch:16},{wch:10},{wch:22},{wch:13},{wch:10}];XLSX.utils.book_append_sheet(wb,lw,'Loans');
  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Column order',hsort=='desc'?'newest first':'oldest first'],['Initial loan',initLoan],...(game?[['Game in progress',game.date,game.players.join(',')]]:[])]),'Info');
  return XLSX.write(wb,{type:'array',bookType:'xlsx'})}
 function pdfPie(d,items,cx,cy,r,x,y,sp){const T=items.reduce((a,b)=>a+b.v,0);if(!T){d.setFontSize(8).setTextColor(110).text('None',cx,cy,{align:'center'});return}
@@ -414,16 +418,24 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(t.id=='orgset'){setPass()}
  else if(t.id=='gencode'){genCode()}
  else if(t.id=='allowall'){allowAll()}
+ else if(t.id=='genview'){genViewCode()}
+ else if(t.id=='allowview'){allowAllView()}
  else if(t.id=='unlock'){unlockEdit()}
+ else if(t.id=='unlockview'){unlockView()}
+ else if(t.id=='copyvcode'){if(navigator.clipboard)navigator.clipboard.writeText(lastViewCode).then(()=>toast('View code copied'));else prompt('Copy this view code',lastViewCode)}
  else if(t.id=='copycode'){if(navigator.clipboard)navigator.clipboard.writeText(lastCode).then(()=>toast('Code copied'));else prompt('Copy this code',lastCode)}
  else if(t.id=='orgrm'){removePass()}
  else if(t.id=='bkfull'){guard('restore a backup',()=>{if(bk.full&&confirm('Replace ALL shared data (sessions, loans, players and any game in progress) with this backup, for everyone?')){applyState(JSON.parse(bk.full.json));tab='hist';render();toast('Backup restored')}})}
  else if(t.id=='bkstd'){guard('restore the standing',()=>{if(bk.standing&&confirm('Replace the current game and its loans with this saved standing?')){const d=JSON.parse(bk.standing.json);loans=loans.filter(l=>l.done).concat(d.loans.map(l=>({...l})));expenses=expenses.filter(e=>e.done).concat((d.expenses||[]).map(e=>({...e,id:e.id||uid()})));game={date:d.game.date,players:[...d.game.players]};initLoan=d.initLoan;d.game.players.forEach(q=>{if(!players.includes(q))players.push(q)});gc=false;finals={};loanDraft={};tab='loans';render();toast('Standing restored')}})}
  else if(t.id=='gjoin'){const c=($('#gc_in').value||'').trim();if(!/^[A-Za-z0-9_-]{8,40}$/.test(c))return toast('Use 8 to 40 letters, numbers, - or _');setGroup(c)}
- else if(t.id=='gnew'){setGroup(randCode());toast('Group created. Tap Copy invite link to share it.')}
+ else if(t.id=='gnew'){const n=prompt('Name this group (optional, e.g. Friday poker):');if(n===null)return;setGroup(randCode(),(n||'').trim());toast('Group created. Tap Copy invite link to share it.')}
+ else if(g('data-grename')){if(!canEdit())return toast('View only: enter the edit code first');const n=prompt('Group name:',groupName||'');if(n===null)return;groupName=n.trim().slice(0,40);if(gid)saveRecent(gid,groupName||gid.slice(0,8));render();toast(groupName?'Group renamed to '+groupName:'Name cleared');queueMicrotask(persist)}
  else if(g('data-gcopy')){copyLink()}
  else if(g('data-gleave')){if(confirm('Leave this group on this device? The shared data stays in the cloud.'))leaveGroup()}
+ else if(g('data-gswitch')){if(confirm('Switch to another group? You can return later from Recent groups.'))switchGroupUI()}
+ else if(g('data-gsw')){setGroup(g('data-gsw').dataset.gsw)}
  else if(t.id=='sxl'){if(!game)return;save(`Current_Session_${game.date}.xlsx`,sessionBuf())}
+ else if(t.id=='ginvite'){if(!game)return;const u=location.origin+location.pathname+'#g='+gid+'&game='+game.date;const msg='Join our session tracker game on '+game.date+': '+u;if(navigator.clipboard)navigator.clipboard.writeText(msg).then(()=>toast('Game invite copied — includes group + date')).catch(()=>prompt('Copy this game invite',msg));else prompt('Copy this game invite',msg)}
  else if(t.id=='gcb'){gc=!gc;render()}
 
  else if(t.id=='jb'){if(!game)return;let n=($('#jn').value||'').trim();if(!n)return toast('Enter a player name');n=players.find(q=>q.toLowerCase()==n.toLowerCase())||n;
@@ -461,27 +473,36 @@ document.addEventListener('change',e=>{const t=e.target;
 // ---- cloud sync (Firestore) ----
 let gid='',cs='connecting',cloudErr='',synced=false,cloudOn=false,base=null,inflight=0,lastSent='',applying=false,pendingRender=false;
 try{gid=((location.hash||'').match(/g=([A-Za-z0-9_-]{8,40})/)||[])[1]||localStorage.getItem('ptc_group')||''}catch(e){}
-const EMPTY=()=>({players:[],sessions:[],loans:[],expenses:[],settle:null,initLoan:500,game:null,readme:null,rules:''});
+const hashGame=((location.hash||'').match(/game=(\d{4}-\d{2}-\d{2})/)||[])[1]||'';
+const EMPTY=()=>({players:[],sessions:[],loans:[],expenses:[],settle:null,initLoan:500,game:null,readme:null,rules:'',groupName:''});
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
 const canon=x=>JSON.stringify(x,(k,v)=>v&&typeof v=='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(q=>[q,v[q]])):v);
-const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],expenses:S.expenses||[],settle:S.settle||null,initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:''});
+const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],expenses:S.expenses||[],settle:S.settle||null,initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:'',groupName:typeof S.groupName=='string'?S.groupName:''});
 function getState(){sessions.forEach(x=>{if(!x.id)x.id=uid()});loans.forEach(l=>{if(!l.id)l.id=uid()});expenses.forEach(e=>{if(!e.id)e.id=uid()});
- return{players:[...players],sessions:sessions.map(x=>({id:x.id,date:x.date||'',label:x.label||'',v:{...x.v}})),loans:loans.map(l=>({id:l.id,date:l.date,who:l.who,amt:l.amt,src:l.src||null,g:l.g||'',done:!!l.done})),initLoan,game:game?{date:game.date,players:[...game.players]}:null,readme,rules,expenses:expenses.map(e=>({id:e.id,date:e.date||'',desc:e.desc||'',paidBy:e.paidBy,amt:e.amt,split:e.split&&e.split.length?[...e.split]:null,g:e.g||'',done:!!e.done})),settle:settle?JSON.parse(JSON.stringify(settle)):null}}
-function applyState(S){S=norm(S);players=[...S.players];sessions=S.sessions.map(x=>({...x,v:{...x.v}}));loans=S.loans.map(l=>({...l}));initLoan=S.initLoan;game=S.game?{date:S.game.date,players:[...S.game.players]}:null;readme=S.readme;rules=S.rules;expenses=S.expenses.map(e=>({...e}));settle=S.settle;if(!game){gc=false;finals={}}sortS()}
+ return{players:[...players],sessions:sessions.map(x=>({id:x.id,date:x.date||'',label:x.label||'',v:{...x.v}})),loans:loans.map(l=>({id:l.id,date:l.date,who:l.who,amt:l.amt,src:l.src||null,g:l.g||'',done:!!l.done})),initLoan,game:game?{date:game.date,players:[...game.players]}:null,readme,rules,groupName,expenses:expenses.map(e=>({id:e.id,date:e.date||'',desc:e.desc||'',paidBy:e.paidBy,amt:e.amt,split:e.split&&e.split.length?[...e.split]:null,g:e.g||'',done:!!e.done})),settle:settle?JSON.parse(JSON.stringify(settle)):null}}
+function applyState(S){S=norm(S);players=[...S.players];sessions=S.sessions.map(x=>({...x,v:{...x.v}}));loans=S.loans.map(l=>({...l}));initLoan=S.initLoan;game=S.game?{date:S.game.date,players:[...S.game.players]}:null;readme=S.readme;rules=S.rules;groupName=S.groupName||'';expenses=S.expenses.map(e=>({...e}));settle=S.settle;if(!game){gc=false;finals={}}sortS();if(gid&&groupName)saveRecent(gid,groupName)}
 function mergeState(b,l,r){const o=norm(JSON.parse(JSON.stringify(r)));b=norm(b);
  l.players.forEach(p=>{if(!o.players.includes(p))o.players.push(p)});b.players.forEach(p=>{if(!l.players.includes(p))o.players=o.players.filter(x=>x!==p)});
  ['sessions','loans','expenses'].forEach(k=>{const bm=new Map(b[k].map(x=>[x.id,canon(x)])),lm=new Set(l[k].map(x=>x.id));
   l[k].forEach(x=>{const i=o[k].findIndex(y=>y.id===x.id),was=bm.get(x.id);if(was===undefined){if(i<0)o[k].push(x)}else if(was!==canon(x)){if(i>=0)o[k][i]=x;else o[k].push(x)}});
   b[k].forEach(x=>{if(!lm.has(x.id)){const i=o[k].findIndex(y=>y.id===x.id);if(i>=0)o[k].splice(i,1)}})});
- if(l.initLoan!==b.initLoan)o.initLoan=l.initLoan;if(canon(l.settle)!==canon(b.settle))o.settle=l.settle;if(l.readme!==b.readme)o.readme=l.readme;if(l.rules!==b.rules)o.rules=l.rules;if(canon(l.game)!==canon(b.game))o.game=l.game;return o}
+ if(l.initLoan!==b.initLoan)o.initLoan=l.initLoan;if(canon(l.settle)!==canon(b.settle))o.settle=l.settle;if(l.readme!==b.readme)o.readme=l.readme;if(l.rules!==b.rules)o.rules=l.rules;if(l.groupName!==b.groupName)o.groupName=l.groupName;if(canon(l.game)!==canon(b.game))o.game=l.game;return o}
+function getRecent(){try{return JSON.parse(localStorage.getItem('ptc_recent')||'[]')}catch(e){return[]}}
+function saveRecent(code,label){let r=getRecent().filter(x=>x.code!==code);r.unshift({code,label:label||code.slice(0,8),last:Date.now()});if(r.length>12)r=r.slice(0,12);try{localStorage.setItem('ptc_recent',JSON.stringify(r))}catch(e){}}
 function gbarHtml(){if(!gid)return'';const m={live:['#15803d','Live'],saving:['#d97706','Saving…'],connecting:['#d97706','Connecting…'],offline:['#dc2626','Offline: changes not saved yet'],error:['#dc2626','Connection problem']}[cs]||['#6b7686',''];
- return`<span style="color:${m[0]}">●</span> ${m[1]} <span class="mut">· group ${E(gid.slice(0,4))}…</span> <button data-gcopy>Copy invite link</button> <button data-gleave>Leave</button>${accessLoaded?(canEdit()?(access?' <span class="pos">✏️ Editor</span>':''):' <span class="neg">👁 View only</span> <button class="pri" id="unlock">Enter edit code</button>'):''}`}
+ const nm=groupName?E(groupName):E(gid.slice(0,6))+'…';
+ return`<span style="color:${m[0]}">●</span> ${m[1]} <span class="mut">· <b>${nm}</b></span> <button data-grename title="Rename group">✎</button> <button data-gcopy>Copy invite link</button> <button data-gswitch>Switch group</button> <button data-gleave>Leave</button>${viewLoaded&&!canView()?' <span class="neg">🔒 Locked</span> <button class="pri" id="unlockview">Enter view code</button>':(accessLoaded?(canEdit()?(access?' <span class="pos">✏️ Editor</span>':''):' <span class="neg">👁 View only</span> <button class="pri" id="unlock">Enter edit code</button>'):'')}`}
 function setSync(c){cs=c;const g=$('#gbar');if(g)g.innerHTML=gbarHtml()}
-function joinScreen(){return`<div class="card"><b>Join your group</b><div class="mut" style="margin:6px 0 10px">Everyone with the same group code sees the same sessions and loans, live. Keep the code private: anyone who has it can view and edit.</div><div class="row"><input id="gc_in" placeholder="Group code" style="text-align:left;flex:1;width:auto"><button class="pri" id="gjoin">Join</button></div><div style="margin-top:12px"><button id="gnew">Create a new group</button></div></div>`}
+function joinScreen(){const recent=getRecent();
+ return`<div class="card"><b>Join or create a group</b><div class="mut" style="margin:6px 0 10px">Each group has its own independent history of sessions, loans and expenses. Use different groups when different sets of players play. Keep the code private.</div>
+ <div class="row"><input id="gc_in" placeholder="Group code" style="text-align:left;flex:1;width:auto"><button class="pri" id="gjoin">Join</button></div>
+ <div style="margin-top:12px"><button id="gnew">Create a new group</button></div></div>
+ ${recent.length?`<div class="card"><b>Recent groups on this device</b><div class="mut" style="margin:4px 0 8px">Tap to switch. Each group keeps its own full history.</div>${recent.map(r=>`<div class="row" style="justify-content:space-between"><span><b>${E(r.label||r.code.slice(0,8))}</b> <span class="mut">${E(r.code.slice(0,6))}…</span></span><button data-gsw="${E(r.code)}">Open</button></div>`).join('')}</div>`:''}`}
 function connectCard(){return`<div class="card"><b>${cs=='error'?'Could not connect':'Connecting…'}</b><div class="mut" style="margin:6px 0">${E(cloudErr)}</div>${cs=='error'?'<p>Check that you are online and that the Firestore rules are published (Database, then Rules, then Publish).</p>':''}<button data-gleave>Use a different group code</button></div>`}
 function render(){document.body.classList.toggle('nogrp',!gid);
  if(!gid){$('#v').innerHTML=joinScreen();return}
  if(!synced){$('#v').innerHTML=connectCard();setSync(cs);return}
+ if(viewLoaded&&!canView()){$('#v').innerHTML=`<div class="card"><b>This group is locked</b><div class="mut" style="margin:6px 0 10px">A view code is required to see the data. Ask the organiser for the view code.</div><button class="pri" id="unlockview">Enter view code</button></div>`;setSync(cs);return}
  render0();setSync(cs);document.body.classList.toggle('viewonly',!canEdit());if(!canEdit())lockUI();queueMicrotask(persist)}
 function renderSafe(){const a=document.activeElement;if(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)){pendingRender=true;return}render()}
 function reconcile(S){base=norm(S);lastSent='';if(canon(getState())!==canon(base)){applying=true;applyState(base);applying=false;renderSafe()}setSync(navigator.onLine===false?'offline':'live')}
@@ -491,21 +512,31 @@ async function persist(){if(!cloudOn||!synced||applying||!window.cloud)return;co
  try{const out=await cloud.commit(gid,rj=>JSON.stringify(mergeState(base||EMPTY(),L,rj?JSON.parse(rj):EMPTY())));base=norm(JSON.parse(out));cs=navigator.onLine===false?'offline':'live';saveBackups()}
  catch(e){lastSent='';cs='offline';toast('Could not save: '+((e&&e.code)||'offline')+'. It will retry on your next change.')}
  inflight--;if(!inflight&&cs!='offline')reconcile(base);else setSync(cs)}
-let access=null,accessLoaded=false,lastCode='';
-const editKey=()=>'ptc_edit_'+gid;
+let access=null,accessLoaded=false,lastCode='',viewAccess=null,viewLoaded=false,lastViewCode='';
+const editKey=()=>'ptc_edit_'+gid,viewKey=()=>'ptc_view_'+gid;
 function canEdit(){if(!accessLoaded)return false;if(!access)return true;try{return localStorage.getItem(editKey())===access.hash}catch(e){return false}}
+function canView(){if(!viewLoaded)return false;if(!viewAccess)return true;try{if(localStorage.getItem(viewKey())===viewAccess.hash)return true}catch(e){}return canEdit()}
 const normCode=c=>String(c||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
-const ALLOW='[data-t],[data-v],[data-x],[data-q],[data-mode],[data-pn],[data-rf],[data-rt],[data-hs],[data-hp],[data-all],[data-xall],#bkref,#sxl,#gencode,#allowall,#orgset,#orgrm,#copycode,[data-sshare],[data-shide]';
+const ALLOW='[data-t],[data-v],[data-x],[data-q],[data-mode],[data-pn],[data-rf],[data-rt],[data-hs],[data-hp],[data-all],[data-xall],#bkref,#sxl,#ginvite,#gencode,#allowall,#genview,#allowview,#orgset,#orgrm,#copycode,#copyvcode,[data-sshare],[data-shide],[data-gcopy],[data-gleave],[data-gswitch],[data-gsw],[data-grename],#unlock,#unlockview';
 function lockUI(){document.querySelectorAll('#v input,#v select,#v textarea,#v button,#v label.btn').forEach(el=>{if(!el.matches(ALLOW)){el.disabled=true;el.style.opacity='.5'}});const u=$('#up');if(u)u.disabled=true}
 async function unlockEdit(){if(!access)return;const c=prompt('Enter the edit code from the organiser:');if(c===null)return;
  const h=await hashPass(normCode(c),access.salt,access.iter);if(h===access.hash){try{localStorage.setItem(editKey(),h)}catch(e){}toast('Editing enabled on this device');render()}else toast('Wrong edit code')}
+async function unlockView(){if(!viewAccess)return;const c=prompt('Enter the view code from the organiser:');if(c===null)return;
+ const h=await hashPass(normCode(c),viewAccess.salt,viewAccess.iter);if(h===viewAccess.hash){try{localStorage.setItem(viewKey(),h)}catch(e){}toast('View access granted on this device');render()}else toast('Wrong view code')}
 async function genCode(){if(!orgInfo){if(!canEdit())return toast('Enter the edit code first, or ask the organiser');if(!confirm('First set an organiser passcode. Only you will be able to create edit codes with it.'))return;await setPass();if(!orgInfo)return}
  else if(!(await checkPass('generate an edit code')))return;
  const a='ABCDEFGHJKMNPQRSTUVWXYZ23456789';let c='';crypto.getRandomValues(new Uint8Array(8)).forEach(x=>{c+=a[x%a.length]});
  const salt=randHex(16),iter=150000,hash=await hashPass(c,salt,iter);
  try{await cloud.put(gid,'access',JSON.stringify({salt,iter,hash}));access={salt,iter,hash};accessLoaded=true;try{localStorage.setItem(editKey(),hash)}catch(e){}lastCode=c.slice(0,4)+'-'+c.slice(4);render();toast('New edit code created')}catch(e){toast('Could not save the edit code')}}
+async function genViewCode(){if(!orgInfo){if(!canEdit())return toast('Enter the edit code first, or ask the organiser');if(!confirm('First set an organiser passcode. Only you will be able to create view codes with it.'))return;await setPass();if(!orgInfo)return}
+ else if(!(await checkPass('generate a view code')))return;
+ const a='ABCDEFGHJKMNPQRSTUVWXYZ23456789';let c='';crypto.getRandomValues(new Uint8Array(8)).forEach(x=>{c+=a[x%a.length]});
+ const salt=randHex(16),iter=150000,hash=await hashPass(c,salt,iter);
+ try{await cloud.put(gid,'viewaccess',JSON.stringify({salt,iter,hash}));viewAccess={salt,iter,hash};viewLoaded=true;try{localStorage.setItem(viewKey(),hash)}catch(e){}lastViewCode=c.slice(0,4)+'-'+c.slice(4);render();toast('New view code created')}catch(e){toast('Could not save the view code')}}
 async function allowAll(){if(!(await checkPass('let everyone edit')))return;if(!confirm('Remove the edit code? Everyone with the link will be able to edit again.'))return;
  try{await cloud.put(gid,'access','null');access=null;accessLoaded=true;lastCode='';render();toast('Everyone can edit again')}catch(e){toast('Could not save')}}
+async function allowAllView(){if(!(await checkPass('let everyone view without a code')))return;if(!confirm('Remove the view code? Anyone with the link will be able to view again.'))return;
+ try{await cloud.put(gid,'viewaccess','null');viewAccess=null;viewLoaded=true;lastViewCode='';render();toast('Anyone with the link can view again')}catch(e){toast('Could not save')}}
 let orgInfo=null,orgLoaded=false,unlockUntil=0;
 const randHex=n=>[...crypto.getRandomValues(new Uint8Array(n))].map(b=>b.toString(16).padStart(2,'0')).join('');
 async function hashPass(pw,saltHex,iter){const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveBits']),bits=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:Uint8Array.from(saltHex.match(/../g).map(h=>parseInt(h,16))),iterations:iter},key,256);return[...new Uint8Array(bits)].map(b=>b.toString(16).padStart(2,'0')).join('')}
@@ -522,28 +553,28 @@ async function setPass(){if(!orgInfo&&!canEdit())return toast('Enter the edit co
  try{await cloud.put(gid,'organiser',JSON.stringify({salt,iter,hash}));orgInfo={salt,iter,hash};orgLoaded=true;unlockUntil=Date.now()+600000;render();toast('Organiser passcode saved')}catch(e){toast('Could not save the passcode')}}
 async function removePass(){if(!orgInfo)return;if(!(await checkPass('remove the passcode')))return;if(!confirm('Remove the organiser passcode? Anyone will be able to upload, restore and delete sessions.'))return;
  try{await cloud.put(gid,'organiser','null');orgInfo=null;unlockUntil=0;render();toast('Passcode removed')}catch(e){toast('Could not remove the passcode')}}
-let readme=null,rules='',editing={},notesDraft={},expenses=[],settle=null,exDraft={desc:'',amt:'',paid:'',shared:{}};
+let readme=null,rules='',groupName='',editing={},notesDraft={},expenses=[],settle=null,exDraft={desc:'',amt:'',paid:'',shared:{}};
 const README_DEFAULT=`# Welcome
-This tracker keeps your group's sessions, loans and results in one shared place. Everyone with the link sees the same data live.
+This tracker keeps your group's sessions, loans and results in one shared place. Everyone with the link sees the same data live. Use different groups when different sets of players play — each group has its own independent history.
 
 ## What each tab does
 - **History**: every finished session in a table (players down, sessions across) with totals. Tap a cell to correct it, sort by newest or oldest, and delete a session with the cross (it asks for the organiser passcode if one is set).
-- **New session**: choose the date and who is playing, then tap Start game. You can add a new player here, or carry on a saved game with Load existing session.
-- **Expenses**: record shared costs such as food (who paid, how much, who shares it). They never appear in History or the Dashboard, but they are added to the settlement.
-- **Loans**: works on the game in progress. Set the initial loan, record fresh loans, see the Current standing, export the session, add a late joiner and finish with Game completion.
-- **Dashboard**: charts and tables for any period (all sessions, last N sessions, last N months). Choose the players and visualizations, then export a PDF or an image.
+- **New session**: choose the date and who is playing, then tap Start game. You can add a new player here, or carry on a saved game with Load existing session. For a completely different group of players, switch group from the top bar.
+- **Expenses**: record shared costs such as food. Choose **who paid** and **who should share the cost**. Expenses stay completely separate from session results and only count in the settlement.
+- **Loans**: works on the game in progress. Set the initial loan, record fresh loans, see the Current standing, copy a game invite, export the session, add a late joiner and finish with Game completion.
+- **Dashboard**: charts and tables for any period. Open expenses appear in their own card so they stay separate from session balances.
 - **Backups**: the automatic backups with restore buttons, the edit code and the organiser passcode.
 - **Readme**: this page. **Rules**: your group's own rules.
 
 ## Start to finish
-1. Organiser: open the app link and tap Create a new group, then Copy invite link and send it to the players.
+1. Organiser: open the app link and tap Create a new group, then Copy invite link and send it to the players. (Or open a recent group from the list.)
 2. Organiser: on the Backups tab set an organiser passcode, then tap Create an edit code and share the code with the players. Without the code people can only view.
 3. Players: open the link, tap Enter edit code at the top and type the code.
 4. First time only: tap Upload Excel to load your old history, or start fresh by adding players in New session.
 5. Start a game: New session, pick the date, tick the players who are playing and tap Start game.
 6. Someone joins late: use Add a player to this game on the Loans or New session tab.
 7. During the game: Loans tab, enter fresh loans. Bank adds to a player's loan, Repay bank reduces it, and choosing another player moves loan between the two. Standing shows negative while a loan is owed.
-8. Every so often tap Export session on the Loans tab to keep a safety copy.
+8. Share the game with late joiners: on the Loans tab tap Copy game invite (includes the group + game date). Every so often also tap Export session to keep a safety copy.
 9. When the game ends: tap Game completion and enter each player's final amount. Result = final amount + current standing. The results should add up to 0.
 10. Tap Complete game and save to History. The session appears in History, a backup is saved automatically, and the Settlement at the top of History shows who pays whom, using as few payments as possible, with any expenses included. Tap Share / copy to send it to the group.
 11. Open the Dashboard, pick a period and players, and export a PDF or image to share.
@@ -592,14 +623,17 @@ function expensesTab(){if(!players.length)return'<p class="mut">Add players firs
  const cand=game?game.players:players,open=expenses.filter(e=>!e.done),done=expenses.filter(e=>e.done),paid=exDraft.paid&&players.includes(exDraft.paid)?exDraft.paid:cand[0];
  const names=[...new Set([...cand,...open.flatMap(e=>[e.paidBy,...(e.split||[])])])],sp=expenseSplit(cand,open),row=e=>`<tr><td>${E(e.date)}</td><td>${E(e.desc)}</td><td>${E(e.paidBy)}</td><td>${fmtA(e.amt)}</td><td>${e.split&&e.split.length?E(e.split.join(', ')):'Everyone'}</td><td>${e.done?'<span class="mut">settled</span>':`<button class="x" data-exdel="${e.id}" title="Delete">✕</button>`}</td></tr>`;
  const tot=k=>names.reduce((a,p)=>a+(sp[k][p]||0),0)/100;
- return`<div class="card"><b>Add an expense</b><div class="mut" style="margin:4px 0 8px">Food, drinks, venue and so on. Expenses do not appear in History or the Dashboard. They are added to the settlement when you complete the game.</div>
+ return`<div class="card"><b>Add an expense</b><div class="mut" style="margin:4px 0 8px">Food, drinks, venue and so on. Expenses stay completely separate from session results and the Dashboard totals. They only appear in the settlement when you complete the game.</div>
  <div class="row"><input data-ed placeholder="What for? (e.g. snacks)" style="text-align:left;flex:1;width:auto" value="${E(exDraft.desc)}"></div>
- <div class="row"><input data-ea inputmode="decimal" placeholder="Amount" value="${E(exDraft.amt)}"><select data-ep>${players.map(p=>`<option value="${E(p)}" ${p==paid?'selected':''}>Paid by ${E(p)}</option>`).join('')}</select></div>
- <div style="margin:8px 0 4px" class="mut">Shared by${game?' (players in this game)':''}:</div><div class="pw">${cand.map(p=>`<label class="chip"><input type="checkbox" data-es="${E(p)}" ${exDraft.shared[p]===false?'':'checked'}> ${E(p)}</label>`).join('')}</div>
- <button class="pri" id="exadd" style="width:100%;margin-top:10px">Add expense</button></div>
+ <div class="row"><input data-ea inputmode="decimal" placeholder="Amount" value="${E(exDraft.amt)}"></div>
+ <div style="margin:10px 0 4px"><b>Who paid?</b> <span class="mut">(this person will be reimbursed in the settlement)</span></div>
+ <div class="row"><select data-ep style="flex:1">${players.map(p=>`<option value="${E(p)}" ${p==paid?'selected':''}>${E(p)}</option>`).join('')}</select></div>
+ <div style="margin:10px 0 4px"><b>Who should share the cost?</b> <span class="mut">${game?'(players in this game)':''}</span></div>
+ <div class="pw">${cand.map(p=>`<label class="chip"><input type="checkbox" data-es="${E(p)}" ${exDraft.shared[p]===false?'':'checked'}> ${E(p)}</label>`).join('')}</div>
+ <button class="pri" id="exadd" style="width:100%;margin-top:12px">Add expense</button></div>
  <p><b>Open expenses</b> <span class="mut">${game?'for the game on '+E(game.date):'(no game in progress yet; they will count at the next completion)'}</span></p>
- ${open.length?`<div class="sc"><table><thead><tr><th>Date</th><th>What</th><th>Paid by</th><th>Amount</th><th>Shared by</th><th></th></tr></thead><tbody>${open.map(row).join('')}</tbody></table></div>
- <p><b>Expense summary</b></p><div class="sc"><table><thead><tr><th>Player</th><th>Paid</th><th>Share</th><th>Net</th></tr></thead><tbody>${names.map(p=>{const a=(sp.paid[p]||0)/100,b=(sp.share[p]||0)/100,n=Math.round((a-b)*100)/100;return`<tr><td>${E(p)}</td><td>${fmtA(a)}</td><td>${fmtA(b)}</td><td class="${cls(n)}"><b>${n>0?'+':''}${fmtA(n)}</b></td></tr>`}).join('')}</tbody><tfoot><tr><td>Total</td><td>${fmtA(tot('paid'))}</td><td>${fmtA(tot('share'))}</td><td></td></tr></tfoot></table></div><div class="mut" style="font-size:12px;margin-top:4px">Net + means the player is owed money back, − means they owe their share.</div>`:'<p class="mut">No open expenses.</p>'}
+ ${open.length?`<div class="sc"><table><thead><tr><th>Date</th><th>What</th><th>Who paid</th><th>Amount</th><th>Shared by</th><th></th></tr></thead><tbody>${open.map(row).join('')}</tbody></table></div>
+ <p><b>Expense summary (separate from session balances)</b></p><div class="sc"><table><thead><tr><th>Player</th><th>Paid</th><th>Their share</th><th>Net (owed / owes)</th></tr></thead><tbody>${names.map(p=>{const a=(sp.paid[p]||0)/100,b=(sp.share[p]||0)/100,n=Math.round((a-b)*100)/100;return`<tr><td>${E(p)}</td><td>${fmtA(a)}</td><td>${fmtA(b)}</td><td class="${cls(n)}"><b>${n>0?'+':''}${fmtA(n)}</b></td></tr>`}).join('')}</tbody><tfoot><tr><td>Total</td><td>${fmtA(tot('paid'))}</td><td>${fmtA(tot('share'))}</td><td></td></tr></tfoot></table></div><div class="mut" style="font-size:12px;margin-top:4px">Net + means the player is owed money back for what they paid; − means they still owe their share. These numbers never mix into History or Dashboard session totals.</div>`:'<p class="mut">No open expenses.</p>'}
  ${done.length?`<details style="margin-top:10px"><summary class="mut">Earlier settled expenses (${done.length})</summary><div class="sc" style="margin-top:6px"><table><tbody>${done.map(row).join('')}</tbody></table></div></details>`:''}`}
 function exSheet(openOnly){const rows=expenses.filter(e=>!openOnly||!e.done);return XLSX.utils.aoa_to_sheet([['Date','Description','Paid by','Amount','Shared by','Game','Status'],...rows.map(e=>[iso2ser(e.date||'1970-01-01'),e.desc,e.paidBy,e.amt,e.split&&e.split.length?e.split.join(','):'All',e.g?iso2ser(e.g):null,e.done?'Settled':'Open'])])}
 function readExpenses(ws,openOnly){const out=[];XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null}).slice(1).forEach(r=>{const d=num(r[0])?ser2iso(r[0]):(typeof r[0]=='string'?r[0].slice(0,10):''),a=Number(r[3]),p=typeof r[2]=='string'?r[2].trim():'',sh=typeof r[4]=='string'?r[4].trim():'All',op=/^open/i.test(String(r[6]||''));
@@ -620,19 +654,22 @@ function backupTab(){const when=x=>new Date(x.savedAt).toLocaleString();
  else b='<div class="mut">No standing saved yet. It is saved automatically while a game is in progress, and it replaces the previous one.</div>';
  return`<div class="card"><b>Last completed game backup</b><div class="mut" style="margin:4px 0 8px">Everything: sessions, players, loans. Restoring replaces the shared data for everyone.</div>${a}</div>
  <div class="card"><b>Current standing backup</b><div class="mut" style="margin:4px 0 8px">The game in progress and its loans. Restoring brings that game back and leaves your sessions alone.</div>${b}</div>
- <div class="card"><b>Edit access</b><div class="mut" style="margin:4px 0 8px">${access?'Only people with the edit code can make changes. Everyone else can view and export.':'Everyone with the link can edit. Create an edit code to make the link view-only for everyone else.'} Needs the organiser passcode.</div><button class="pri" id="gencode">${access?'Generate a new edit code':'Create an edit code'}</button>${access?' <button id="allowall">Allow everyone to edit</button>':''}${lastCode?`<div style="margin-top:10px">Share this code with your players (shown once):<div style="font-size:24px;font-weight:700;letter-spacing:2px;margin:4px 0">${lastCode}</div><button id="copycode">Copy code</button></div>`:''}</div>
- <div class="card"><b>Organiser passcode</b><div class="mut" style="margin:4px 0 8px">${orgInfo?'A passcode is set. It is asked before uploading Excel, restoring a backup or deleting a session.':'Not set. Set one so only the organiser can upload Excel, restore backups or delete sessions. Everyone can still record games and loans.'}</div><button class="pri" id="orgset">${orgInfo?'Change passcode':'Set passcode'}</button>${orgInfo?' <button id="orgrm">Remove</button>':''}</div>
+ <div class="card"><b>View access</b><div class="mut" style="margin:4px 0 8px">${viewAccess?'Only people with the view code can see the group data. Share the view code with people who should only look.':'Anyone with the invite link can view the data. Create a view code to lock the group until the code is entered.'} Needs the organiser passcode.</div><button class="pri" id="genview">${viewAccess?'Generate a new view code':'Create a view code'}</button>${viewAccess?' <button id="allowview">Allow anyone to view</button>':''}${lastViewCode?`<div style="margin-top:10px">Share this view code (shown once):<div style="font-size:24px;font-weight:700;letter-spacing:2px;margin:4px 0">${lastViewCode}</div><button id="copyvcode">Copy view code</button></div>`:''}</div>
+ <div class="card"><b>Edit access</b><div class="mut" style="margin:4px 0 8px">${access?'Only people with the edit code can make changes. Everyone else can view and export (if they have the view code, when one is set).':'Everyone who can view can also edit. Create an edit code so only editors can change data.'} Needs the organiser passcode.</div><button class="pri" id="gencode">${access?'Generate a new edit code':'Create an edit code'}</button>${access?' <button id="allowall">Allow everyone to edit</button>':''}${lastCode?`<div style="margin-top:10px">Share this edit code (shown once):<div style="font-size:24px;font-weight:700;letter-spacing:2px;margin:4px 0">${lastCode}</div><button id="copycode">Copy code</button></div>`:''}</div>
+ <div class="card"><b>Organiser passcode</b><div class="mut" style="margin:4px 0 8px">${orgInfo?'A passcode is set. It is asked before uploading Excel, restoring a backup or deleting a session, and before generating access codes.':'Not set. Set one so only the organiser can upload Excel, restore backups, delete sessions, or create view/edit codes.'}</div><button class="pri" id="orgset">${orgInfo?'Change passcode':'Set passcode'}</button>${orgInfo?' <button id="orgrm">Remove</button>':''}</div>
  <button id="bkref">Refresh</button>${bk.err?`<p class="neg">Could not load backups (${E(bk.err)}).</p>`:''}`}
 function startCloud(){if(!gid)return;
  if(!window.cloud){window.addEventListener('cloudready',startCloud,{once:true});setTimeout(()=>{if(!window.cloud){cloudErr='Could not load Google services. Check your internet connection and reload.';cs='error';render()}},15000);return}
- cloudOn=true;cs='connecting';access=null;accessLoaded=false;
+ cloudOn=true;cs='connecting';access=null;accessLoaded=false;viewAccess=null;viewLoaded=false;
  if(cloud.watch)cloud.watch(gid,'access',json=>{if(json===undefined)return;access=(json&&json!=='null')?JSON.parse(json):null;accessLoaded=true;if(synced)renderSafe()});
+ if(cloud.watch)cloud.watch(gid,'viewaccess',json=>{if(json===undefined)return;viewAccess=(json&&json!=='null')?JSON.parse(json):null;viewLoaded=true;if(synced)renderSafe()});
  cloud.listen(gid,json=>{const S=json?norm(JSON.parse(json)):EMPTY();
-  if(!synced){synced=true;cs='live';base=S;lastSent='';applying=true;applyState(S);applying=false;render();return}
+  if(!synced){synced=true;cs='live';const keepName=groupName;base=S;lastSent='';applying=true;applyState(S);if(keepName&&!groupName){groupName=keepName;if(gid)saveRecent(gid,groupName)}applying=false;if(hashGame){if(game&&game.date===hashGame){tab='loans';toast('Opened the game of '+hashGame)}else if(game)toast('A different game is in progress ('+game.date+')')}render();queueMicrotask(persist);return}
   if(inflight)return;reconcile(S)},e=>{cloudErr=((e&&e.code)||'error')+': '+((e&&e.message)||'');cs='error';synced=synced&&false;render()})}
-function clearLocal(){readme=null;rules='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};access=null;accessLoaded=false;lastCode='';players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
-function setGroup(code){gid=code;try{localStorage.setItem('ptc_group',code);history.replaceState(null,'','#g='+code)}catch(e){}clearLocal();cs='connecting';startCloud();render()}
-function leaveGroup(){if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;gid='';try{localStorage.removeItem('ptc_group');history.replaceState(null,'',location.pathname)}catch(e){}clearLocal();render()}
+function clearLocal(){readme=null;rules='';groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
+function setGroup(code,name){const nm=(name!=null?String(name):'').trim().slice(0,40);gid=code;saveRecent(code,nm||code.slice(0,8));try{localStorage.setItem('ptc_group',code);history.replaceState(null,'','#g='+code)}catch(e){}clearLocal();groupName=nm;cs='connecting';startCloud();render()}
+function leaveGroup(){if(gid)saveRecent(gid,groupName||gid.slice(0,8));if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;gid='';try{localStorage.removeItem('ptc_group');history.replaceState(null,'',location.pathname)}catch(e){}clearLocal();render()}
+function switchGroupUI(){tab='hist';leaveGroup()}
 function randCode(){const a='abcdefghjkmnpqrstuvwxyz23456789';let s='';crypto.getRandomValues(new Uint8Array(14)).forEach(x=>{s+=a[x%a.length]});return s}
 function copyLink(){const u=location.origin+location.pathname+'#g='+gid;if(navigator.clipboard)navigator.clipboard.writeText(u).then(()=>toast('Invite link copied')).catch(()=>prompt('Copy this link',u));else prompt('Copy this link',u)}
 document.addEventListener('focusout',()=>{if(pendingRender)setTimeout(()=>{const a=document.activeElement;if(!(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName))){pendingRender=false;render()}},60)});
