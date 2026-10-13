@@ -42,15 +42,14 @@ input.c{width:78px;text-align:right}th input{font-size:12px;width:128px;display:
 
 select{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:5px 8px;max-width:190px}
 .nogrp .bar,.nogrp .tabs,.nogrp #gbar{display:none}
-.viewonly label[for=up],.locked .bar{opacity:.45;pointer-events:none}
-.locked .bar button,.locked label[for=up]{pointer-events:none}
+.locked .bar{opacity:.45;pointer-events:none}
+.locked .bar button{pointer-events:none}
 .chip{display:flex;align-items:center;gap:6px;border:1px solid var(--bd);border-radius:20px;padding:5px 12px;cursor:pointer}
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:10px 16px;border-radius:8px;display:none}
 </style></head><body><main>
 <h1>🃏 Session Tracker</h1>
-<div class="mut">Upload last time's Excel, add the new session, export. Positive = winning, negative = losing. Use different groups for different player sets.</div>
+<div class="mut">Add sessions, track loans and expenses, export. Positive = winning, negative = losing. Use different groups for different player sets.</div>
 <div class="bar">
- <label class="btn pri" for="up">Upload Excel</label><input id="up" type="file" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
  <button id="xl">Export Excel</button><button id="pdf">Export Dashboard PDF</button><button id="jpg">Share as image</button>
 </div>
 <div class="pw" id="gbar" style="margin:0 0 10px"></div>
@@ -76,7 +75,7 @@ function render0(){
  document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t==tab));
  $('#xl').disabled=!sessions.length;$('#jpg').disabled=$('#pdf').disabled=!sessions.length||!players.length||!Object.values(sel).some(Boolean)||players.every(p=>excl[p]);upd()}
 function hist(){
- if(!players.length)return'<p class="mut">No data yet. Upload your Excel, or add players in “New session”.</p>';
+ if(!players.length)return'<p class="mut">No data yet. Add players in “New session”.</p>';
  const si=sOrd(sessions.map((_,i)=>i)),ps=pOrd(players),o=(v,l,c)=>`<option value="${v}" ${c==v?'selected':''}>${l}</option>`;
  let h=settleCard()+`<div class="pw" style="margin:0 0 10px"><label>Sessions <select data-hs>${o('desc','Newest first',hsort)}${o('asc','Oldest first',hsort)}</select></label><label>Players <select data-hp>${o('file','As in file',hpl)}${o('name','A–Z',hpl)}${o('total','Highest total first',hpl)}</select></label></div><div class="sc"><table><thead><tr><th>Player</th>`+si.map(i=>{const s=sessions[i];return`<th><div class="lb">${E(s.date?'':s.label||'Session '+(i+1))}<button class="x" data-del="${i}" title="Delete session">✕</button></div><input type="date" data-d="${i}" value="${s.date}"></th>`}).join('')+'<th>Total</th></tr></thead><tbody>';
  ps.forEach(p=>h+=`<tr><td>${E(p)}</td>`+si.map(i=>{const s=sessions[i];return`<td><input class="c ${cls(s.v[p])}" inputmode="decimal" data-p="${E(p)}" data-s="${i}" value="${num(s.v[p])?s.v[p]:''}"></td>`}).join('')+`<td class="${cls(tot(p))}"><b>${f(tot(p))}</b></td></tr>`);
@@ -434,7 +433,10 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(t.id=='bkstd'){guard('restore the standing',()=>{if(bk.standing&&confirm('Replace the current game and its loans with this saved standing?')){const d=JSON.parse(bk.standing.json);loans=loans.filter(l=>l.done).concat(d.loans.map(l=>({...l})));expenses=expenses.filter(e=>e.done).concat((d.expenses||[]).map(e=>({...e,id:e.id||uid()})));game={date:d.game.date,players:[...d.game.players]};initLoan=d.initLoan;d.game.players.forEach(q=>{if(!players.includes(q))players.push(q)});gc=false;finals={};loanDraft={};tab='loans';render();toast('Standing restored')}})}
  else if(t.id=='gjoin'){const c=($('#gc_in').value||'').trim();if(!/^[A-Za-z0-9_-]{8,40}$/.test(c))return toast('Use 8 to 40 letters, numbers, - or _');setGroup(c)}
  else if(t.id=='gnew'){createNewGroup()}
- else if(g('data-grename')){if(!canEdit())return toast('View only: enter the edit code first');const n=prompt('Group name:',groupName||'');if(n===null)return;groupName=n.trim().slice(0,40);if(gid)saveRecent(gid,groupName||gid.slice(0,8));render();toast(groupName?'Group renamed to '+groupName:'Name cleared');queueMicrotask(persist)}
+ else if(g('data-grename')){if(!canEdit())return toast('View only: enter the edit code first');const n=prompt('Group name:',groupName||'');if(n===null)return;groupName=n.trim().slice(0,40);if(gid){saveRecent(gid,groupName||gid.slice(0,8));registerGroup(gid,groupName).catch(()=>{})}render();toast(groupName?'Group renamed to '+groupName:'Name cleared');queueMicrotask(persist)}
+ else if(g('data-gopen')){const c=g('data-gopen').dataset.gopen;if(c&&c!==gid)setGroup(c)}
+ else if(g('data-gdel')){deleteGroupFully(g('data-gdel').dataset.gdel)}
+ else if(t.id=='gadmin'){guard('manage all groups',()=>{loadGroupAdmin()})}
  else if(g('data-gcopy')){copyLink()}
  else if(g('data-gleave')){if(confirm('Leave this group on this device? The shared data stays in the cloud.'))leaveGroup()}
  else if(g('data-gswitch')){if(confirm('Switch to another group? You can return later from Recent groups.'))switchGroupUI()}
@@ -462,8 +464,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
 });
 document.addEventListener('input',e=>{const t=e.target;if(t.dataset.fa!==undefined){finals[t.dataset.fa]=t.value;upd()}else if(t.id=='nd')dd=t.value;else if(t.dataset.la!==undefined){(loanDraft[t.dataset.la]=loanDraft[t.dataset.la]||{}).amt=t.value}else if(t.id=='ld')ld=t.value;else if(t.dataset.ta!==undefined)notesDraft[t.dataset.ta]=t.value;else if(t.dataset.ed!==undefined)exDraft.desc=t.value;else if(t.dataset.ea!==undefined)exDraft.amt=t.value});
 document.addEventListener('change',e=>{const t=e.target;
- if(t.id=='up'&&t.files[0]){if(!canView()){t.value='';return toast('Enter the view code first')}if(!canEdit()){t.value='';return toast('View only: enter the edit code first')}const f0=t.files[0];t.value='';guard('upload an Excel file',()=>{if((sessions.length||players.length)&&!confirm('Uploading replaces the shared data for EVERYONE in this group. Continue?'))return;importXlsx(f0).catch(e=>toast('Could not read file: '+(e&&e.message||e)))})}
- else if(t.id=='lg'&&t.files&&t.files[0]){if(!canEdit()){t.value='';return toast('View only: enter the edit code first')}loadSessionFile(t.files[0]).catch(e=>toast('Could not read file: '+(e&&e.message||e)));t.value=''}
+ if(t.id=='lg'&&t.files&&t.files[0]){if(!canEdit()){t.value='';return toast('View only: enter the edit code first')}loadSessionFile(t.files[0]).catch(e=>toast('Could not read file: '+(e&&e.message||e)));t.value=''}
  else if(t.dataset.pl!==undefined){plays[t.dataset.pl]=t.checked}
  else if(t.dataset.ep!==undefined){exDraft.paid=t.value}
  else if(t.dataset.es!==undefined){exDraft.shared[t.dataset.es]=t.checked}
@@ -516,9 +517,9 @@ function render(){document.body.classList.toggle('nogrp',!gid);
  if(locked){$('#v').innerHTML=`<div class="card"><b>This group is locked</b><div class="mut" style="margin:6px 0 10px">A view code is required to see the data. Upload, export and share are disabled until you unlock.</div>
  <button class="pri" id="unlockview" style="width:100%;margin-bottom:8px">Enter view code</button>
  <div class="mut" style="margin:12px 0 6px">Lost your phone or on a new device? Use the organiser passcode — it grants full access on this device.</div>
- <button id="unlockorg" style="width:100%">Enter organiser passcode</button></div>`;setSync(cs);['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el)el.disabled=true});const u=$('#up');if(u)u.disabled=true;return}
+ <button id="unlockorg" style="width:100%">Enter organiser passcode</button></div>`;setSync(cs);['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el)el.disabled=true});return}
  render0();setSync(cs);document.body.classList.toggle('viewonly',!canEdit());if(!canEdit())lockUI();
- ['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el)el.disabled=!sessions.length||!players.length});const u=$('#up');if(u)u.disabled=!canEdit();
+ ['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el)el.disabled=!sessions.length||!players.length});
  queueMicrotask(persist)}
 function renderSafe(){const a=document.activeElement;if(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)){pendingRender=true;return}render()}
 function reconcile(S){base=norm(S);lastSent='';if(canon(getState())!==canon(base)){applying=true;applyState(base);applying=false;renderSafe()}setSync(navigator.onLine===false?'offline':'live')}
@@ -533,8 +534,8 @@ const editKey=()=>'ptc_edit_'+gid,viewKey=()=>'ptc_view_'+gid;
 function canEdit(){if(!accessLoaded)return false;if(!access)return true;try{return localStorage.getItem(editKey())===access.hash}catch(e){return false}}
 function canView(){if(!viewLoaded)return false;if(!viewAccess)return true;try{if(localStorage.getItem(viewKey())===viewAccess.hash)return true}catch(e){}return canEdit()}
 const normCode=c=>String(c||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
-const ALLOW='[data-t],[data-v],[data-x],[data-q],[data-mode],[data-pn],[data-rf],[data-rt],[data-hs],[data-hp],[data-all],[data-xall],#bkref,#sxl,#ginvite,#gencode,#allowall,#genview,#allowview,#orgset,#orgrm,#copycode,#copyvcode,[data-sshare],[data-shide],[data-gcopy],[data-gleave],[data-gswitch],[data-gsw],[data-grename],#unlock,#unlockview,#unlockorg';
-function lockUI(){document.querySelectorAll('#v input,#v select,#v textarea,#v button,#v label.btn').forEach(el=>{if(!el.matches(ALLOW)){el.disabled=true;el.style.opacity='.5'}});const u=$('#up');if(u)u.disabled=true}
+const ALLOW='[data-t],[data-v],[data-x],[data-q],[data-mode],[data-pn],[data-rf],[data-rt],[data-hs],[data-hp],[data-all],[data-xall],#bkref,#sxl,#ginvite,#gencode,#allowall,#genview,#allowview,#orgset,#orgrm,#copycode,#copyvcode,#gadmin,[data-sshare],[data-shide],[data-gcopy],[data-gleave],[data-gswitch],[data-gsw],[data-grename],[data-gopen],[data-gdel],#unlock,#unlockview,#unlockorg';
+function lockUI(){document.querySelectorAll('#v input,#v select,#v textarea,#v button,#v label.btn').forEach(el=>{if(!el.matches(ALLOW)){el.disabled=true;el.style.opacity='.5'}})}
 async function unlockEdit(){if(!access)return;const c=prompt('Enter the edit code from the organiser:');if(c===null)return;
  const h=await hashPass(normCode(c),access.salt,access.iter);if(h===access.hash){try{localStorage.setItem(editKey(),h)}catch(e){}toast('Editing enabled on this device');render()}else toast('Wrong edit code')}
 async function unlockView(){if(!viewAccess)return;const c=prompt('Enter the view code from the organiser:');if(c===null)return;
@@ -550,7 +551,8 @@ async function unlockAsOrganiser(){
   if(access)localStorage.setItem(editKey(),access.hash);
  }catch(e){}
  unlockUntil=Date.now()+600000;
- toast('Organiser access granted on this device');render()}
+ toast('Organiser access granted on this device');
+ tab='backup';render();loadGroupAdmin()}
 async function genCode(){if(!orgInfo){if(!canEdit())return toast('Enter the edit code first, or ask the organiser');if(!confirm('First set an organiser passcode. Only you will be able to create edit codes with it.'))return;await setPass();if(!orgInfo)return}
  else if(!(await checkPass('generate an edit code')))return;
  const a='ABCDEFGHJKMNPQRSTUVWXYZ23456789';let c='';crypto.getRandomValues(new Uint8Array(8)).forEach(x=>{c+=a[x%a.length]});
@@ -575,6 +577,27 @@ async function loadCreatePass(){
  for(const r of recent){try{const d=await c.get(r.code,'organiser');if(d&&d.json&&d.json!=='null'){const info=JSON.parse(d.json);try{await c.put(CFG,'createpass',JSON.stringify(info))}catch(e){}return info}}catch(e){}}
  return null
 }
+async function loadGroupList(){try{const d=await window.cloud.get(CFG,'grouplist');if(d&&d.json&&d.json!=='null'){const a=JSON.parse(d.json);return Array.isArray(a)?a:[]}}catch(e){}return[]}
+async function saveGroupList(list){try{await window.cloud.put(CFG,'grouplist',JSON.stringify(list))}catch(e){}}
+async function registerGroup(code,name){const list=await loadGroupList();const i=list.findIndex(x=>x.code===code);const row={code,name:(name||code.slice(0,8)).slice(0,40),at:Date.now()};if(i>=0)list[i]={...list[i],...row};else list.unshift(row);await saveGroupList(list.slice(0,50))}
+async function unregisterGroup(code){const list=(await loadGroupList()).filter(x=>x.code!==code);await saveGroupList(list)}
+async function deleteGroupFully(code){
+ if(!(await checkPass('delete a group and all its data')))return;
+ if(!confirm('Permanently delete group '+(code.slice(0,8))+'… including all sessions, loans, expenses and backups?\nThis cannot be undone.'))return;
+ if(!confirm('Type-confirm: really delete this group forever?'))return;
+ try{
+  await window.cloud.deleteGroup(code);
+  await unregisterGroup(code);
+  try{const r=getRecent().filter(x=>x.code!==code);localStorage.setItem('ptc_recent',JSON.stringify(r))}catch(e){}
+  if(gid===code){leaveGroup();toast('Group deleted')}
+  else{toast('Group deleted');if(tab==='backup')loadGroupAdmin()}
+ }catch(e){toast('Could not delete group: '+(e&&e.message||e))}
+}
+let adminGroups=[],adminGroupsLoaded=false;
+async function loadGroupAdmin(){if(!window.cloud)return;adminGroupsLoaded=false;render();
+ try{adminGroups=await loadGroupList();
+  if(gid&&!adminGroups.some(x=>x.code===gid)){await registerGroup(gid,groupName);adminGroups=await loadGroupList()}
+  adminGroupsLoaded=true;render()}catch(e){adminGroups=[];adminGroupsLoaded=true;render()}}
 async function createNewGroup(){
  const n=prompt('Name this group (optional, e.g. Friday poker):');if(n===null)return;
  if(!(await ensureCloud()))return toast('Could not connect. Check your internet and try again.');
@@ -618,7 +641,7 @@ This tracker keeps your group's sessions, loans and results in one shared place.
 1. Organiser: open the app link and tap Create a new group, then Copy invite link and send it to the players. (Or open a recent group from the list.)
 2. Organiser: on the Backups tab set an organiser passcode, then tap Create an edit code and share the code with the players. Without the code people can only view.
 3. Players: open the link, tap Enter edit code at the top and type the code.
-4. First time only: tap Upload Excel to load your old history, or start fresh by adding players in New session.
+4. First time only: start fresh by adding players in New session, or resume a saved session file from New session.
 5. Start a game: New session, pick the date, tick the players who are playing and tap Start game.
 6. Someone joins late: use Add a player to this game on the Loans or New session tab.
 7. During the game: Loans tab, enter fresh loans. Bank adds to a player's loan, Repay bank reduces it, and choosing another player moves loan between the two. Standing shows negative while a loan is owed.
@@ -630,7 +653,7 @@ This tracker keeps your group's sessions, loans and results in one shared place.
 
 ## Good to know
 - If you see View only at the top, tap Enter edit code and type the code from the organiser.
-- Upload Excel replaces the shared data for everyone, so only the organiser should use it.
+- There is no bulk Excel upload; data is entered in the app or resumed from a session export on New session.
 - If something goes wrong, the Backups tab can restore the last completed game or the last standing.
 - A blank cell means the player did not play. A 0 means they played and broke even.
 - Win % counts only the sessions a player played. A 0 session counts as played but is not a win.
@@ -704,7 +727,11 @@ function backupTab(){const when=x=>new Date(x.savedAt).toLocaleString();
  <div class="card"><b>Current standing backup</b><div class="mut" style="margin:4px 0 8px">The game in progress and its loans. Restoring brings that game back and leaves your sessions alone.</div>${b}</div>
  <div class="card"><b>View access</b><div class="mut" style="margin:4px 0 8px">${viewAccess?'Only people with the view code can see the group data. Share the view code with people who should only look.':'Anyone with the invite link can view the data. Create a view code to lock the group until the code is entered.'} Needs the organiser passcode.</div><button class="pri" id="genview">${viewAccess?'Generate a new view code':'Create a view code'}</button>${viewAccess?' <button id="allowview">Allow anyone to view</button>':''}${lastViewCode?`<div style="margin-top:10px">Share this view code (shown once):<div style="font-size:24px;font-weight:700;letter-spacing:2px;margin:4px 0">${lastViewCode}</div><button id="copyvcode">Copy view code</button></div>`:''}</div>
  <div class="card"><b>Edit access</b><div class="mut" style="margin:4px 0 8px">${access?'Only people with the edit code can make changes. Everyone else can view and export (if they have the view code, when one is set).':'Everyone who can view can also edit. Create an edit code so only editors can change data.'} Needs the organiser passcode.</div><button class="pri" id="gencode">${access?'Generate a new edit code':'Create an edit code'}</button>${access?' <button id="allowall">Allow everyone to edit</button>':''}${lastCode?`<div style="margin-top:10px">Share this edit code (shown once):<div style="font-size:24px;font-weight:700;letter-spacing:2px;margin:4px 0">${lastCode}</div><button id="copycode">Copy code</button></div>`:''}</div>
- <div class="card"><b>Organiser passcode</b><div class="mut" style="margin:4px 0 8px">${orgInfo?'A passcode is set. It is asked before uploading Excel, restoring a backup or deleting a session, and before generating access codes.':'Not set. Set one so only the organiser can upload Excel, restore backups, delete sessions, or create view/edit codes.'}</div><button class="pri" id="orgset">${orgInfo?'Change passcode':'Set passcode'}</button>${orgInfo?' <button id="orgrm">Remove</button>':''}</div>
+ <div class="card"><b>Organiser passcode</b><div class="mut" style="margin:4px 0 8px">${orgInfo?'A passcode is set. It is asked before restoring a backup, deleting a session or player, and before generating access codes.':'Not set. Set one so only the organiser can restore backups, delete sessions, or create view/edit codes.'}</div><button class="pri" id="orgset">${orgInfo?'Change passcode':'Set passcode'}</button>${orgInfo?' <button id="orgrm">Remove</button>':''}</div>
+ <div class="card"><b>All groups (admin)</b><div class="mut" style="margin:4px 0 8px">After entering the organiser passcode you can open any registered group or permanently delete one (history, loans, expenses and backups).</div>
+ <button class="pri" id="gadmin">Load / refresh group list</button>
+ ${adminGroupsLoaded?(adminGroups.length?adminGroups.map(g=>`<div class="row" style="justify-content:space-between;flex-wrap:wrap;margin-top:8px;gap:6px"><span><b>${E(g.name||g.code.slice(0,8))}</b> <span class="mut">${E(g.code.slice(0,8))}…</span>${g.code===gid?' <span class="pos">· current</span>':''}</span><span style="display:flex;gap:6px">${g.code!==gid?`<button data-gopen="${E(g.code)}">Open</button>`:''}<button class="x" data-gdel="${E(g.code)}">Delete</button></span></div>`).join(''):'<p class="mut" style="margin-top:8px">No groups registered yet. Create or open groups while organiser is set — they appear here.</p>'):''}
+ </div>
  <button id="bkref">Refresh</button>${bk.err?`<p class="neg">Could not load backups (${E(bk.err)}).</p>`:''}`}
 function startCloud(){if(!gid)return;
  if(!window.cloud){window.addEventListener('cloudready',startCloud,{once:true});setTimeout(()=>{if(!window.cloud){cloudErr='Could not load Google services. Check your internet connection and reload.';cs='error';render()}},15000);return}
@@ -717,7 +744,7 @@ function startCloud(){if(!gid)return;
    render();queueMicrotask(persist);return}
   if(inflight)return;reconcile(S)},e=>{cloudErr=((e&&e.code)||'error')+': '+((e&&e.message)||'');cs='error';synced=synced&&false;render()})}
 function clearLocal(){readme=null;rules='';groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
-function setGroup(code,name){const nm=(name!=null?String(name):'').trim().slice(0,40);gid=code;saveRecent(code,nm||code.slice(0,8));try{localStorage.setItem('ptc_group',code);history.replaceState(null,'','#g='+code)}catch(e){}clearLocal();groupName=nm;cs='connecting';startCloud();render()}
+function setGroup(code,name){const nm=(name!=null?String(name):'').trim().slice(0,40);gid=code;saveRecent(code,nm||code.slice(0,8));try{localStorage.setItem('ptc_group',code);history.replaceState(null,'','#g='+code)}catch(e){}clearLocal();groupName=nm;cs='connecting';startCloud();render();queueMicrotask(()=>registerGroup(code,nm).catch(()=>{}))}
 function leaveGroup(){if(gid)saveRecent(gid,groupName||gid.slice(0,8));if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;gid='';try{localStorage.removeItem('ptc_group');history.replaceState(null,'',location.pathname)}catch(e){}clearLocal();render()}
 function switchGroupUI(){tab='hist';leaveGroup()}
 function randCode(){const a='abcdefghjkmnpqrstuvwxyz23456789';let s='';crypto.getRandomValues(new Uint8Array(14)).forEach(x=>{s+=a[x%a.length]});return s}
@@ -729,7 +756,7 @@ render();
 </script>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {initializeFirestore,doc,onSnapshot,runTransaction,setDoc,getDoc} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {initializeFirestore,doc,onSnapshot,runTransaction,setDoc,getDoc,deleteDoc} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 const firebaseConfig={apiKey:"AIzaSyB-B8LBHwZtBQ5-qzU0YCX9s3Xt90gs2EY",authDomain:"patte-session-tracker.firebaseapp.com",projectId:"patte-session-tracker",storageBucket:"patte-session-tracker.firebasestorage.app",messagingSenderId:"275172572901",appId:"1:275172572901:web:d48c43b803285b23ad5e0c"};
 const app=initializeApp(firebaseConfig),db=initializeFirestore(app,{experimentalAutoDetectLongPolling:true});
 let unsub=null;const un={};const ref=g=>doc(db,'groups',g,'app','state');
@@ -739,6 +766,8 @@ window.cloud={
  watch(g,n,cb){if(un[n])un[n]();un[n]=onSnapshot(doc(db,'groups',g,'backup',n),x=>cb(x.exists()?x.data().json:null),()=>cb(undefined))},
  put(g,n,json){return setDoc(doc(db,'groups',g,'backup',n),{json,savedAt:Date.now()})},
  async get(g,n){const x=await getDoc(doc(db,'groups',g,'backup',n));return x.exists()?x.data():null},
+ async del(g,n){try{await deleteDoc(doc(db,'groups',g,'backup',n))}catch(e){}},
+ async deleteGroup(g){const names=['access','viewaccess','organiser','full','standing'];for(const n of names){try{await deleteDoc(doc(db,'groups',g,'backup',n))}catch(e){}}try{await deleteDoc(doc(db,'groups',g,'app','state'))}catch(e){}},
  commit(g,fn){return runTransaction(db,async tx=>{const r=ref(g),s=await tx.get(r),out=fn(s.exists()?s.data().json:null);tx.set(r,{json:out,updatedAt:Date.now()});return out})}
 };
 window.dispatchEvent(new Event('cloudready'));
