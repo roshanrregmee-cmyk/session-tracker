@@ -50,6 +50,7 @@ select{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--bd
 <h1>🃏 Session Tracker</h1>
 <div class="mut">Add sessions, track loans and expenses, export. Positive = winning, negative = losing. Use different groups for different player sets.</div>
 <div class="bar">
+ <label class="btn pri" id="uplbl" for="up" style="display:none">Upload Excel</label><input id="up" type="file" accept=".xlsx,.xls" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
  <button id="xl">Export Excel</button><button id="pdf">Export Dashboard PDF</button><button id="jpg">Share as image</button>
 </div>
 <div class="pw" id="gbar" style="margin:0 0 10px"></div>
@@ -76,10 +77,11 @@ function render0(){
  $('#xl').disabled=!sessions.length;$('#jpg').disabled=$('#pdf').disabled=!sessions.length||!players.length||!Object.values(sel).some(Boolean)||players.every(p=>excl[p]);upd()}
 function hist(){
  if(!players.length)return'<p class="mut">No data yet. Add players in “New session”.</p>';
- const si=sOrd(sessions.map((_,i)=>i)),ps=pOrd(players),o=(v,l,c)=>`<option value="${v}" ${c==v?'selected':''}>${l}</option>`;
- let h=settleCard()+`<div class="pw" style="margin:0 0 10px"><label>Sessions <select data-hs>${o('desc','Newest first',hsort)}${o('asc','Oldest first',hsort)}</select></label><label>Players <select data-hp>${o('file','As in file',hpl)}${o('name','A–Z',hpl)}${o('total','Highest total first',hpl)}</select></label></div><div class="sc"><table><thead><tr><th>Player</th>`+si.map(i=>{const s=sessions[i];return`<th><div class="lb">${E(s.date?'':s.label||'Session '+(i+1))}<button class="x" data-del="${i}" title="Delete session">✕</button></div><input type="date" data-d="${i}" value="${s.date}"></th>`}).join('')+'<th>Total</th></tr></thead><tbody>';
- ps.forEach(p=>h+=`<tr><td>${E(p)}</td>`+si.map(i=>{const s=sessions[i];return`<td><input class="c ${cls(s.v[p])}" inputmode="decimal" data-p="${E(p)}" data-s="${i}" value="${num(s.v[p])?s.v[p]:''}"></td>`}).join('')+`<td class="${cls(tot(p))}"><b>${f(tot(p))}</b></td></tr>`);
- return h+'</tbody><tfoot><tr><td>Net</td>'+si.map(i=>`<td>${f(net(sessions[i]))}</td>`).join('')+`<td>${f(players.reduce((a,p)=>a+tot(p),0))}</td></tr></tfoot></table></div><p class="mut">Tap any cell to correct it. Blank = didn't play. Sessions are kept in date order; undated ones stay beside the session before them.</p>`}
+ const si=sOrd(sessions.map((_,i)=>i)),ps=pOrd(players),o=(v,l,c)=>`<option value="${v}" ${c==v?'selected':''}>${l}</option>`,admin=canOrganise();
+ let h=settleCard()+`<div class="pw" style="margin:0 0 10px"><label>Sessions <select data-hs>${o('desc','Newest first',hsort)}${o('asc','Oldest first',hsort)}</select></label><label>Players <select data-hp>${o('file','As in file',hpl)}${o('name','A–Z',hpl)}${o('total','Highest total first',hpl)}</select></label>
+ ${admin?'':'<span class="mut">History is view-only. Organiser can unlock editing.</span> <button id="orghist">Organiser unlock</button>'}</div><div class="sc"><table><thead><tr><th>Player</th>`+si.map(i=>{const s=sessions[i];return`<th><div class="lb">${E(s.date?'':s.label||'Session '+(i+1))}${admin?`<button class="x" data-del="${i}" title="Delete session">✕</button>`:''}</div>${admin?`<input type="date" data-d="${i}" value="${s.date}">`:`<div class="mut">${E(s.date||'—')}</div>`}</th>`}).join('')+'<th>Total</th></tr></thead><tbody>';
+ ps.forEach(p=>h+=`<tr><td>${E(p)}</td>`+si.map(i=>{const s=sessions[i],v=s.v[p];return admin?`<td><input class="c ${cls(v)}" inputmode="decimal" data-p="${E(p)}" data-s="${i}" value="${num(v)?v:''}"></td>`:`<td class="${cls(v)}">${num(v)?f(v):'<span class="mut">–</span>'}</td>`}).join('')+`<td class="${cls(tot(p))}"><b>${f(tot(p))}</b></td></tr>`);
+ return h+'</tbody><tfoot><tr><td>Net</td>'+si.map(i=>`<td>${f(net(sessions[i]))}</td>`).join('')+`<td>${f(players.reduce((a,p)=>a+tot(p),0))}</td></tr></tfoot></table></div><p class="mut">${admin?'Tap any cell to correct it. Blank = didn\'t play. Sessions are kept in date order.':'Only the organiser can edit or delete sessions in History.'}</p>`}
 function loanRows(P){return P.map(p=>{let bank=0,bor=0,len=0;loans.forEach(l=>{if(l.done)return;if(l.who==p){if(l.src)bor+=l.amt;else bank+=l.amt}if(l.src==p)len+=l.amt});return{p,init:initLoan,bank,bor,len,cur:initLoan+bank+bor-len}})}
 const ng=n=>n?-n:0;
 function loantable(P){const r=loanRows(P).map(x=>({p:x.p,i:ng(x.init),b:ng(x.bank),n:ng(x.bor-x.len),c:ng(x.cur)})),S=k=>r.reduce((a,x)=>a+x[k],0),td=v=>`<td class="${cls(v)}">${v>0?'+':''}${f(v)}</td>`;
@@ -402,7 +404,8 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(g('data-all')){const v=+g('data-all').dataset.all;OPTS.forEach(o=>sel[o[0]]=v);render()}
  else if(g('data-q')){const q=g('data-q').dataset.q.split(':');mode=q[0];if(+q[1])pn=+q[1];render()}
  else if(g('data-xall')){excl={};render()}
- else if(g('data-del')){const i=+g('data-del').dataset.del;if(!canEdit())return toast('View only: enter the edit code first');guard('delete a session',()=>{if(confirm('Delete session '+nm(sessions[i],i)+'? This cannot be undone.')){sessions.splice(i,1);render();toast('Session deleted')}})}
+ else if(g('data-del')){const i=+g('data-del').dataset.del;guard('delete a session',()=>{if(confirm('Delete session '+nm(sessions[i],i)+'? This cannot be undone.')){sessions.splice(i,1);render();toast('Session deleted')}})}
+ else if(t.id=='orghist'){guard('edit History',()=>{render();toast('History editing unlocked')})}
  else if(t.id=='ap'){const n=$('#np').value.trim();if(!n)return;if(players.includes(n))return toast('Player already exists');players.push(n);render();upd()}
  else if(t.id=='save'){const ps=players.filter(p=>plays[p]!==false);if(!dd)return toast('Pick the date played');if(!ps.length)return toast('Select at least one player');
   game={date:dd,players:ps};gc=false;finals={};loanDraft={};ld=dd;tab='loans';render();toast('Game started — add fresh loans, then tap Game completion')}
@@ -464,7 +467,9 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
 });
 document.addEventListener('input',e=>{const t=e.target;if(t.dataset.fa!==undefined){finals[t.dataset.fa]=t.value;upd()}else if(t.id=='nd')dd=t.value;else if(t.dataset.la!==undefined){(loanDraft[t.dataset.la]=loanDraft[t.dataset.la]||{}).amt=t.value}else if(t.id=='ld')ld=t.value;else if(t.dataset.ta!==undefined)notesDraft[t.dataset.ta]=t.value;else if(t.dataset.ed!==undefined)exDraft.desc=t.value;else if(t.dataset.ea!==undefined)exDraft.amt=t.value});
 document.addEventListener('change',e=>{const t=e.target;
- if(t.id=='lg'&&t.files&&t.files[0]){if(!canEdit()){t.value='';return toast('View only: enter the edit code first')}loadSessionFile(t.files[0]).catch(e=>toast('Could not read file: '+(e&&e.message||e)));t.value=''}
+ if(t.id=='up'&&t.files[0]){const f0=t.files[0];t.value='';if(!canView())return toast('Enter the view code first');
+  guard('upload an Excel file',()=>{if((sessions.length||players.length)&&!confirm('Uploading replaces the shared data for EVERYONE in this group. Continue?'))return;importXlsx(f0).catch(e=>toast('Could not read file: '+(e&&e.message||e)))})}
+ else if(t.id=='lg'&&t.files&&t.files[0]){if(!canEdit()){t.value='';return toast('View only: enter the edit code first')}loadSessionFile(t.files[0]).catch(e=>toast('Could not read file: '+(e&&e.message||e)));t.value=''}
  else if(t.dataset.pl!==undefined){plays[t.dataset.pl]=t.checked}
  else if(t.dataset.ep!==undefined){exDraft.paid=t.value}
  else if(t.dataset.es!==undefined){exDraft.shared[t.dataset.es]=t.checked}
@@ -478,8 +483,8 @@ document.addEventListener('change',e=>{const t=e.target;
  else if(t.dataset.rt!==undefined){rt=+t.value;render()}
  else if(t.dataset.x!==undefined){if(t.checked)delete excl[t.dataset.x];else excl[t.dataset.x]=1;render()}
  else if(t.dataset.v!==undefined){sel[t.dataset.v]=t.checked?1:0;render()}
- else if(t.dataset.d!==undefined){sessions[+t.dataset.d].date=t.value;sortS();render()}
- else if(t.dataset.s!==undefined){const s=sessions[+t.dataset.s],x=t.value.trim()===''?null:Number(t.value);if(x===null)delete s.v[t.dataset.p];else if(isFinite(x))s.v[t.dataset.p]=x;render()}});
+ else if(t.dataset.d!==undefined){if(!canOrganise())return toast('Only the organiser can edit History');sessions[+t.dataset.d].date=t.value;sortS();render()}
+ else if(t.dataset.s!==undefined){if(!canOrganise())return toast('Only the organiser can edit History');const s=sessions[+t.dataset.s],x=t.value.trim()===''?null:Number(t.value);if(x===null)delete s.v[t.dataset.p];else if(isFinite(x))s.v[t.dataset.p]=x;render()}});
 // ---- cloud sync (Firestore) ----
 let gid='',cs='connecting',cloudErr='',synced=false,cloudOn=false,base=null,inflight=0,lastSent='',applying=false,pendingRender=false;
 try{gid=((location.hash||'').match(/g=([A-Za-z0-9_-]{8,40})/)||[])[1]||localStorage.getItem('ptc_group')||''}catch(e){}
@@ -520,6 +525,7 @@ function render(){document.body.classList.toggle('nogrp',!gid);
  <button id="unlockorg" style="width:100%">Enter organiser passcode</button></div>`;setSync(cs);['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el)el.disabled=true});return}
  render0();setSync(cs);document.body.classList.toggle('viewonly',!canEdit());if(!canEdit())lockUI();
  ['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el)el.disabled=!sessions.length||!players.length});
+ const upl=$('#uplbl');if(upl)upl.style.display=canOrganise()?'':'none';
  queueMicrotask(persist)}
 function renderSafe(){const a=document.activeElement;if(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)){pendingRender=true;return}render()}
 function reconcile(S){base=norm(S);lastSent='';if(canon(getState())!==canon(base)){applying=true;applyState(base);applying=false;renderSafe()}setSync(navigator.onLine===false?'offline':'live')}
@@ -530,9 +536,11 @@ async function persist(){if(!cloudOn||!synced||applying||!window.cloud)return;co
  catch(e){lastSent='';cs='offline';toast('Could not save: '+((e&&e.code)||'offline')+'. It will retry on your next change.')}
  inflight--;if(!inflight&&cs!='offline')reconcile(base);else setSync(cs)}
 let access=null,accessLoaded=false,lastCode='',viewAccess=null,viewLoaded=false,lastViewCode='';
-const editKey=()=>'ptc_edit_'+gid,viewKey=()=>'ptc_view_'+gid;
+const editKey=()=>'ptc_edit_'+gid,viewKey=()=>'ptc_view_'+gid,orgKey=()=>'ptc_org_'+gid;
 function canEdit(){if(!accessLoaded)return false;if(!access)return true;try{return localStorage.getItem(editKey())===access.hash}catch(e){return false}}
 function canView(){if(!viewLoaded)return false;if(!viewAccess)return true;try{if(localStorage.getItem(viewKey())===viewAccess.hash)return true}catch(e){}return canEdit()}
+function canOrganise(){if(Date.now()<unlockUntil)return true;if(!orgInfo)return false;try{return localStorage.getItem(orgKey())===orgInfo.hash}catch(e){return false}}
+function markOrganiser(){if(orgInfo)try{localStorage.setItem(orgKey(),orgInfo.hash)}catch(e){}unlockUntil=Date.now()+36e5}
 const normCode=c=>String(c||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
 const ALLOW='[data-t],[data-v],[data-x],[data-q],[data-mode],[data-pn],[data-rf],[data-rt],[data-hs],[data-hp],[data-all],[data-xall],#bkref,#sxl,#ginvite,#gencode,#allowall,#genview,#allowview,#orgset,#orgrm,#copycode,#copyvcode,#gadmin,[data-sshare],[data-shide],[data-gcopy],[data-gleave],[data-gswitch],[data-gsw],[data-grename],[data-gopen],[data-gdel],#unlock,#unlockview,#unlockorg';
 function lockUI(){document.querySelectorAll('#v input,#v select,#v textarea,#v button,#v label.btn').forEach(el=>{if(!el.matches(ALLOW)){el.disabled=true;el.style.opacity='.5'}})}
@@ -550,7 +558,7 @@ async function unlockAsOrganiser(){
   if(viewAccess)localStorage.setItem(viewKey(),viewAccess.hash);
   if(access)localStorage.setItem(editKey(),access.hash);
  }catch(e){}
- unlockUntil=Date.now()+600000;
+ markOrganiser();
  toast('Organiser access granted on this device');
  tab='backup';render();loadGroupAdmin()}
 async function genCode(){if(!orgInfo){if(!canEdit())return toast('Enter the edit code first, or ask the organiser');if(!confirm('First set an organiser passcode. Only you will be able to create edit codes with it.'))return;await setPass();if(!orgInfo)return}
@@ -615,13 +623,13 @@ async function loadOrg(){orgLoaded=false;try{const d=await cloud.get(gid,'organi
 async function checkPass(label){if(Date.now()<unlockUntil)return true;await loadOrg();
  if(!orgLoaded){toast('Could not check the organiser passcode. Check your connection and try again.');return false}
  if(!orgInfo)return true;const pw=prompt('Organiser passcode needed to '+label+':');if(pw===null)return false;
- if(await hashPass(pw,orgInfo.salt,orgInfo.iter)===orgInfo.hash){unlockUntil=Date.now()+600000;return true}toast('Wrong passcode');return false}
+ if(await hashPass(pw,orgInfo.salt,orgInfo.iter)===orgInfo.hash){markOrganiser();return true}toast('Wrong passcode');return false}
 async function guard(label,fn){if(await checkPass(label))fn()}
 async function setPass(){if(!orgInfo&&!canEdit())return toast('Enter the edit code first, or ask the organiser');if(orgInfo&&!(await checkPass('change the passcode')))return;
  const a=prompt('New organiser passcode (at least 4 characters):');if(a===null)return;if(a.length<4)return toast('Use at least 4 characters');
  const b=prompt('Type it again to confirm:');if(b!==a)return toast('The two entries did not match');
  const salt=randHex(16),iter=150000,hash=await hashPass(a,salt,iter);
- try{const payload=JSON.stringify({salt,iter,hash});await cloud.put(gid,'organiser',payload);await cloud.put(CFG,'createpass',payload);orgInfo={salt,iter,hash};orgLoaded=true;unlockUntil=Date.now()+600000;render();toast('Organiser passcode saved (also used to create new groups)')}catch(e){toast('Could not save the passcode')}}
+ try{const payload=JSON.stringify({salt,iter,hash});await cloud.put(gid,'organiser',payload);await cloud.put(CFG,'createpass',payload);orgInfo={salt,iter,hash};orgLoaded=true;markOrganiser();render();toast('Organiser passcode saved (also used to create new groups)')}catch(e){toast('Could not save the passcode')}}
 async function removePass(){if(!orgInfo)return;if(!(await checkPass('remove the passcode')))return;if(!confirm('Remove the organiser passcode? Anyone will be able to upload, restore and delete sessions.'))return;
  try{await cloud.put(gid,'organiser','null');orgInfo=null;unlockUntil=0;render();toast('Passcode removed')}catch(e){toast('Could not remove the passcode')}}
 let readme=null,rules='',groupName='',editing={},notesDraft={},expenses=[],settle=null,exDraft={desc:'',amt:'',paid:'',shared:{}};
@@ -740,7 +748,8 @@ function startCloud(){if(!gid)return;
  if(cloud.watch)cloud.watch(gid,'viewaccess',json=>{if(json===undefined)return;viewAccess=(json&&json!=='null')?JSON.parse(json):null;viewLoaded=true;if(synced)renderSafe()});
  cloud.listen(gid,json=>{const S=json?norm(JSON.parse(json)):EMPTY();
   if(!synced){synced=true;cs='live';const keepName=groupName;base=S;lastSent='';applying=true;applyState(S);if(keepName&&!groupName){groupName=keepName;if(gid)saveRecent(gid,groupName)}applying=false;if(hashGame){if(game&&game.date===hashGame){tab='loans';toast('Opened the game of '+hashGame)}else if(game)toast('A different game is in progress ('+game.date+')')}
-   if(pendingOrgPass){const pw=pendingOrgPass,setG=pendingSetGlobal;pendingOrgPass=null;pendingSetGlobal=false;(async()=>{try{const salt=randHex(16),iter=150000,hash=await hashPass(pw,salt,iter);const payload=JSON.stringify({salt,iter,hash});await cloud.put(gid,'organiser',payload);if(setG)await cloud.put(CFG,'createpass',payload);orgInfo={salt,iter,hash};orgLoaded=true;unlockUntil=Date.now()+600000;render()}catch(e){toast('Could not save organiser passcode — set it on the Backups tab')}})()}
+   loadOrg().then(()=>render());
+   if(pendingOrgPass){const pw=pendingOrgPass,setG=pendingSetGlobal;pendingOrgPass=null;pendingSetGlobal=false;(async()=>{try{const salt=randHex(16),iter=150000,hash=await hashPass(pw,salt,iter);const payload=JSON.stringify({salt,iter,hash});await cloud.put(gid,'organiser',payload);if(setG)await cloud.put(CFG,'createpass',payload);orgInfo={salt,iter,hash};orgLoaded=true;markOrganiser();render()}catch(e){toast('Could not save organiser passcode — set it on the Backups tab')}})()}
    render();queueMicrotask(persist);return}
   if(inflight)return;reconcile(S)},e=>{cloudErr=((e&&e.code)||'error')+': '+((e&&e.message)||'');cs='error';synced=synced&&false;render()})}
 function clearLocal(){readme=null;rules='';groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
