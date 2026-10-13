@@ -42,7 +42,8 @@ input.c{width:78px;text-align:right}th input{font-size:12px;width:128px;display:
 
 select{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:5px 8px;max-width:190px}
 .nogrp .bar,.nogrp .tabs,.nogrp #gbar{display:none}
-.viewonly label[for=up]{opacity:.45;pointer-events:none}
+.viewonly label[for=up],.locked .bar{opacity:.45;pointer-events:none}
+.locked .bar button,.locked label[for=up]{pointer-events:none}
 .chip{display:flex;align-items:center;gap:6px;border:1px solid var(--bd);border-radius:20px;padding:5px 12px;cursor:pointer}
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:10px 16px;border-radius:8px;display:none}
 </style></head><body><main>
@@ -87,7 +88,9 @@ function loantable(P){const r=loanRows(P).map(x=>({p:x.p,i:ng(x.init),b:ng(x.ban
 function loglist(){const log=loans.map((l,i)=>({l,i})).sort((a,b)=>a.l.date<b.l.date?1:a.l.date>b.l.date?-1:b.i-a.i);
  return'<p><b>Loan log</b></p>'+(log.length?'<div class="sc"><table><tbody>'+log.map(o=>`<tr><td>${o.l.date}</td><td>${E(o.l.who)}</td><td class="${cls(ng(o.l.amt))}">${o.l.amt>0?'−':'+'}${f(Math.abs(o.l.amt))}</td><td>${o.l.amt<0?'repaid to ':'borrowed from '}${o.l.src?E(o.l.src):'Bank'}</td><td>${o.l.done?'<span class="mut">settled</span>':`<button class="x" data-ldel="${o.i}" title="Delete">✕</button>`}</td></tr>`).join('')+'</tbody></table></div>':'<p class="mut">No fresh loans yet.</p>')}
 function joinCard(){const out=players.filter(p=>!game.players.includes(p));
- return`<div class="card"><b>Add a player to this game</b><div class="mut">For someone joining late. Type a new name, or pick someone who sat out. They start with the initial loan (${f(initLoan)}).</div><div class="row"><input id="jn" list="jl" placeholder="Player name" style="text-align:left;flex:1"><button id="jb">Add to game</button></div><datalist id="jl">${out.map(p=>`<option value="${E(p)}">`).join('')}</datalist></div>`}
+ return`<div class="card"><b>Add a player to this game</b><div class="mut">For someone joining late. Type a new name, or pick someone who sat out. They start with the initial loan (${f(initLoan)}).</div><div class="row"><input id="jn" list="jl" placeholder="Player name" style="text-align:left;flex:1"><button id="jb">Add to game</button></div><datalist id="jl">${out.map(p=>`<option value="${E(p)}">`).join('')}</datalist></div>
+ <div class="card"><b>Remove a player from this game</b><div class="mut" style="margin:4px 0 8px">Removes them from the current game only (not from History). Open loans involving them stay in the log.</div>
+ ${game.players.map(p=>`<div class="row" style="justify-content:space-between"><span>${E(p)}</span><button class="x" data-prm="${E(p)}" title="Remove from game">Remove</button></div>`).join('')||'<p class="mut">No players in this game.</p>'}</div>`}
 function gcPanel(P,cur){return`<div class="card"><b>Game completion</b><div class="mut">Enter what each player finished with. Result = final amount + current standing (standing is negative while a loan is owed). Saved results go to the History tab.</div>
  ${P.map(p=>`<div class="row"><span>${E(p)} <small class="mut">(${f(ng(cur[p]))})</small></span><input inputmode="decimal" placeholder="final amount" data-fa="${E(p)}" value="${E(finals[p]===undefined?'':finals[p])}"><b class="res" data-rp="${E(p)}"></b></div>`).join('')}
  <div class="sum" id="gsum"></div><button class="pri" id="gfin" style="width:100%">Complete game &amp; save to History</button></div>`}
@@ -105,8 +108,9 @@ function entry(){
  if(game)return`<div class="card"><b>Game in progress</b><div class="mut">${game.date} · ${game.players.length} playing: ${game.players.map(E).join(', ')}</div><p>Add loans and finish the game from the Loans tab. The final results are saved to History.</p><button class="pri" data-t="loans">Go to Loans</button> <button id="gdisc">Discard game</button></div>${joinCard()}`;
  return`<div class="card"><b>Start a new game in this group</b><div class="mut" style="margin:4px 0 8px">This group keeps one continuous history. If a completely different set of players is playing, switch to (or create) another group from the top bar.</div>
  <label>Date played <input type="date" id="nd" value="${dd}"></label>
- <div style="margin-top:10px">${players.map(p=>`<label class="row"><span>${E(p)}</span><input type="checkbox" data-pl="${E(p)}" ${plays[p]===false?'':'checked'}> Playing</label>`).join('')||'<p class="mut">Add your first player below.</p>'}</div>
- <div class="row"><input id="np" placeholder="New player name" style="text-align:left;flex:1"><button id="ap">Add player</button></div></div>
+ <div style="margin-top:10px">${players.map(p=>`<div class="row"><label style="flex:1;display:flex;align-items:center;gap:8px"><input type="checkbox" data-pl="${E(p)}" ${plays[p]===false?'':'checked'}> <span>${E(p)}</span></label><button class="x" data-pdel="${E(p)}" title="Delete player (organiser passcode)">✕</button></div>`).join('')||'<p class="mut">Add your first player below.</p>'}</div>
+ <div class="row"><input id="np" placeholder="New player name" style="text-align:left;flex:1"><button id="ap">Add player</button></div>
+ <div class="mut" style="margin-top:6px">✕ deletes a player from the roster (needs organiser passcode). Past session results stay in History.</div></div>
  <button class="pri" id="save" style="width:100%">Start game</button>
  <div class="card" style="margin-top:14px"><b>Resume a saved session</b><div class="mut" style="margin:4px 0 10px">If you exported your session from the Loans tab, load that file here to carry on. Upload your history Excel first so earlier sessions are kept.</div><label class="btn" for="lg">📂 Load existing session</label><input id="lg" type="file" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"></div>`}
 function upd(){const el=$('#gsum');if(!el||!game)return;const cur=Object.fromEntries(loanRows(game.players).map(r=>[r.p,r.cur]));let t=0,all=1;
@@ -399,7 +403,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(g('data-all')){const v=+g('data-all').dataset.all;OPTS.forEach(o=>sel[o[0]]=v);render()}
  else if(g('data-q')){const q=g('data-q').dataset.q.split(':');mode=q[0];if(+q[1])pn=+q[1];render()}
  else if(g('data-xall')){excl={};render()}
- else if(g('data-del')){const i=+g('data-del').dataset.del;guard('delete a session',()=>{if(confirm('Delete '+nm(sessions[i],i)+'?')){sessions.splice(i,1);render()}})}
+ else if(g('data-del')){const i=+g('data-del').dataset.del;if(!canEdit())return toast('View only: enter the edit code first');guard('delete a session',()=>{if(confirm('Delete session '+nm(sessions[i],i)+'? This cannot be undone.')){sessions.splice(i,1);render();toast('Session deleted')}})}
  else if(t.id=='ap'){const n=$('#np').value.trim();if(!n)return;if(players.includes(n))return toast('Player already exists');players.push(n);render();upd()}
  else if(t.id=='save'){const ps=players.filter(p=>plays[p]!==false);if(!dd)return toast('Pick the date played');if(!ps.length)return toast('Select at least one player');
   game={date:dd,players:ps};gc=false;finals={};loanDraft={};ld=dd;tab='loans';render();toast('Game started — add fresh loans, then tap Game completion')}
@@ -422,6 +426,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(t.id=='allowview'){allowAllView()}
  else if(t.id=='unlock'){unlockEdit()}
  else if(t.id=='unlockview'){unlockView()}
+ else if(t.id=='unlockorg'){unlockAsOrganiser()}
  else if(t.id=='copyvcode'){if(navigator.clipboard)navigator.clipboard.writeText(lastViewCode).then(()=>toast('View code copied'));else prompt('Copy this view code',lastViewCode)}
  else if(t.id=='copycode'){if(navigator.clipboard)navigator.clipboard.writeText(lastCode).then(()=>toast('Code copied'));else prompt('Copy this code',lastCode)}
  else if(t.id=='orgrm'){removePass()}
@@ -448,12 +453,16 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   loans.push(...add);loanDraft={};render();toast(add.length+(add.length>1?' loans':' loan')+' saved — tap Export session to keep a copy')}
  else if(g('data-lsg')){const b=g('data-lsg'),p=b.dataset.lsg,x=(loanDraft[p]=loanDraft[p]||{}),v=x.amt||'';x.amt=v[0]=='-'?v.slice(1):(v?'-'+v:'-');b.previousElementSibling.value=x.amt}
  else if(g('data-ldel')){if(confirm('Delete this loan entry?')){loans.splice(+g('data-ldel').dataset.ldel,1);render()}}
- else if(t.id=='xl')save(`Session_Balances_${last()}.xlsx`,xlsxBuf());
- else if(t.id=='jpg')shareImg().catch(e=>toast('Could not create image: '+(e&&e.message||e)));
- else if(t.id=='pdf')save(`Session_Dashboard_${last()}.pdf`,pdfBuf())});
+ else if(t.id=='xl'){if(!canView())return toast('Enter the view code first');if(!sessions.length)return;save(`Session_Balances_${last()}.xlsx`,xlsxBuf())}
+ else if(t.id=='jpg'){if(!canView())return toast('Enter the view code first');shareImg().catch(e=>toast('Could not create image: '+(e&&e.message||e)))}
+ else if(t.id=='pdf'){if(!canView())return toast('Enter the view code first');save(`Session_Dashboard_${last()}.pdf`,pdfBuf())}
+ else if(g('data-prm')){if(!game||!canEdit())return toast('View only: enter the edit code first');const p=g('data-prm').dataset.prm;if(game.players.length<=1)return toast('Need at least one player in the game');if(!confirm('Remove '+p+' from this game?'))return;
+  game.players=game.players.filter(q=>q!==p);delete loanDraft[p];delete finals[p];render();toast(p+' removed from this game')}
+ else if(g('data-pdel')){const p=g('data-pdel').dataset.pdel;guard('delete a player',()=>{if(!confirm('Delete player '+p+' from the group roster? Their past session results stay in History.'))return;players=players.filter(q=>q!==p);if(game)game.players=game.players.filter(q=>q!==p);delete plays[p];delete excl[p];render();toast(p+' removed from the roster')})}
+});
 document.addEventListener('input',e=>{const t=e.target;if(t.dataset.fa!==undefined){finals[t.dataset.fa]=t.value;upd()}else if(t.id=='nd')dd=t.value;else if(t.dataset.la!==undefined){(loanDraft[t.dataset.la]=loanDraft[t.dataset.la]||{}).amt=t.value}else if(t.id=='ld')ld=t.value;else if(t.dataset.ta!==undefined)notesDraft[t.dataset.ta]=t.value;else if(t.dataset.ed!==undefined)exDraft.desc=t.value;else if(t.dataset.ea!==undefined)exDraft.amt=t.value});
 document.addEventListener('change',e=>{const t=e.target;
- if(t.id=='up'&&t.files[0]){if(!canEdit()){t.value='';return toast('View only: enter the edit code first')}const f0=t.files[0];t.value='';guard('upload an Excel file',()=>{if((sessions.length||players.length)&&!confirm('Uploading replaces the shared data for EVERYONE in this group. Continue?'))return;importXlsx(f0).catch(e=>toast('Could not read file: '+(e&&e.message||e)))})}
+ if(t.id=='up'&&t.files[0]){if(!canView()){t.value='';return toast('Enter the view code first')}if(!canEdit()){t.value='';return toast('View only: enter the edit code first')}const f0=t.files[0];t.value='';guard('upload an Excel file',()=>{if((sessions.length||players.length)&&!confirm('Uploading replaces the shared data for EVERYONE in this group. Continue?'))return;importXlsx(f0).catch(e=>toast('Could not read file: '+(e&&e.message||e)))})}
  else if(t.id=='lg'&&t.files&&t.files[0]){if(!canEdit()){t.value='';return toast('View only: enter the edit code first')}loadSessionFile(t.files[0]).catch(e=>toast('Could not read file: '+(e&&e.message||e)));t.value=''}
  else if(t.dataset.pl!==undefined){plays[t.dataset.pl]=t.checked}
  else if(t.dataset.ep!==undefined){exDraft.paid=t.value}
@@ -502,8 +511,15 @@ function connectCard(){return`<div class="card"><b>${cs=='error'?'Could not conn
 function render(){document.body.classList.toggle('nogrp',!gid);
  if(!gid){$('#v').innerHTML=joinScreen();return}
  if(!synced){$('#v').innerHTML=connectCard();setSync(cs);return}
- if(viewLoaded&&!canView()){$('#v').innerHTML=`<div class="card"><b>This group is locked</b><div class="mut" style="margin:6px 0 10px">A view code is required to see the data. Ask the organiser for the view code.</div><button class="pri" id="unlockview">Enter view code</button></div>`;setSync(cs);return}
- render0();setSync(cs);document.body.classList.toggle('viewonly',!canEdit());if(!canEdit())lockUI();queueMicrotask(persist)}
+ const locked=viewLoaded&&!canView();
+ document.body.classList.toggle('locked',locked);
+ if(locked){$('#v').innerHTML=`<div class="card"><b>This group is locked</b><div class="mut" style="margin:6px 0 10px">A view code is required to see the data. Upload, export and share are disabled until you unlock.</div>
+ <button class="pri" id="unlockview" style="width:100%;margin-bottom:8px">Enter view code</button>
+ <div class="mut" style="margin:12px 0 6px">Lost your phone or on a new device? Use the organiser passcode — it grants full access on this device.</div>
+ <button id="unlockorg" style="width:100%">Enter organiser passcode</button></div>`;setSync(cs);['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el)el.disabled=true});const u=$('#up');if(u)u.disabled=true;return}
+ render0();setSync(cs);document.body.classList.toggle('viewonly',!canEdit());if(!canEdit())lockUI();
+ ['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el)el.disabled=!sessions.length||!players.length});const u=$('#up');if(u)u.disabled=!canEdit();
+ queueMicrotask(persist)}
 function renderSafe(){const a=document.activeElement;if(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)){pendingRender=true;return}render()}
 function reconcile(S){base=norm(S);lastSent='';if(canon(getState())!==canon(base)){applying=true;applyState(base);applying=false;renderSafe()}setSync(navigator.onLine===false?'offline':'live')}
 async function persist(){if(!cloudOn||!synced||applying||!window.cloud)return;const L=getState(),c=canon(L);if(c===canon(base||EMPTY())||c===lastSent)return;
@@ -517,12 +533,24 @@ const editKey=()=>'ptc_edit_'+gid,viewKey=()=>'ptc_view_'+gid;
 function canEdit(){if(!accessLoaded)return false;if(!access)return true;try{return localStorage.getItem(editKey())===access.hash}catch(e){return false}}
 function canView(){if(!viewLoaded)return false;if(!viewAccess)return true;try{if(localStorage.getItem(viewKey())===viewAccess.hash)return true}catch(e){}return canEdit()}
 const normCode=c=>String(c||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
-const ALLOW='[data-t],[data-v],[data-x],[data-q],[data-mode],[data-pn],[data-rf],[data-rt],[data-hs],[data-hp],[data-all],[data-xall],#bkref,#sxl,#ginvite,#gencode,#allowall,#genview,#allowview,#orgset,#orgrm,#copycode,#copyvcode,[data-sshare],[data-shide],[data-gcopy],[data-gleave],[data-gswitch],[data-gsw],[data-grename],#unlock,#unlockview';
+const ALLOW='[data-t],[data-v],[data-x],[data-q],[data-mode],[data-pn],[data-rf],[data-rt],[data-hs],[data-hp],[data-all],[data-xall],#bkref,#sxl,#ginvite,#gencode,#allowall,#genview,#allowview,#orgset,#orgrm,#copycode,#copyvcode,[data-sshare],[data-shide],[data-gcopy],[data-gleave],[data-gswitch],[data-gsw],[data-grename],#unlock,#unlockview,#unlockorg';
 function lockUI(){document.querySelectorAll('#v input,#v select,#v textarea,#v button,#v label.btn').forEach(el=>{if(!el.matches(ALLOW)){el.disabled=true;el.style.opacity='.5'}});const u=$('#up');if(u)u.disabled=true}
 async function unlockEdit(){if(!access)return;const c=prompt('Enter the edit code from the organiser:');if(c===null)return;
  const h=await hashPass(normCode(c),access.salt,access.iter);if(h===access.hash){try{localStorage.setItem(editKey(),h)}catch(e){}toast('Editing enabled on this device');render()}else toast('Wrong edit code')}
 async function unlockView(){if(!viewAccess)return;const c=prompt('Enter the view code from the organiser:');if(c===null)return;
  const h=await hashPass(normCode(c),viewAccess.salt,viewAccess.iter);if(h===viewAccess.hash){try{localStorage.setItem(viewKey(),h)}catch(e){}toast('View access granted on this device');render()}else toast('Wrong view code')}
+async function unlockAsOrganiser(){
+ if(!(await ensureCloud()))return toast('Could not connect. Check your internet and try again.');
+ await loadOrg();
+ if(!orgInfo)return toast('No organiser passcode is set for this group. Use the view code, or set an organiser passcode from a device that already has access.');
+ const pw=prompt('Enter the organiser passcode:');if(pw===null)return;
+ if(await hashPass(pw,orgInfo.salt,orgInfo.iter)!==orgInfo.hash)return toast('Wrong organiser passcode');
+ try{
+  if(viewAccess)localStorage.setItem(viewKey(),viewAccess.hash);
+  if(access)localStorage.setItem(editKey(),access.hash);
+ }catch(e){}
+ unlockUntil=Date.now()+600000;
+ toast('Organiser access granted on this device');render()}
 async function genCode(){if(!orgInfo){if(!canEdit())return toast('Enter the edit code first, or ask the organiser');if(!confirm('First set an organiser passcode. Only you will be able to create edit codes with it.'))return;await setPass();if(!orgInfo)return}
  else if(!(await checkPass('generate an edit code')))return;
  const a='ABCDEFGHJKMNPQRSTUVWXYZ23456789';let c='';crypto.getRandomValues(new Uint8Array(8)).forEach(x=>{c+=a[x%a.length]});
