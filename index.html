@@ -517,7 +517,8 @@ function connectCard(){return`<div class="card"><b>${cs=='error'?'Could not conn
 function render(){document.body.classList.toggle('nogrp',!gid);
  if(!gid){$('#v').innerHTML=joinScreen();return}
  if(!synced){$('#v').innerHTML=connectCard();setSync(cs);return}
- const locked=viewLoaded&&!canView();
+ if(!viewLoaded||!accessLoaded){$('#v').innerHTML=`<div class="card"><b>Checking access…</b><div class="mut" style="margin:6px 0">Loading view and edit codes for this group.</div></div>`;setSync(cs);['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el)el.disabled=true});return}
+ const locked=!canView();
  document.body.classList.toggle('locked',locked);
  if(locked){$('#v').innerHTML=`<div class="card"><b>This group is locked</b><div class="mut" style="margin:6px 0 10px">A view code is required to see the data. Upload, export and share are disabled until you unlock.</div>
  <button class="pri" id="unlockview" style="width:100%;margin-bottom:8px">Enter view code</button>
@@ -796,6 +797,8 @@ function backupTab(){const when=x=>new Date(x.savedAt).toLocaleString();
 function startCloud(){if(!gid)return;
  if(!window.cloud){window.addEventListener('cloudready',startCloud,{once:true});setTimeout(()=>{if(!window.cloud){cloudErr='Could not load Google services. Check your internet connection and reload.';cs='error';render()}},15000);return}
  cloudOn=true;cs='connecting';access=null;accessLoaded=false;viewAccess=null;viewLoaded=false;
+ (async()=>{try{const a=await cloud.get(gid,'access');access=(a&&a.json&&a.json!=='null')?JSON.parse(a.json):null}catch(e){access=null}accessLoaded=true;if(synced)renderSafe()})();
+ (async()=>{try{const v=await cloud.get(gid,'viewaccess');viewAccess=(v&&v.json&&v.json!=='null')?JSON.parse(v.json):null}catch(e){viewAccess=null}viewLoaded=true;if(synced)renderSafe()})();
  if(cloud.watch)cloud.watch(gid,'access',json=>{if(json===undefined)return;access=(json&&json!=='null')?JSON.parse(json):null;accessLoaded=true;if(synced)renderSafe()});
  if(cloud.watch)cloud.watch(gid,'viewaccess',json=>{if(json===undefined)return;viewAccess=(json&&json!=='null')?JSON.parse(json):null;viewLoaded=true;if(synced)renderSafe()});
  cloud.listen(gid,json=>{const S=json?norm(JSON.parse(json)):EMPTY();
@@ -813,8 +816,8 @@ function randCode(){const a='abcdefghjkmnpqrstuvwxyz23456789';let s='';crypto.ge
 function copyLink(){const u=location.origin+location.pathname+'#g='+gid;if(navigator.clipboard)navigator.clipboard.writeText(u).then(()=>toast('Invite link copied')).catch(()=>prompt('Copy this link',u));else prompt('Copy this link',u)}
 document.addEventListener('focusout',()=>{if(pendingRender)setTimeout(()=>{const a=document.activeElement;if(!(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName))){pendingRender=false;render()}},60)});
 window.addEventListener('online',()=>{if(cloudOn){setSync('live');persist()}});window.addEventListener('offline',()=>setSync('offline'));
-if(gid)startCloud();
-render();
+if(gid){const boot=gid;gid='';(async()=>{await openExistingGroup(boot);if(!gid)render()})()}
+else render();
 </script>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
