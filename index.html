@@ -517,13 +517,15 @@ function connectCard(){return`<div class="card"><b>${cs=='error'?'Could not conn
 function render(){document.body.classList.toggle('nogrp',!gid);
  if(!gid){$('#v').innerHTML=joinScreen();return}
  if(!synced){$('#v').innerHTML=connectCard();setSync(cs);return}
- if(!viewLoaded||!accessLoaded){$('#v').innerHTML=`<div class="card"><b>Checking access…</b><div class="mut" style="margin:6px 0">Loading view and edit codes for this group.</div></div>`;setSync(cs);['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el)el.disabled=true});return}
+ if(!viewLoaded||!accessLoaded){$('#v').innerHTML=`<div class="card"><b>Checking access…</b><div class="mut" style="margin:6px 0">Loading access for this group.</div></div>`;setSync(cs);['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el)el.disabled=true});return}
  const locked=!canView();
  document.body.classList.toggle('locked',locked);
- if(locked){$('#v').innerHTML=`<div class="card"><b>This group is locked</b><div class="mut" style="margin:6px 0 10px">A view code is required to see the data. Upload, export and share are disabled until you unlock.</div>
+ if(locked){$('#v').innerHTML=`<div class="card"><b>This group is locked</b>
+ <div class="mut" style="margin:6px 0 12px">Anyone with only the invite link cannot see data. Enter a <b>view code</b> (from the organiser) or the <b>organiser passcode</b> to continue.</div>
  <button class="pri" id="unlockview" style="width:100%;margin-bottom:8px">Enter view code</button>
- <div class="mut" style="margin:12px 0 6px">Lost your phone or on a new device? Use the organiser passcode — it grants full access on this device.</div>
- <button id="unlockorg" style="width:100%">Enter organiser passcode</button></div>`;setSync(cs);['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el)el.disabled=true});return}
+ <button id="unlockorg" style="width:100%">Enter organiser passcode</button>
+ <div class="mut" style="margin-top:12px">${viewAccess?'A view code is set for this group.':'No view code yet — only the organiser can open this group until they create one on the Backups tab.'}</div>
+ </div>`;setSync(cs);['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el)el.disabled=true});return}
  render0();setSync(cs);document.body.classList.toggle('viewonly',!canEdit());if(!canEdit())lockUI();
  ['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el)el.disabled=!sessions.length||!players.length});
  const upl=$('#uplbl');if(upl)upl.style.display=canOrganise()?'':'none';
@@ -538,8 +540,8 @@ async function persist(){if(!cloudOn||!synced||applying||!window.cloud)return;co
  inflight--;if(!inflight&&cs!='offline')reconcile(base);else setSync(cs)}
 let access=null,accessLoaded=false,lastCode='',viewAccess=null,viewLoaded=false,lastViewCode='';
 const editKey=()=>'ptc_edit_'+gid,viewKey=()=>'ptc_view_'+gid,orgKey=()=>'ptc_org_'+gid;
-function canEdit(){if(!accessLoaded)return false;if(!access)return true;try{return localStorage.getItem(editKey())===access.hash}catch(e){return false}}
-function canView(){if(!viewLoaded)return false;if(!viewAccess)return true;try{if(localStorage.getItem(viewKey())===viewAccess.hash)return true}catch(e){}return canEdit()}
+function canEdit(){if(!accessLoaded||!canView())return false;if(!access)return true;try{return localStorage.getItem(editKey())===access.hash}catch(e){return false}}
+function canView(){if(!viewLoaded)return false;if(canOrganise())return true;if(viewAccess){try{return localStorage.getItem(viewKey())===viewAccess.hash}catch(e){return false}}return false}
 function canOrganise(){if(Date.now()<unlockUntil)return true;if(!orgInfo)return false;try{return localStorage.getItem(orgKey())===orgInfo.hash}catch(e){return false}}
 function markOrganiser(){if(orgInfo)try{localStorage.setItem(orgKey(),orgInfo.hash)}catch(e){}unlockUntil=Date.now()+36e5}
 const normCode=c=>String(c||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
@@ -547,7 +549,8 @@ const ALLOW='[data-t],[data-v],[data-x],[data-q],[data-mode],[data-pn],[data-rf]
 function lockUI(){document.querySelectorAll('#v input,#v select,#v textarea,#v button,#v label.btn').forEach(el=>{if(!el.matches(ALLOW)){el.disabled=true;el.style.opacity='.5'}})}
 async function unlockEdit(){if(!access)return;const c=prompt('Enter the edit code from the organiser:');if(c===null)return;
  const h=await hashPass(normCode(c),access.salt,access.iter);if(h===access.hash){try{localStorage.setItem(editKey(),h)}catch(e){}toast('Editing enabled on this device');render()}else toast('Wrong edit code')}
-async function unlockView(){if(!viewAccess)return;const c=prompt('Enter the view code from the organiser:');if(c===null)return;
+async function unlockView(){if(!viewAccess){toast('No view code is set yet. Ask the organiser to create one, or use the organiser passcode.');return}
+ const c=prompt('Enter the view code from the organiser:');if(c===null)return;
  const h=await hashPass(normCode(c),viewAccess.salt,viewAccess.iter);if(h===viewAccess.hash){try{localStorage.setItem(viewKey(),h)}catch(e){}toast('View access granted on this device');render()}else toast('Wrong view code')}
 async function unlockAsOrganiser(){
  if(!(await ensureCloud()))return toast('Could not connect. Check your internet and try again.');
@@ -574,7 +577,7 @@ async function genViewCode(){if(!orgInfo){if(!canEdit())return toast('Enter the 
  try{await cloud.put(gid,'viewaccess',JSON.stringify({salt,iter,hash}));viewAccess={salt,iter,hash};viewLoaded=true;try{localStorage.setItem(viewKey(),hash)}catch(e){}lastViewCode=c.slice(0,4)+'-'+c.slice(4);render();toast('New view code created')}catch(e){toast('Could not save the view code')}}
 async function allowAll(){if(!(await checkPass('let everyone edit')))return;if(!confirm('Remove the edit code? Everyone with the link will be able to edit again.'))return;
  try{await cloud.put(gid,'access','null');access=null;accessLoaded=true;lastCode='';render();toast('Everyone can edit again')}catch(e){toast('Could not save')}}
-async function allowAllView(){if(!(await checkPass('let everyone view without a code')))return;if(!confirm('Remove the view code? Anyone with the link will be able to view again.'))return;
+async function allowAllView(){if(!(await checkPass('let everyone view without a code')))return;if(!confirm('Remove the view code? The group stays locked for invite-only users until a new view code is created. Only the organiser passcode will open it.'))return;
  try{await cloud.put(gid,'viewaccess','null');viewAccess=null;viewLoaded=true;lastViewCode='';render();toast('Anyone with the link can view again')}catch(e){toast('Could not save')}}
 let orgInfo=null,orgLoaded=false,unlockUntil=0,pendingOrgPass=null,pendingSetGlobal=false;
 const CFG='appconfig';
@@ -609,10 +612,8 @@ async function openExistingGroup(code){
  if(!code)return;
  if(!(await ensureCloud()))return toast('Could not connect. Check your internet and try again.');
  try{const del=await window.cloud.get(code,'deleted');if(del&&del.json&&del.json!=='null'){removeRecent(code);return toast('This group no longer exists. It was deleted by the organiser.')}}catch(e){}
- try{const va=await window.cloud.get(code,'viewaccess');
-  if(va&&va.json&&va.json!=='null'){const info=JSON.parse(va.json);let ok=false;try{ok=localStorage.getItem('ptc_view_'+code)===info.hash}catch(e){}
-   if(!ok){const c=prompt('This group is locked. Enter the view code to open it:');if(c===null)return;
-    const h=await hashPass(normCode(c),info.salt,info.iter);if(h!==info.hash)return toast('Wrong view code');try{localStorage.setItem('ptc_view_'+code,h)}catch(e){}}}}catch(e){}
+ // Clear remembered access so every join shows the lock screen (view code or organiser passcode)
+ try{localStorage.removeItem('ptc_view_'+code);localStorage.removeItem('ptc_edit_'+code);localStorage.removeItem('ptc_org_'+code)}catch(e){}
  setGroup(code,null,{register:false})}
 let adminGroups=[],adminGroupsLoaded=false;
 async function loadGroupAdmin(){if(!window.cloud)return;adminGroupsLoaded=false;render();
@@ -810,7 +811,7 @@ function startCloud(){if(!gid)return;
   if(inflight)return;reconcile(S)},e=>{cloudErr=((e&&e.code)||'error')+': '+((e&&e.message)||'');cs='error';synced=synced&&false;render()})}
 function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
 function setGroup(code,name,opts){const nm=(name!=null?String(name):'').trim().slice(0,40);const doReg=opts&&opts.register;gid=code;saveRecent(code,nm||code.slice(0,8));try{localStorage.setItem('ptc_group',code);history.replaceState(null,'','#g='+code)}catch(e){}clearLocal();groupName=nm;cs='connecting';startCloud();render();if(doReg)queueMicrotask(()=>registerGroup(code,nm).catch(()=>{}))}
-function leaveGroup(){if(gid)saveRecent(gid,groupName||gid.slice(0,8));if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;gid='';try{localStorage.removeItem('ptc_group');history.replaceState(null,'',location.pathname)}catch(e){}clearLocal();render()}
+function leaveGroup(){if(gid){saveRecent(gid,groupName||gid.slice(0,8));try{localStorage.removeItem(viewKey());localStorage.removeItem(editKey())}catch(e){}}if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;gid='';try{localStorage.removeItem('ptc_group');history.replaceState(null,'',location.pathname)}catch(e){}clearLocal();render()}
 function switchGroupUI(){tab='hist';leaveGroup()}
 function randCode(){const a='abcdefghjkmnpqrstuvwxyz23456789';let s='';crypto.getRandomValues(new Uint8Array(14)).forEach(x=>{s+=a[x%a.length]});return s}
 function copyLink(){const u=location.origin+location.pathname+'#g='+gid;if(navigator.clipboard)navigator.clipboard.writeText(u).then(()=>toast('Invite link copied')).catch(()=>prompt('Copy this link',u));else prompt('Copy this link',u)}
