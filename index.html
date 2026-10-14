@@ -540,7 +540,7 @@ async function persist(){if(!cloudOn||!synced||applying||!window.cloud)return;co
  inflight--;if(!inflight&&cs!='offline')reconcile(base);else setSync(cs)}
 let access=null,accessLoaded=false,lastCode='',viewAccess=null,viewLoaded=false,lastViewCode='';
 const editKey=()=>'ptc_edit_'+gid,viewKey=()=>'ptc_view_'+gid,orgKey=()=>'ptc_org_'+gid;
-function canEdit(){if(!accessLoaded||!canView())return false;if(!access)return true;try{return localStorage.getItem(editKey())===access.hash}catch(e){return false}}
+function canEdit(){if(!accessLoaded||!canView())return false;if(canOrganise())return true;if(!access)return false;try{return localStorage.getItem(editKey())===access.hash}catch(e){return false}}
 function canView(){if(!viewLoaded)return false;if(canOrganise())return true;if(viewAccess){try{return localStorage.getItem(viewKey())===viewAccess.hash}catch(e){return false}}return false}
 function canOrganise(){if(Date.now()<unlockUntil)return true;if(!orgInfo)return false;try{return localStorage.getItem(orgKey())===orgInfo.hash}catch(e){return false}}
 function markOrganiser(){if(orgInfo)try{localStorage.setItem(orgKey(),orgInfo.hash)}catch(e){}unlockUntil=Date.now()+36e5}
