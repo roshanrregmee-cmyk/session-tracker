@@ -441,6 +441,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(g('data-gdel')){deleteGroupFully(g('data-gdel').dataset.gdel)}
  else if(t.id=='gadmin'){guard('manage all groups',()=>{loadGroupAdmin()})}
  else if(g('data-gcopy')){copyLink()}
+ else if(t.id=='gref'){refreshGroup()}
  else if(g('data-gleave')){if(confirm('Leave this group on this device? The shared data stays in the cloud.'))leaveGroup()}
  else if(g('data-gswitch')){if(confirm('Switch to another group? You can return later from Recent groups.'))switchGroupUI()}
  else if(g('data-gsw')){openExistingGroup(g('data-gsw').dataset.gsw)}
@@ -506,7 +507,7 @@ function getRecent(){try{return JSON.parse(localStorage.getItem('ptc_recent')||'
 function saveRecent(code,label){let r=getRecent().filter(x=>x.code!==code);r.unshift({code,label:label||code.slice(0,8),last:Date.now()});if(r.length>12)r=r.slice(0,12);try{localStorage.setItem('ptc_recent',JSON.stringify(r))}catch(e){}}
 function gbarHtml(){if(!gid)return'';const m={live:['#15803d','Live'],saving:['#d97706','Saving…'],connecting:['#d97706','Connecting…'],offline:['#dc2626','Offline: changes not saved yet'],error:['#dc2626','Connection problem']}[cs]||['#6b7686',''];
  const nm=groupName?E(groupName):E(gid.slice(0,6))+'…';
- return`<span style="color:${m[0]}">●</span> ${m[1]} <span class="mut">· <b>${nm}</b></span>${canEdit()?` <button data-grename title="Rename group">✎</button>`:''} <button data-gcopy>Copy invite link</button> <button data-gswitch>Switch group</button> <button data-gleave>Leave</button>${viewLoaded&&!canView()?' <span class="neg">🔒 Locked</span>':(accessLoaded?(canEdit()?(access?' <span class="pos">✏️ Editor</span>':''):' <span class="neg">👁 View only</span> <button class="pri" id="unlock">Enter edit code</button>'):'')}`}
+ return`<span style="color:${m[0]}">●</span> ${m[1]} <span class="mut">· <b>${nm}</b></span>${canEdit()?` <button data-grename title="Rename group">✎</button>`:''} <button data-gcopy>Copy invite link</button> <button data-gswitch>Switch group</button> <button id="gref" title="Refresh data from cloud">↻ Refresh</button> <button data-gleave>Leave</button>${viewLoaded&&!canView()?' <span class="neg">🔒 Locked</span>':(accessLoaded?(canEdit()?(access?' <span class="pos">✏️ Editor</span>':''):' <span class="neg">👁 View only</span> <button class="pri" id="unlock">Enter edit code</button>'):'')}`}
 function setSync(c){cs=c;const g=$('#gbar');if(g)g.innerHTML=gbarHtml()}
 function joinScreen(){const recent=getRecent();
  return`<div class="card"><b>Join or create a group</b><div class="mut" style="margin:6px 0 10px">Each group has its own independent history of sessions, loans and expenses. Use different groups when different sets of players play. Keep the code private. Creating a group requires the organiser passcode (the same one set on Backups).</div>
@@ -545,7 +546,7 @@ function canView(){if(!viewLoaded)return false;if(canOrganise())return true;if(v
 function canOrganise(){if(Date.now()<unlockUntil)return true;if(!orgInfo)return false;try{return localStorage.getItem(orgKey())===orgInfo.hash}catch(e){return false}}
 function markOrganiser(){if(orgInfo)try{localStorage.setItem(orgKey(),orgInfo.hash)}catch(e){}unlockUntil=Date.now()+36e5}
 const normCode=c=>String(c||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
-const ALLOW='[data-t],[data-v],[data-x],[data-q],[data-mode],[data-pn],[data-rf],[data-rt],[data-hs],[data-hp],[data-all],[data-xall],#bkref,#ginvite,#gencode,#allowall,#genview,#allowview,#orgset,#orgrm,#copycode,#copyvcode,#gadmin,[data-sshare],[data-shide],[data-gcopy],[data-gleave],[data-gswitch],[data-gsw],[data-gopen],[data-gdel],#unlock,#unlockview,#unlockorg';
+const ALLOW='[data-t],[data-v],[data-x],[data-q],[data-mode],[data-pn],[data-rf],[data-rt],[data-hs],[data-hp],[data-all],[data-xall],#bkref,#gref,#ginvite,#gencode,#allowall,#genview,#allowview,#orgset,#orgrm,#copycode,#copyvcode,#gadmin,[data-sshare],[data-shide],[data-gcopy],[data-gleave],[data-gswitch],[data-gsw],[data-gopen],[data-gdel],#unlock,#unlockview,#unlockorg';
 function lockUI(){document.querySelectorAll('#v input,#v select,#v textarea,#v button,#v label.btn').forEach(el=>{if(!el.matches(ALLOW)){el.disabled=true;el.style.opacity='.5'}})}
 async function unlockEdit(){if(!access)return;const c=prompt('Enter the edit code from the organiser:');if(c===null)return;
  const h=await hashPass(normCode(c),access.salt,access.iter);if(h===access.hash){try{localStorage.setItem(editKey(),h)}catch(e){}toast('Editing enabled on this device');render()}else toast('Wrong edit code')}
@@ -813,6 +814,7 @@ function startCloud(){if(!gid)return;
   if(inflight)return;reconcile(S)},e=>{cloudErr=((e&&e.code)||'error')+': '+((e&&e.message)||'');cs='error';synced=synced&&false;render()})}
 function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
 function setGroup(code,name,opts){const nm=(name!=null?String(name):'').trim().slice(0,40);const doReg=opts&&opts.register;gid=code;saveRecent(code,nm||code.slice(0,8));try{localStorage.setItem('ptc_group',code);history.replaceState(null,'','#g='+code)}catch(e){}clearLocal();groupName=nm;cs='connecting';startCloud();render();if(doReg)queueMicrotask(()=>registerGroup(code,nm).catch(()=>{}))}
+function refreshGroup(){if(!gid){location.reload();return}if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;synced=false;cs='connecting';accessLoaded=false;viewLoaded=false;orgLoaded=false;base=null;lastSent='';inflight=0;startCloud();render();toast('Refreshing…')}
 function leaveGroup(){if(gid){saveRecent(gid,groupName||gid.slice(0,8));try{localStorage.removeItem(viewKey());localStorage.removeItem(editKey())}catch(e){}}if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;gid='';try{localStorage.removeItem('ptc_group');history.replaceState(null,'',location.pathname)}catch(e){}clearLocal();render()}
 function switchGroupUI(){tab='hist';leaveGroup()}
 function randCode(){const a='abcdefghjkmnpqrstuvwxyz23456789';let s='';crypto.getRandomValues(new Uint8Array(14)).forEach(x=>{s+=a[x%a.length]});return s}
