@@ -434,16 +434,16 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(t.id=='orgrm'){removePass()}
  else if(t.id=='bkfull'){guard('restore a backup',()=>{if(bk.full&&confirm('Replace ALL shared data (sessions, loans, players and any game in progress) with this backup, for everyone?')){applyState(JSON.parse(bk.full.json));tab='hist';render();toast('Backup restored')}})}
  else if(t.id=='bkstd'){guard('restore the standing',()=>{if(bk.standing&&confirm('Replace the current game and its loans with this saved standing?')){const d=JSON.parse(bk.standing.json);loans=loans.filter(l=>l.done).concat(d.loans.map(l=>({...l})));expenses=expenses.filter(e=>e.done).concat((d.expenses||[]).map(e=>({...e,id:e.id||uid()})));game={date:d.game.date,players:[...d.game.players]};initLoan=d.initLoan;d.game.players.forEach(q=>{if(!players.includes(q))players.push(q)});gc=false;finals={};loanDraft={};tab='loans';render();toast('Standing restored')}})}
- else if(t.id=='gjoin'){const c=($('#gc_in').value||'').trim();if(!/^[A-Za-z0-9_-]{8,40}$/.test(c))return toast('Use 8 to 40 letters, numbers, - or _');setGroup(c)}
+ else if(t.id=='gjoin'){const c=($('#gc_in').value||'').trim();if(!/^[A-Za-z0-9_-]{8,40}$/.test(c))return toast('Use 8 to 40 letters, numbers, - or _');openExistingGroup(c)}
  else if(t.id=='gnew'){createNewGroup()}
  else if(g('data-grename')){if(!canEdit())return toast('View only: enter the edit code first');const n=prompt('Group name:',groupName||'');if(n===null)return;groupName=n.trim().slice(0,40);if(gid){saveRecent(gid,groupName||gid.slice(0,8));registerGroup(gid,groupName).catch(()=>{})}render();toast(groupName?'Group renamed to '+groupName:'Name cleared');queueMicrotask(persist)}
- else if(g('data-gopen')){const c=g('data-gopen').dataset.gopen;if(c&&c!==gid)setGroup(c)}
+ else if(g('data-gopen')){const c=g('data-gopen').dataset.gopen;if(c&&c!==gid)openExistingGroup(c)}
  else if(g('data-gdel')){deleteGroupFully(g('data-gdel').dataset.gdel)}
  else if(t.id=='gadmin'){guard('manage all groups',()=>{loadGroupAdmin()})}
  else if(g('data-gcopy')){copyLink()}
  else if(g('data-gleave')){if(confirm('Leave this group on this device? The shared data stays in the cloud.'))leaveGroup()}
  else if(g('data-gswitch')){if(confirm('Switch to another group? You can return later from Recent groups.'))switchGroupUI()}
- else if(g('data-gsw')){setGroup(g('data-gsw').dataset.gsw)}
+ else if(g('data-gsw')){openExistingGroup(g('data-gsw').dataset.gsw)}
  else if(t.id=='sxl'){if(!game)return;save(`Current_Session_${game.date}.xlsx`,sessionBuf())}
  else if(t.id=='ginvite'){if(!game)return;const u=location.origin+location.pathname+'#g='+gid+'&game='+game.date;const msg='Join our session tracker game on '+game.date+': '+u;if(navigator.clipboard)navigator.clipboard.writeText(msg).then(()=>toast('Game invite copied — includes group + date')).catch(()=>prompt('Copy this game invite',msg));else prompt('Copy this game invite',msg)}
  else if(t.id=='gcb'){gc=!gc;render()}
@@ -512,7 +512,7 @@ function joinScreen(){const recent=getRecent();
  return`<div class="card"><b>Join or create a group</b><div class="mut" style="margin:6px 0 10px">Each group has its own independent history of sessions, loans and expenses. Use different groups when different sets of players play. Keep the code private. Creating a group requires the organiser passcode (the same one set on Backups).</div>
  <div class="row"><input id="gc_in" placeholder="Group code" style="text-align:left;flex:1;width:auto"><button class="pri" id="gjoin">Join</button></div>
  <div style="margin-top:12px"><button id="gnew">Create a new group</button></div></div>
- ${recent.length?`<div class="card"><b>Recent groups on this device</b><div class="mut" style="margin:4px 0 8px">Tap to switch. Each group keeps its own full history.</div>${recent.map(r=>`<div class="row" style="justify-content:space-between"><span><b>${E(r.label||r.code.slice(0,8))}</b> <span class="mut">${E(r.code.slice(0,6))}…</span></span><button data-gsw="${E(r.code)}">Open</button></div>`).join('')}</div>`:''}`}
+ ${recent.length?`<div class="card"><b>Recent groups on this device</b><div class="mut" style="margin:4px 0 8px">Tap to open. Locked groups ask for the view code. Deleted groups are removed from this list.</div>${recent.map(r=>`<div class="row" style="justify-content:space-between"><span><b>${E(r.label||r.code.slice(0,8))}</b> <span class="mut">${E(r.code.slice(0,6))}…</span></span><button data-gsw="${E(r.code)}">Open</button></div>`).join('')}</div>`:''}`}
 function connectCard(){return`<div class="card"><b>${cs=='error'?'Could not connect':'Connecting…'}</b><div class="mut" style="margin:6px 0">${E(cloudErr)}</div>${cs=='error'?'<p>Check that you are online and that the Firestore rules are published (Database, then Rules, then Publish).</p>':''}<button data-gleave>Use a different group code</button></div>`}
 function render(){document.body.classList.toggle('nogrp',!gid);
  if(!gid){$('#v').innerHTML=joinScreen();return}
@@ -589,18 +589,30 @@ async function loadGroupList(){try{const d=await window.cloud.get(CFG,'grouplist
 async function saveGroupList(list){try{await window.cloud.put(CFG,'grouplist',JSON.stringify(list))}catch(e){}}
 async function registerGroup(code,name){const list=await loadGroupList();const i=list.findIndex(x=>x.code===code);const row={code,name:(name||code.slice(0,8)).slice(0,40),at:Date.now()};if(i>=0)list[i]={...list[i],...row};else list.unshift(row);await saveGroupList(list.slice(0,50))}
 async function unregisterGroup(code){const list=(await loadGroupList()).filter(x=>x.code!==code);await saveGroupList(list)}
+function removeRecent(code){try{const r=getRecent().filter(x=>x.code!==code);localStorage.setItem('ptc_recent',JSON.stringify(r))}catch(e){}}
 async function deleteGroupFully(code){
  if(!(await checkPass('delete a group and all its data')))return;
  if(!confirm('Permanently delete group '+(code.slice(0,8))+'… including all sessions, loans, expenses and backups?\nThis cannot be undone.'))return;
  if(!confirm('Type-confirm: really delete this group forever?'))return;
  try{
   await window.cloud.deleteGroup(code);
+  try{await window.cloud.put(code,'deleted',JSON.stringify({at:Date.now()}))}catch(e){}
   await unregisterGroup(code);
-  try{const r=getRecent().filter(x=>x.code!==code);localStorage.setItem('ptc_recent',JSON.stringify(r))}catch(e){}
+  removeRecent(code);
+  try{localStorage.removeItem('ptc_view_'+code);localStorage.removeItem('ptc_edit_'+code);localStorage.removeItem('ptc_org_'+code)}catch(e){}
   if(gid===code){leaveGroup();toast('Group deleted')}
   else{toast('Group deleted');if(tab==='backup')loadGroupAdmin()}
  }catch(e){toast('Could not delete group: '+(e&&e.message||e))}
 }
+async function openExistingGroup(code){
+ if(!code)return;
+ if(!(await ensureCloud()))return toast('Could not connect. Check your internet and try again.');
+ try{const del=await window.cloud.get(code,'deleted');if(del&&del.json&&del.json!=='null'){removeRecent(code);return toast('This group no longer exists. It was deleted by the organiser.')}}catch(e){}
+ try{const va=await window.cloud.get(code,'viewaccess');
+  if(va&&va.json&&va.json!=='null'){const info=JSON.parse(va.json);let ok=false;try{ok=localStorage.getItem('ptc_view_'+code)===info.hash}catch(e){}
+   if(!ok){const c=prompt('This group is locked. Enter the view code to open it:');if(c===null)return;
+    const h=await hashPass(normCode(c),info.salt,info.iter);if(h!==info.hash)return toast('Wrong view code');try{localStorage.setItem('ptc_view_'+code,h)}catch(e){}}}}catch(e){}
+ setGroup(code,null,{register:false})}
 let adminGroups=[],adminGroupsLoaded=false;
 async function loadGroupAdmin(){if(!window.cloud)return;adminGroupsLoaded=false;render();
  try{adminGroups=await loadGroupList();
@@ -615,7 +627,7 @@ async function createNewGroup(){
  if(a===null)return;if(a.length<4)return toast('Use at least 4 characters');
  if(hasGlobal){const h=await hashPass(a,info.salt,info.iter);if(h!==info.hash)return toast('Wrong organiser passcode');pendingOrgPass=a;pendingSetGlobal=false}
  else{const b=prompt('Type the organiser passcode again to confirm:');if(b!==a)return toast('The two entries did not match');pendingOrgPass=a;pendingSetGlobal=true}
- setGroup(randCode(),(n||'').trim());toast('Group created. Tap Copy invite link to share it.')}
+ setGroup(randCode(),(n||'').trim(),{register:true});toast('Group created. Tap Copy invite link to share it.')}
 const randHex=n=>[...crypto.getRandomValues(new Uint8Array(n))].map(b=>b.toString(16).padStart(2,'0')).join('');
 async function hashPass(pw,saltHex,iter){const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveBits']),bits=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:Uint8Array.from(saltHex.match(/../g).map(h=>parseInt(h,16))),iterations:iter},key,256);return[...new Uint8Array(bits)].map(b=>b.toString(16).padStart(2,'0')).join('')}
 async function loadOrg(){orgLoaded=false;try{const d=await cloud.get(gid,'organiser');orgInfo=d?JSON.parse(d.json):null;orgLoaded=true;
@@ -788,12 +800,13 @@ function startCloud(){if(!gid)return;
  if(cloud.watch)cloud.watch(gid,'viewaccess',json=>{if(json===undefined)return;viewAccess=(json&&json!=='null')?JSON.parse(json):null;viewLoaded=true;if(synced)renderSafe()});
  cloud.listen(gid,json=>{const S=json?norm(JSON.parse(json)):EMPTY();
   if(!synced){synced=true;cs='live';const keepName=groupName;base=S;lastSent='';applying=true;applyState(S);if(keepName&&!groupName){groupName=keepName;if(gid)saveRecent(gid,groupName)}applying=false;if(hashGame){if(game&&game.date===hashGame){tab='loans';toast('Opened the game of '+hashGame)}else if(game)toast('A different game is in progress ('+game.date+')')}
-   loadOrg().then(()=>render());
-   if(pendingOrgPass){const pw=pendingOrgPass,setG=pendingSetGlobal;pendingOrgPass=null;pendingSetGlobal=false;(async()=>{try{const salt=randHex(16),iter=150000,hash=await hashPass(pw,salt,iter);const payload=JSON.stringify({salt,iter,hash});await cloud.put(gid,'organiser',payload);if(setG)await cloud.put(CFG,'createpass',payload);orgInfo={salt,iter,hash};orgLoaded=true;markOrganiser();render()}catch(e){toast('Could not save organiser passcode — set it on the Backups tab')}})()}
-   render();queueMicrotask(persist);return}
+   ;(async()=>{try{const del=await cloud.get(gid,'deleted');if(del&&del.json&&del.json!=='null'&&!pendingOrgPass){removeRecent(gid);const gone=gid;leaveGroup();toast('Group '+(gone.slice(0,8))+'… no longer exists (deleted by the organiser).');return}}catch(e){}
+    loadOrg().then(()=>render());
+    if(pendingOrgPass){const pw=pendingOrgPass,setG=pendingSetGlobal;pendingOrgPass=null;pendingSetGlobal=false;try{const salt=randHex(16),iter=150000,hash=await hashPass(pw,salt,iter);const payload=JSON.stringify({salt,iter,hash});await cloud.put(gid,'organiser',payload);if(setG)await cloud.put(CFG,'createpass',payload);orgInfo={salt,iter,hash};orgLoaded=true;markOrganiser();await registerGroup(gid,groupName);render()}catch(e){toast('Could not save organiser passcode — set it on the Backups tab')}}
+    else render();queueMicrotask(persist)})();return}
   if(inflight)return;reconcile(S)},e=>{cloudErr=((e&&e.code)||'error')+': '+((e&&e.message)||'');cs='error';synced=synced&&false;render()})}
 function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
-function setGroup(code,name){const nm=(name!=null?String(name):'').trim().slice(0,40);gid=code;saveRecent(code,nm||code.slice(0,8));try{localStorage.setItem('ptc_group',code);history.replaceState(null,'','#g='+code)}catch(e){}clearLocal();groupName=nm;cs='connecting';startCloud();render();queueMicrotask(()=>registerGroup(code,nm).catch(()=>{}))}
+function setGroup(code,name,opts){const nm=(name!=null?String(name):'').trim().slice(0,40);const doReg=opts&&opts.register;gid=code;saveRecent(code,nm||code.slice(0,8));try{localStorage.setItem('ptc_group',code);history.replaceState(null,'','#g='+code)}catch(e){}clearLocal();groupName=nm;cs='connecting';startCloud();render();if(doReg)queueMicrotask(()=>registerGroup(code,nm).catch(()=>{}))}
 function leaveGroup(){if(gid)saveRecent(gid,groupName||gid.slice(0,8));if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;gid='';try{localStorage.removeItem('ptc_group');history.replaceState(null,'',location.pathname)}catch(e){}clearLocal();render()}
 function switchGroupUI(){tab='hist';leaveGroup()}
 function randCode(){const a='abcdefghjkmnpqrstuvwxyz23456789';let s='';crypto.getRandomValues(new Uint8Array(14)).forEach(x=>{s+=a[x%a.length]});return s}
