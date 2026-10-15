@@ -1,5 +1,5 @@
 // Basic Service Worker for Session Tracker PWA
-const CACHE_NAME = 'session-tracker-v2';
+const CACHE_NAME = 'session-tracker-v3';
 const ASSETS = [
   './',
   './index.html',

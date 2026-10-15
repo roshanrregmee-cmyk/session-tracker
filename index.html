@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0f766e">
+<meta name="theme-color" content="#ff2878">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -68,6 +68,41 @@ html{overscroll-behavior-y:none}body{overscroll-behavior-y:none}
 #enterBtn:active{transform:scale(.96)}
 @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
 @media(prefers-reduced-motion:reduce){#enterBtn{animation:none}}
+/* ===== FUNKY THEME ===== */
+:root{--bg:#fff4e6;--card:#fff;--tx:#2a1650;--mut:#7a5fa0;--bd:#2a1650;--ac:#ff2878;--pos:#00a86b;--neg:#e11d48;--g1:#ff2878;--g2:#ff9600;--g3:#ffdc28;--s1:#ff2878;--s2:#00c2ff;--s3:#ffb400;--s4:#8a4dff}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1a0b3b;--card:#2a1458;--tx:#fff3d6;--mut:#c4a8ff;--bd:#8a5cf0;--ac:#ff5ea0;--pos:#3dffa8;--neg:#ff6b81}}
+:root[data-theme="dark"]{--bg:#1a0b3b;--card:#2a1458;--tx:#fff3d6;--mut:#c4a8ff;--bd:#8a5cf0;--ac:#ff5ea0;--pos:#3dffa8;--neg:#ff6b81}
+body{min-height:100vh;background:linear-gradient(160deg,#ffd9ec,#ffe8bf 50%,#fff6c4) fixed}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) body{background:linear-gradient(160deg,#2b0a5c,#58106e 55%,#7d1b4c) fixed}}
+:root[data-theme="dark"] body{background:linear-gradient(160deg,#2b0a5c,#58106e 55%,#7d1b4c) fixed}
+main{animation:pop .5s cubic-bezier(.34,1.56,.64,1) both}
+@keyframes pop{from{opacity:0;transform:translateY(18px) scale(.97)}to{opacity:1;transform:none}}
+h1{font-size:30px;font-weight:900;letter-spacing:-.5px;display:flex;align-items:center;background:linear-gradient(90deg,var(--g1),var(--g2),#a020f0);-webkit-background-clip:text;background-clip:text;color:transparent}
+h1 img{animation:wob 3s ease-in-out infinite;box-shadow:0 4px 0 var(--tx)}
+@keyframes wob{0%,100%{transform:rotate(-6deg)}50%{transform:rotate(6deg) scale(1.06)}}
+button,.btn{border:2px solid var(--tx);border-radius:999px;font-weight:700;box-shadow:0 3px 0 var(--tx);transition:transform .08s,box-shadow .08s}
+button:active,.btn:active{transform:translateY(3px);box-shadow:0 0 0 var(--tx)}
+.pri{background:linear-gradient(135deg,var(--g1),var(--g2));color:#fff;border-color:var(--tx);text-shadow:0 1px 2px rgba(0,0,0,.25)}
+.tabs{border-bottom:0;gap:8px;padding:4px 2px 10px}
+.tabs button{border:2px solid var(--tx);border-radius:999px;background:var(--card);box-shadow:0 3px 0 var(--tx);padding:8px 16px}
+.tabs .on{background:linear-gradient(135deg,var(--g1),var(--g2));color:#fff;border-color:var(--tx);font-weight:800}
+.card,.sc{border:2px solid var(--tx);border-radius:20px;box-shadow:5px 5px 0 var(--s1)}
+.g2>.card:nth-child(4n+2),.card:nth-of-type(4n+2){box-shadow:5px 5px 0 var(--s2)}
+.g2>.card:nth-child(4n+3),.card:nth-of-type(4n+3){box-shadow:5px 5px 0 var(--s3)}
+.g2>.card:nth-child(4n),.card:nth-of-type(4n){box-shadow:5px 5px 0 var(--s4)}
+.kp div{border:2px solid var(--tx);border-radius:18px;box-shadow:4px 4px 0 var(--s1)}
+.kp div:nth-child(4n+2){box-shadow:4px 4px 0 var(--s2)}.kp div:nth-child(4n+3){box-shadow:4px 4px 0 var(--s3)}.kp div:nth-child(4n){box-shadow:4px 4px 0 var(--s4)}
+.kp b{font-weight:900;font-size:22px}
+th{background:linear-gradient(135deg,var(--g1),var(--g2));color:#fff;border-bottom:2px solid var(--tx)}
+th:first-child{background:var(--g1)}
+tbody tr:nth-child(even) td:not(:first-child){background:rgba(255,40,120,.07)}
+tfoot td{background:rgba(255,180,0,.18)}tfoot td:first-child{background:var(--card)}
+.pos,.neg{font-weight:800}
+input,select{border:2px solid var(--bd);border-radius:10px}
+input:focus,select:focus{outline:3px solid var(--g2);outline-offset:1px}
+.chip{border:2px solid var(--tx);box-shadow:0 3px 0 var(--tx);font-weight:600}
+#toast{background:linear-gradient(135deg,var(--g1),var(--g2));color:#fff;border:2px solid var(--tx);border-radius:999px;font-weight:700}
+@media(prefers-reduced-motion:reduce){main,h1 img{animation:none}}
 </style></head><body><div id="welcome"><img src="icon-512.png" alt=""><h2>Welcome Folks! 👑</h2><button id="enterBtn" type="button">Enter</button></div><main>
 <h1><img src="icon-192.png" alt="" style="height:1.15em;width:1.15em;border-radius:22%;vertical-align:-0.2em;margin-right:.3em"> Session Tracker</h1>
 <div class="mut">Add sessions, track loans and expenses, export. Positive = winning, negative = losing. Use different groups for different player sets.</div>
