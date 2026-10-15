@@ -55,7 +55,16 @@ select{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--bd
 .locked .bar button{pointer-events:none}
 .chip{display:flex;align-items:center;gap:6px;border:1px solid var(--bd);border-radius:20px;padding:5px 12px;cursor:pointer}
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:10px 16px;border-radius:8px;display:none}
-</style></head><body><main>
+html{overscroll-behavior-y:none}body{overscroll-behavior-y:none}
+#welcome{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:linear-gradient(135deg,#ff2878,#ff9600 55%,#ffdc28);transition:opacity .5s ease,visibility .5s}
+#welcome.hide{opacity:0;visibility:hidden}
+#welcome img{width:min(46vw,200px);height:auto;border-radius:22%;box-shadow:0 14px 40px rgba(0,0,0,.35);animation:kingIn .9s cubic-bezier(.34,1.56,.64,1) both,kingWave 1.4s ease-in-out .9s 1}
+#welcome h2{margin:0;font-size:clamp(28px,8vw,44px);color:#fff;text-shadow:0 3px 12px rgba(0,0,0,.3);animation:txtIn .6s ease .6s both}
+@keyframes kingIn{from{transform:scale(.2) rotate(-25deg);opacity:0}to{transform:none;opacity:1}}
+@keyframes kingWave{0%,100%{transform:rotate(0)}25%{transform:rotate(-8deg)}75%{transform:rotate(8deg)}}
+@keyframes txtIn{from{transform:translateY(20px);opacity:0}to{transform:none;opacity:1}}
+@media(prefers-reduced-motion:reduce){#welcome img,#welcome h2{animation:none}}
+</style></head><body><div id="welcome"><img src="icon-512.png" alt=""><h2>Welcome Folks! 👑</h2></div><main>
 <h1><img src="icon-192.png" alt="" style="height:1.15em;width:1.15em;border-radius:22%;vertical-align:-0.2em;margin-right:.3em"> Session Tracker</h1>
 <div class="mut">Add sessions, track loans and expenses, export. Positive = winning, negative = losing. Use different groups for different player sets.</div>
 <div class="bar">
@@ -861,4 +870,6 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
+<script>(function(){var w=document.getElementById('welcome');if(!w)return;var seen=false;try{seen=sessionStorage.getItem('welcomed')==='1';sessionStorage.setItem('welcomed','1')}catch(e){}
+if(seen){w.remove();return}setTimeout(function(){w.classList.add('hide');setTimeout(function(){w.remove()},600)},2400)})();</script>
 </body></html>
