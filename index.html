@@ -64,7 +64,11 @@ html{overscroll-behavior-y:none}body{overscroll-behavior-y:none}
 @keyframes kingWave{0%,100%{transform:rotate(0)}25%{transform:rotate(-8deg)}75%{transform:rotate(8deg)}}
 @keyframes txtIn{from{transform:translateY(20px);opacity:0}to{transform:none;opacity:1}}
 @media(prefers-reduced-motion:reduce){#welcome img,#welcome h2{animation:none}}
-</style></head><body><div id="welcome"><img src="icon-512.png" alt=""><h2>Welcome Folks! 👑</h2></div><main>
+#enterBtn{margin-top:8px;padding:14px 44px;font-size:20px;font-weight:700;letter-spacing:.5px;color:#ff2878;background:#fff;border:0;border-radius:999px;box-shadow:0 8px 22px rgba(0,0,0,.3);cursor:pointer;animation:txtIn .6s ease 1.1s both,pulse 1.6s ease-in-out 1.8s infinite}
+#enterBtn:active{transform:scale(.96)}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
+@media(prefers-reduced-motion:reduce){#enterBtn{animation:none}}
+</style></head><body><div id="welcome"><img src="icon-512.png" alt=""><h2>Welcome Folks! 👑</h2><button id="enterBtn" type="button">Enter</button></div><main>
 <h1><img src="icon-192.png" alt="" style="height:1.15em;width:1.15em;border-radius:22%;vertical-align:-0.2em;margin-right:.3em"> Session Tracker</h1>
 <div class="mut">Add sessions, track loans and expenses, export. Positive = winning, negative = losing. Use different groups for different player sets.</div>
 <div class="bar">
@@ -870,6 +874,7 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-<script>(function(){var w=document.getElementById('welcome');if(!w)return;var seen=false;try{seen=sessionStorage.getItem('welcomed')==='1';sessionStorage.setItem('welcomed','1')}catch(e){}
-if(seen){w.remove();return}setTimeout(function(){w.classList.add('hide');setTimeout(function(){w.remove()},600)},2400)})();</script>
+<script>(function(){var w=document.getElementById('welcome');if(!w)return;var seen=false;try{seen=sessionStorage.getItem('welcomed')==='1'}catch(e){}
+if(seen){w.remove();return}
+document.getElementById('enterBtn').addEventListener('click',function(){try{sessionStorage.setItem('welcomed','1')}catch(e){}w.classList.add('hide');setTimeout(function(){w.remove()},600)})})();</script>
 </body></html>
