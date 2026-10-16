@@ -144,7 +144,7 @@ function kpis(){const st=stats();let b=null;sessions.forEach((s,i)=>players.forE
 function render0(){
  $('#v').innerHTML=tab=='hist'?hist():tab=='add'?entry():tab=='loans'?loansTab():tab=='expenses'?expensesTab():tab=='backup'?backupTab():(tab=='readme'||tab=='rules')?notesTab(tab):dash();
  document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t==tab));
- $('#xl').disabled=!sessions.length;$('#jpg').disabled=$('#pdf').disabled=!sessions.length||!players.length||!Object.values(sel).some(Boolean)||players.every(p=>excl[p]);upd()}
+ {const xb=$('#xl'),jb=$('#jpg'),pb=$('#pdf');if(xb)xb.disabled=!sessions.length;const off=!sessions.length||!players.length||!Object.values(sel).some(Boolean)||players.every(p=>excl[p]);if(jb)jb.disabled=off;if(pb)pb.disabled=off}upd()}
 function hist(){
  if(!players.length)return'<p class="mut">No data yet. Add players in “New session”.</p>';
  const si=sOrd(sessions.map((_,i)=>i)),ps=pOrd(players),o=(v,l,c)=>`<option value="${v}" ${c==v?'selected':''}>${l}</option>`,admin=canOrganise();
@@ -517,7 +517,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(g('data-gdel')){deleteGroupFully(g('data-gdel').dataset.gdel)}
  else if(t.id=='gadmin'){guard('manage all groups',()=>{loadGroupAdmin()})}
  else if(g('data-gcopy')){copyLink()}
- else if(t.id=='gref'){refreshGroup()}
+ else if(t.id=='gref'){refreshGroup();if(tab=='backup')setTimeout(loadBackups,1500)}
  else if(g('data-gleave')){if(confirm('Leave this group on this device? The shared data stays in the cloud.'))leaveGroup()}
  else if(g('data-gswitch')){if(confirm('Switch to another group? You can return later from Recent groups.'))switchGroupUI()}
  else if(g('data-gsw')){openExistingGroup(g('data-gsw').dataset.gsw)}
@@ -583,7 +583,7 @@ function getRecent(){try{return JSON.parse(localStorage.getItem('ptc_recent')||'
 function saveRecent(code,label){let r=getRecent().filter(x=>x.code!==code);r.unshift({code,label:label||code.slice(0,8),last:Date.now()});if(r.length>12)r=r.slice(0,12);try{localStorage.setItem('ptc_recent',JSON.stringify(r))}catch(e){}}
 function gbarHtml(){if(!gid)return'';const m={live:['#15803d','Live'],saving:['#d97706','Saving…'],connecting:['#d97706','Connecting…'],offline:['#dc2626','Offline: changes not saved yet'],error:['#dc2626','Connection problem']}[cs]||['#6b7686',''];
  const nm=groupName?E(groupName):E(gid.slice(0,6))+'…';
- return`<span style="color:${m[0]}">●</span> ${m[1]} <span class="mut">· <b>${nm}</b></span>${canEdit()?` <button data-grename title="Rename group">✎</button>`:''} <button data-gcopy>Copy invite link</button> <button data-gswitch>Switch group</button> <button id="gref" title="Refresh data from cloud">↻ Refresh</button> <button data-gleave>Leave</button>${viewLoaded&&!canView()?' <span class="neg">🔒 Locked</span>':(accessLoaded?(canEdit()?(access?' <span class="pos">✏️ Editor</span>':''):' <span class="neg">👁 View only</span> <button class="pri" id="unlock">Enter password</button>'):'')}`}
+ return`<span style="color:${m[0]}">●</span> ${m[1]} <span class="mut">· <b>${nm}</b></span>${canEdit()?` <button data-grename title="Rename group">✎</button>`:''} <button data-gcopy>Copy Group Code</button> <button data-gswitch>Switch group</button> <button id="gref" title="Refresh data from cloud">↻ Refresh</button> <button data-gleave>Leave</button>${viewLoaded&&!canView()?' <span class="neg">🔒 Locked</span>':(accessLoaded?(canEdit()?(access?' <span class="pos">✏️ Editor</span>':''):' <span class="neg">👁 View only</span> <button class="pri" id="unlock">Enter password</button>'):'')}`}
 function setSync(c){cs=c;const g=$('#gbar');if(g)g.innerHTML=gbarHtml()}
 function joinScreen(){
  if(adminOpen)return`<div class="jn">${adminGroups.length?adminGroups.map(g=>`<div class="grow"><span><b>${E(g.name||g.code.slice(0,8))}</b><small class="mut">${E(g.code.slice(0,8))}…</small></span><button class="pri" data-gadm="${E(g.code)}">Enter</button></div>`).join(''):'<div class="mut" style="text-align:center">No groups yet</div>'}<button class="pri" id="gnew2">＋ New group</button><button id="gback">Back</button></div>`;
@@ -599,7 +599,7 @@ async function adminLogin(){
 async function adminCreate(){const n=prompt('Group name:');if(n===null)return;
  const p=prompt('Password for players (optional, at least 4 characters):');if(p===null)return;if(p&&p.length<4)return toast('Use at least 4 characters');
  pendingOrgPass=adminPw;pendingSetGlobal=false;pendingEditPw=p||null;adminOpen=false;adminPw=null;
- setGroup(randCode(),(n||'').trim(),{register:true});toast('Group created. Tap Copy invite link to share it.')}
+ setGroup(randCode(),(n||'').trim(),{register:true});toast('Group created. Tap Copy Group Code to share it.')}
 function connectCard(){return`<div class="card"><b>${cs=='error'?'Could not connect':'Connecting…'}</b><div class="mut" style="margin:6px 0">${E(cloudErr)}</div>${cs=='error'?'<p>Check that you are online and that the Firestore rules are published (Database, then Rules, then Publish).</p>':''}<button data-gleave>Use a different group code</button></div>`}
 function render(){document.body.classList.toggle('nogrp',!gid);
  if(!gid){$('#v').innerHTML=joinScreen();return}
@@ -677,8 +677,8 @@ async function loadCreatePass(){
  for(const r of recent){try{const d=await c.get(r.code,'organiser');if(d&&d.json&&d.json!=='null'){const info=JSON.parse(d.json);try{await c.put(CFG,'createpass',JSON.stringify(info))}catch(e){}return info}}catch(e){}}
  return null
 }
-async function loadGroupList(){try{const d=await window.cloud.get(CFG,'grouplist');if(d&&d.json&&d.json!=='null'){const a=JSON.parse(d.json);return Array.isArray(a)?a:[]}}catch(e){}return[]}
-async function saveGroupList(list){try{await window.cloud.put(CFG,'grouplist',JSON.stringify(list))}catch(e){}}
+async function loadGroupList(strict){try{const d=await withTimeout(window.cloud.get(CFG,'grouplist'));if(d&&d.json&&d.json!=='null'){const a=JSON.parse(d.json);return Array.isArray(a)?a:[]}}catch(e){if(strict)throw e}return[]}
+async function saveGroupList(list){try{await withTimeout(window.cloud.put(CFG,'grouplist',JSON.stringify(list)))}catch(e){}}
 async function registerGroup(code,name){const list=await loadGroupList();const i=list.findIndex(x=>x.code===code);const row={code,name:(name||code.slice(0,8)).slice(0,40),at:Date.now()};if(i>=0)list[i]={...list[i],...row};else list.unshift(row);await saveGroupList(list.slice(0,50))}
 async function unregisterGroup(code){const list=(await loadGroupList()).filter(x=>x.code!==code);await saveGroupList(list)}
 function removeRecent(code){try{const r=getRecent().filter(x=>x.code!==code);localStorage.setItem('ptc_recent',JSON.stringify(r))}catch(e){}}
@@ -713,11 +713,13 @@ async function openExistingGroup(code,pw,asAdmin){
   if(!ok)return toast('Wrong password')}
  adminOpen=false;adminPw=null;
  setGroup(code,null,{register:false})}
-let adminGroupsLoaded=false;
-async function loadGroupAdmin(){if(!window.cloud)return;adminGroupsLoaded=false;render();
- try{adminGroups=await loadGroupList();
-  if(gid&&!adminGroups.some(x=>x.code===gid)){await registerGroup(gid,groupName);adminGroups=await loadGroupList()}
-  adminGroupsLoaded=true;render()}catch(e){adminGroups=[];adminGroupsLoaded=true;render()}}
+let adminGroupsLoaded=false,adminGroupsBusy=false,adminGroupsErr='';
+const withTimeout=(p,ms)=>Promise.race([p,new Promise((_,r)=>setTimeout(()=>r({code:'timeout'}),ms||10000))]);
+async function loadGroupAdmin(){if(!window.cloud||adminGroupsBusy)return;adminGroupsBusy=true;adminGroupsErr='';render();
+ try{adminGroups=await loadGroupList(true);
+  if(gid&&!adminGroups.some(x=>x.code===gid)){await registerGroup(gid,groupName);adminGroups=await loadGroupList(true)}
+  adminGroupsLoaded=true}catch(e){adminGroupsErr=(e&&e.code)||'error';adminGroupsLoaded=false}
+ adminGroupsBusy=false;render()}
 async function createNewGroup(){
  const n=prompt('Name this group (optional, e.g. Friday poker):');if(n===null)return;
  if(!(await ensureCloud()))return toast('Could not connect. Check your internet and try again.');
@@ -727,10 +729,10 @@ async function createNewGroup(){
  if(a===null)return;if(a.length<4)return toast('Use at least 4 characters');
  if(hasGlobal){const h=await hashPass(a,info.salt,info.iter);if(h!==info.hash)return toast('Wrong admin password');pendingOrgPass=a;pendingSetGlobal=false}
  else{const b=prompt('Type the admin password again to confirm:');if(b!==a)return toast('The two entries did not match');pendingOrgPass=a;pendingSetGlobal=true}
- setGroup(randCode(),(n||'').trim(),{register:true});toast('Group created. Tap Copy invite link to share it.')}
+ setGroup(randCode(),(n||'').trim(),{register:true});toast('Group created. Tap Copy Group Code to share it.')}
 const randHex=n=>[...crypto.getRandomValues(new Uint8Array(n))].map(b=>b.toString(16).padStart(2,'0')).join('');
 async function hashPass(pw,saltHex,iter){const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveBits']),bits=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:Uint8Array.from(saltHex.match(/../g).map(h=>parseInt(h,16))),iterations:iter},key,256);return[...new Uint8Array(bits)].map(b=>b.toString(16).padStart(2,'0')).join('')}
-async function loadOrg(){orgLoaded=false;try{const d=await cloud.get(gid,'organiser');orgInfo=d?JSON.parse(d.json):null;orgLoaded=true;
+async function loadOrg(){orgLoaded=false;try{const d=await withTimeout(cloud.get(gid,'organiser'));orgInfo=d?JSON.parse(d.json):null;orgLoaded=true;
  if(orgInfo){try{const m=await cloud.get(CFG,'createpass');if(!m||!m.json||m.json==='null')await cloud.put(CFG,'createpass',JSON.stringify(orgInfo))}catch(e){}}}catch(e){}return orgLoaded}
 async function checkPass(label){if(Date.now()<unlockUntil)return true;await loadOrg();
  if(!orgLoaded){toast('Could not check the admin password. Check your connection and try again.');return false}
@@ -795,8 +797,8 @@ This tracker keeps your group's sessions, loans and results in one shared place.
 - **Readme**: this page. **Rules**: Teen Patti house rules by default (editable).
 
 ## Start to finish
-1. Admin: tap **Admin**, enter the admin password, then **New group** (optionally set a Password), then Copy invite link.
-2. Players: open the link, or enter the Group Code on the first screen. To play, enter the **Password**.
+1. Admin: tap **Admin**, enter the admin password, then **New group** (optionally set a Password), then Copy Group Code.
+2. Players: enter the Group Code on the first screen. To play, enter the **Password**.
 3. Start a game: New session → date → tick players → Start game.
 4. Late joiner: Add a player on Loans or New session. To drop someone mid-game: Remove on Loans.
 6. During the game: Loans — Bank / Repay bank / player-to-player. Standing is negative while a loan is owed. Copy game invite or Export session for safety.
@@ -876,7 +878,7 @@ async function saveBackups(){try{
  if(base.game){const st=JSON.stringify({game:base.game,loans:base.loans.filter(l=>!l.done),expenses:base.expenses.filter(e=>!e.done),initLoan:base.initLoan}),c=canon(JSON.parse(st));if(c!==lastStd){await cloud.put(gid,'standing',st);lastStd=c}}
 }catch(e){}}
 async function loadBackups(){if(!window.cloud||!gid)return;bk.busy=true;bk.err='';render();loadOrg();
- try{bk.full=await cloud.get(gid,'full');bk.standing=await cloud.get(gid,'standing')}catch(e){bk.err=(e&&e.code)||'error'}bk.busy=false;render()}
+ try{bk.full=await withTimeout(cloud.get(gid,'full'));bk.standing=await withTimeout(cloud.get(gid,'standing'))}catch(e){bk.err=(e&&e.code)||'error';if(bk.full===undefined)bk.full=null;if(bk.standing===undefined)bk.standing=null}bk.busy=false;render()}
 function backupTab(){const when=x=>new Date(x.savedAt).toLocaleString();
  if(bk.busy&&bk.full===undefined)return'<p class="mut">Loading backups…</p>';
  let a,b;
@@ -889,7 +891,7 @@ function backupTab(){const when=x=>new Date(x.savedAt).toLocaleString();
  <div class="card"><b>Password</b><div class="mut" style="margin:4px 0 8px">${access?'Players need it to make changes.':'Not set: anyone with the link can edit.'}</div><button class="pri" id="gencode">${access?'Change password':'Set password'}</button>${access?' <button id="allowall">Remove</button>':''}</div>
  <div class="card"><b>Admin password</b><div class="mut" style="margin:4px 0 8px">${orgInfo?'Needed to restore backups, delete data and manage groups.':'Not set.'}</div><button class="pri" id="orgset">${orgInfo?'Change':'Set'}</button>${orgInfo?' <button id="orgrm">Remove</button>':''}</div>
  <div class="card"><b>All groups (admin)</b><div class="mut" style="margin:4px 0 8px">After entering the admin password you can open any registered group or permanently delete one (history, loans, expenses and backups).</div>
- <button class="pri" id="gadmin">Load / refresh group list</button>
+ <button class="pri" id="gadmin" ${adminGroupsBusy?'disabled':''}>${adminGroupsBusy?'Loading…':'Load / refresh group list'}</button>${adminGroupsErr?`<p class="neg" style="margin-top:8px">Could not load the group list (${E(adminGroupsErr)}). Tap the button to try again.</p>`:''}
  ${adminGroupsLoaded?(adminGroups.length?adminGroups.map(g=>`<div class="row" style="justify-content:space-between;flex-wrap:wrap;margin-top:8px;gap:6px"><span><b>${E(g.name||g.code.slice(0,8))}</b> <span class="mut">${E(g.code.slice(0,8))}…</span>${g.code===gid?' <span class="pos">· current</span>':''}</span><span style="display:flex;gap:6px">${g.code!==gid?`<button data-gopen="${E(g.code)}">Open</button>`:''}<button class="x" data-gdel="${E(g.code)}">Delete</button></span></div>`).join(''):'<p class="mut" style="margin-top:8px">No groups registered yet. Create or open groups while organiser is set — they appear here.</p>'):''}
  </div>
  <button id="bkref">Refresh</button>${bk.err?`<p class="neg">Could not load backups (${E(bk.err)}).</p>`:''}`}
@@ -913,7 +915,7 @@ function refreshGroup(){if(!gid){location.reload();return}if(window.cloud&&cloud
 function leaveGroup(){adminOpen=false;adminPw=null;if(gid){saveRecent(gid,groupName||gid.slice(0,8));try{localStorage.removeItem(viewKey());localStorage.removeItem(editKey())}catch(e){}}if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;gid='';try{localStorage.removeItem('ptc_group');history.replaceState(null,'',location.pathname)}catch(e){}clearLocal();render()}
 function switchGroupUI(){tab='hist';leaveGroup()}
 function randCode(){const a='abcdefghjkmnpqrstuvwxyz23456789';let s='';crypto.getRandomValues(new Uint8Array(14)).forEach(x=>{s+=a[x%a.length]});return s}
-function copyLink(){const u=location.origin+location.pathname+'#g='+gid;if(navigator.clipboard)navigator.clipboard.writeText(u).then(()=>toast('Invite link copied')).catch(()=>prompt('Copy this link',u));else prompt('Copy this link',u)}
+function copyLink(){const u=gid;if(navigator.clipboard)navigator.clipboard.writeText(u).then(()=>toast('Group code copied')).catch(()=>prompt('Copy this group code',u));else prompt('Copy this group code',u)}
 document.addEventListener('focusout',()=>{if(pendingRender)setTimeout(()=>{const a=document.activeElement;if(!(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName))){pendingRender=false;render()}},60)});
 window.addEventListener('online',()=>{if(cloudOn){setSync('live');persist()}});window.addEventListener('offline',()=>setSync('offline'));
 if(gid){const boot=gid;gid='';(async()=>{await openExistingGroup(boot);if(!gid)render()})()}
