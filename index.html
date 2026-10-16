@@ -597,9 +597,9 @@ async function adminLogin(){
   const salt=randHex(16),iter=150000,hash=await hashPass(a,salt,iter);try{await window.cloud.put(CFG,'createpass',JSON.stringify({salt,iter,hash}))}catch(e){return toast('Could not save the admin password')}}
  adminPw=a;try{adminGroups=await loadGroupList()}catch(e){adminGroups=[]}adminOpen=true;render()}
 async function adminCreate(){const n=prompt('Group name:');if(n===null)return;
- const p=prompt('Password for players (optional, at least 4 characters):');if(p===null)return;if(p&&p.length<4)return toast('Use at least 4 characters');
- pendingOrgPass=adminPw;pendingSetGlobal=false;pendingEditPw=p||null;adminOpen=false;adminPw=null;
- setGroup(randCode(),(n||'').trim(),{register:true});toast('Group created. Tap Copy Group Code to share it.')}
+ let ep=null;if(confirm('Generate a Password for players now? You can also do it later from Backups.')){const a='ABCDEFGHJKMNPQRSTUVWXYZ23456789';ep='';crypto.getRandomValues(new Uint8Array(8)).forEach(x=>{ep+=a[x%a.length]})}
+ pendingOrgPass=adminPw;pendingSetGlobal=false;pendingEditPw=ep;adminOpen=false;adminPw=null;
+ setGroup(randCode(),(n||'').trim(),{register:true});toast(ep?'Group created. Open Backups to copy the Password.':'Group created.')}
 function connectCard(){return`<div class="card"><b>${cs=='error'?'Could not connect':'Connecting…'}</b><div class="mut" style="margin:6px 0">${E(cloudErr)}</div>${cs=='error'?'<p>Check that you are online and that the Firestore rules are published (Database, then Rules, then Publish).</p>':''}<button data-gleave>Use a different group code</button></div>`}
 function render(){document.body.classList.toggle('nogrp',!gid);
  if(!gid){$('#v').innerHTML=joinScreen();return}
@@ -636,7 +636,6 @@ const ALLOW='[data-t],[data-v],[data-x],[data-q],[data-mode],[data-pn],[data-rf]
 function lockUI(){document.querySelectorAll('#v input,#v select,#v textarea,#v button,#v label.btn').forEach(el=>{if(!el.matches(ALLOW)){el.disabled=true;el.style.opacity='.5'}})}
 async function unlockEdit(){if(!access)return;const c=prompt('Enter the password:');if(c===null)return;
  for(const x of [c,normCode(c)]){const hh=await hashPass(x,access.salt,access.iter);if(hh===access.hash){try{localStorage.setItem(editKey(),hh)}catch(e){}toast('Editing enabled on this device');render();return}}
- if(orgInfo&&await hashPass(c,orgInfo.salt,orgInfo.iter)===orgInfo.hash){markOrganiser();toast('Admin access enabled');render();return}
  toast('Wrong password')}
 async function unlockView(){if(!viewAccess){toast('No view code is set yet. Ask the admin to create one, or use the admin password.');return}
  const c=prompt('Enter the view code from the admin:');if(c===null)return;
@@ -654,10 +653,11 @@ async function unlockAsOrganiser(){
  markOrganiser();
  toast('Organiser access granted on this device');
  tab='backup';render();loadGroupAdmin()}
-async function genCode(){if(!(await checkPass('set the password')))return;
- const p=prompt('New password for players (at least 4 characters):');if(p===null)return;if(p.length<4)return toast('Use at least 4 characters');
- const salt=randHex(16),iter=150000,hash=await hashPass(p,salt,iter);
- try{await cloud.put(gid,'access',JSON.stringify({salt,iter,hash}));access={salt,iter,hash};accessLoaded=true;try{localStorage.setItem(editKey(),hash)}catch(e){}render();toast('Password saved')}catch(e){toast('Could not save the password')}}
+async function genCode(){if(!orgInfo){if(!canEdit())return toast('Enter the password first, or ask the admin');if(!confirm('First set an admin password. Only you will be able to create passwords with it.'))return;await setPass();if(!orgInfo)return}
+ else if(!(await checkPass('generate a password')))return;
+ const a='ABCDEFGHJKMNPQRSTUVWXYZ23456789';let c='';crypto.getRandomValues(new Uint8Array(8)).forEach(x=>{c+=a[x%a.length]});
+ const salt=randHex(16),iter=150000,hash=await hashPass(c,salt,iter);
+ try{await cloud.put(gid,'access',JSON.stringify({salt,iter,hash}));access={salt,iter,hash};accessLoaded=true;try{localStorage.setItem(editKey(),hash)}catch(e){}lastCode=c.slice(0,4)+'-'+c.slice(4);render();toast('New password created')}catch(e){toast('Could not save the password')}}
 async function genViewCode(){if(!orgInfo){if(!canEdit())return toast('Enter the password first, or ask the admin');if(!confirm('First set an admin password. Only you will be able to create view codes with it.'))return;await setPass();if(!orgInfo)return}
  else if(!(await checkPass('generate a view code')))return;
  const a='ABCDEFGHJKMNPQRSTUVWXYZ23456789';let c='';crypto.getRandomValues(new Uint8Array(8)).forEach(x=>{c+=a[x%a.length]});
@@ -707,8 +707,6 @@ async function openExistingGroup(code,pw,asAdmin){
   try{const r=await window.cloud.get(code,'access');const ac=(r&&r.json&&r.json!=='null')?JSON.parse(r.json):null;
    if(!ac)ok=true;
    else for(const x of [pw,normCode(pw)]){const hh=await hashPass(x,ac.salt,ac.iter);if(hh===ac.hash){try{localStorage.setItem('ptc_edit_'+code,hh)}catch(e){}ok=true;break}}
-   if(!ok){const o=await window.cloud.get(code,'organiser');const oi=(o&&o.json&&o.json!=='null')?JSON.parse(o.json):null;
-    if(oi&&await hashPass(pw,oi.salt,oi.iter)===oi.hash){try{localStorage.setItem('ptc_org_'+code,oi.hash)}catch(e){}ok=true}}
   }catch(e){return toast('Could not check the password. Try again.')}
   if(!ok)return toast('Wrong password')}
  adminOpen=false;adminPw=null;
@@ -888,7 +886,7 @@ function backupTab(){const when=x=>new Date(x.savedAt).toLocaleString();
  else b='<div class="mut">No standing saved yet. It is saved automatically while a game is in progress, and it replaces the previous one.</div>';
  return`<div class="card"><b>Last completed game backup</b><div class="mut" style="margin:4px 0 8px">Everything: sessions, players, loans. Restoring replaces the shared data for everyone.</div>${a}</div>
  <div class="card"><b>Current standing backup</b><div class="mut" style="margin:4px 0 8px">The game in progress and its loans. Restoring brings that game back and leaves your sessions alone.</div>${b}</div>
- <div class="card"><b>Password</b><div class="mut" style="margin:4px 0 8px">${access?'Players need it to make changes.':'Not set: anyone with the link can edit.'}</div><button class="pri" id="gencode">${access?'Change password':'Set password'}</button>${access?' <button id="allowall">Remove</button>':''}</div>
+ <div class="card"><b>Password</b><div class="mut" style="margin:4px 0 8px">${access?'Only people with the password can make changes. Everyone else can view and export.':'Everyone can edit. Create a password so only people who have it can change data.'} Needs the admin password.</div><button class="pri" id="gencode">${access?'Generate a new password':'Create a password'}</button>${access?' <button id="allowall">Allow everyone to edit</button>':''}${lastCode?`<div style="margin-top:10px">Share this password (shown once):<div style="font-size:24px;font-weight:700;letter-spacing:2px;margin:4px 0">${lastCode}</div><button id="copycode">Copy password</button></div>`:''}</div>
  <div class="card"><b>Admin password</b><div class="mut" style="margin:4px 0 8px">${orgInfo?'Needed to restore backups, delete data and manage groups.':'Not set.'}</div><button class="pri" id="orgset">${orgInfo?'Change':'Set'}</button>${orgInfo?' <button id="orgrm">Remove</button>':''}</div>
  <div class="card"><b>All groups (admin)</b><div class="mut" style="margin:4px 0 8px">After entering the admin password you can open any registered group or permanently delete one (history, loans, expenses and backups).</div>
  <button class="pri" id="gadmin" ${adminGroupsBusy?'disabled':''}>${adminGroupsBusy?'Loading…':'Load / refresh group list'}</button>${adminGroupsErr?`<p class="neg" style="margin-top:8px">Could not load the group list (${E(adminGroupsErr)}). Tap the button to try again.</p>`:''}
@@ -906,7 +904,7 @@ function startCloud(){if(!gid)return;
   if(!synced){synced=true;cs='live';const keepName=groupName;base=S;lastSent='';applying=true;applyState(S);if(keepName&&!groupName){groupName=keepName;if(gid)saveRecent(gid,groupName)}applying=false;if(hashGame){if(game&&game.date===hashGame){tab='loans';toast('Opened the game of '+hashGame)}else if(game)toast('A different game is in progress ('+game.date+')')}
    ;(async()=>{try{const del=await cloud.get(gid,'deleted');if(del&&del.json&&del.json!=='null'&&!pendingOrgPass){removeRecent(gid);const gone=gid;leaveGroup();toast('Group '+(gone.slice(0,8))+'… no longer exists (deleted by the admin).');return}}catch(e){}
     loadOrg().then(()=>render());
-    if(pendingOrgPass){const pw=pendingOrgPass,setG=pendingSetGlobal,ep=pendingEditPw;pendingOrgPass=null;pendingSetGlobal=false;pendingEditPw=null;try{const salt=randHex(16),iter=150000,hash=await hashPass(pw,salt,iter);const payload=JSON.stringify({salt,iter,hash});await cloud.put(gid,'organiser',payload);if(ep){const s2=randHex(16),h2=await hashPass(ep,s2,150000);await cloud.put(gid,'access',JSON.stringify({salt:s2,iter:150000,hash:h2}));access={salt:s2,iter:150000,hash:h2};accessLoaded=true}if(setG)await cloud.put(CFG,'createpass',payload);orgInfo={salt,iter,hash};orgLoaded=true;markOrganiser();await registerGroup(gid,groupName);render()}catch(e){toast('Could not save admin password — set it on the Backups tab')}}
+    if(pendingOrgPass){const pw=pendingOrgPass,setG=pendingSetGlobal,ep=pendingEditPw;pendingOrgPass=null;pendingSetGlobal=false;pendingEditPw=null;try{const salt=randHex(16),iter=150000,hash=await hashPass(pw,salt,iter);const payload=JSON.stringify({salt,iter,hash});await cloud.put(gid,'organiser',payload);if(ep){const s2=randHex(16),h2=await hashPass(ep,s2,150000);await cloud.put(gid,'access',JSON.stringify({salt:s2,iter:150000,hash:h2}));access={salt:s2,iter:150000,hash:h2};accessLoaded=true;lastCode=ep.slice(0,4)+'-'+ep.slice(4)}if(setG)await cloud.put(CFG,'createpass',payload);orgInfo={salt,iter,hash};orgLoaded=true;markOrganiser();await registerGroup(gid,groupName);render()}catch(e){toast('Could not save admin password — set it on the Backups tab')}}
     else render();queueMicrotask(persist)})();return}
   if(inflight)return;reconcile(S)},e=>{cloudErr=((e&&e.code)||'error')+': '+((e&&e.message)||'');cs='error';synced=synced&&false;render()})}
 function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
