@@ -124,10 +124,28 @@ h1{font-size:24px}
 .tool{display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 8px;border:2px solid var(--tx);border-radius:18px;background:var(--card);color:var(--tx);font:inherit;font-weight:700;font-size:14px;box-shadow:0 3px 0 var(--tx);cursor:pointer;text-align:center}
 .tool i{font-style:normal;font-size:26px}
 @media(min-width:640px){.tools{grid-template-columns:repeat(4,1fr)}}
+*{-webkit-tap-highlight-color:transparent}
+button,label,select,input,a{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+button:focus{outline:none}
+.hd .ind,.hd .rbtn{flex-shrink:0}
+main{padding-bottom:96px}
+.rbtn{width:28px;height:28px;padding:0;font-size:15px;line-height:1;border-radius:50%;box-shadow:0 2px 0 var(--tx)}
+#fab{position:fixed;right:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);z-index:8000;width:58px;height:58px;padding:0;border-radius:50%;border:2px solid var(--tx);background:var(--card);box-shadow:0 4px 0 var(--tx),0 8px 20px rgba(0,0,0,.3);overflow:hidden;cursor:pointer}
+#fab img{width:100%;height:100%;display:block;object-fit:cover}
+#fab:active{transform:translateY(3px);box-shadow:0 1px 0 var(--tx),0 4px 12px rgba(0,0,0,.3)}
+#scrim{position:fixed;inset:0;z-index:8500;background:rgba(20,5,50,.45);opacity:0;pointer-events:none;transition:opacity .25s}
+#drawer{position:fixed;top:0;right:0;bottom:0;z-index:8600;width:min(78vw,300px);background:var(--card);border-left:2px solid var(--tx);box-shadow:-8px 0 30px rgba(0,0,0,.35);padding:calc(env(safe-area-inset-top,0px) + 18px) 16px 24px;transform:translateX(105%);transition:transform .28s cubic-bezier(.3,.8,.3,1);overflow-y:auto}
+body.dopen #drawer{transform:none}body.dopen #scrim{opacity:1;pointer-events:auto}
+#drawer .dh{display:flex;align-items:center;gap:10px;margin-bottom:18px}
+#drawer .dh img{width:44px;height:44px;border-radius:22%;border:2px solid var(--tx)}
+#drawer .dh b{display:block;font-size:17px;word-break:break-word}#drawer .dh small{display:block}
+#drawer #gbar{display:flex;flex-direction:column;gap:10px;font-size:15px}
+#drawer #gbar button{width:100%;font-size:15px;padding:12px 16px;text-align:left;box-shadow:0 3px 0 var(--tx)}
+.nogrp #fab,.nogrp #drawer,.nogrp #scrim,.nogrp .rbtn,.nogrp .ind{display:none}
+@media(prefers-reduced-motion:reduce){#drawer,#scrim{transition:none}}
 </style></head><body><div id="welcome"><img src="icon-512.png" alt=""><h2>Welcome Folks! 👑</h2><button id="enterBtn" type="button">Enter</button></div><main>
-<div class="hd"><h1><img src="icon-192.png" alt="" style="height:1.15em;width:1.15em;border-radius:22%;vertical-align:-0.2em;margin-right:.3em"><span class="ttl" id="ttl"></span></h1><span id="ind" class="ind"></span></div>
+<div class="hd"><h1><img src="icon-192.png" alt="" style="height:1.15em;width:1.15em;border-radius:22%;vertical-align:-0.2em;margin-right:.3em"><span class="ttl" id="ttl"></span></h1><span id="ind" class="ind"></span><button id="gref" class="rbtn" title="Refresh data from cloud" aria-label="Refresh">↻</button></div>
 <div class="intro mut">Add sessions, track loans and expenses.</div>
-<div class="pw" id="gbar" style="margin:0 0 10px"></div>
 <div class="tabs"><button data-t="hist">History</button><button data-t="add">New session</button><button data-t="loans">Loans</button><button data-t="expenses">Expenses</button><button data-t="dash">Dashboard</button><button data-t="backup">Backups</button><button data-t="readme">Readme</button><button data-t="rules">Rules</button></div>
 <div id="v"></div></main><div id="toast"></div>
 <script>
@@ -490,7 +508,9 @@ async function save(name,data){
  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data]));a.download=name;a.click()}
 const last=()=>(sessions.map(s=>s.date).filter(Boolean).sort().pop()||dd);
 // ---- events ----
-document.addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.target.id==='gc_in'||e.target.id==='gp_in')){const b=$('#gjoin');if(b)b.click()}});
+const closeDrawer=()=>document.body.classList.remove('dopen');
+document.addEventListener('click',e=>{const t=e.target;if(t.closest('#fab')){document.body.classList.toggle('dopen')}else if(t.closest('#scrim')){closeDrawer()}else if(t.closest('#drawer button')){setTimeout(closeDrawer,60)}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer();if(e.key==='Enter'&&(e.target.id==='gc_in'||e.target.id==='gp_in')){const b=$('#gjoin');if(b)b.click()}});
 document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']');
  if(g('data-t')){tab=g('data-t').dataset.t;render();upd();if(tab=='backup')loadBackups()}
  else if(g('data-all')){const v=+g('data-all').dataset.all;OPTS.forEach(o=>sel[o[0]]=v);render()}
@@ -604,8 +624,8 @@ function saveRecent(code,label){let r=getRecent().filter(x=>x.code!==code);r.uns
 function indHtml(){if(!gid)return'';const m={live:['#15803d','Live'],saving:['#d97706','Saving'],connecting:['#d97706','Connecting'],offline:['#dc2626','Offline'],error:['#dc2626','Error']}[cs]||['#6b7686',''];
  const mode=!accessLoaded?'':canOrganise()?'✏️ Admin':canEdit()?'✏️ Write':'👁 View';return`<span style="color:${m[0]}">●</span> ${m[1]}${mode?' · '+mode:''}`}
 function gbarHtml(){if(!gid)return'';
- return`${canEdit()?'<button data-grename title="Rename group">✎ Rename</button> ':''}<button data-gcopy>Copy Group Code</button> <button data-gswitch>Switch group</button> <button id="gref" title="Refresh data from cloud">↻ Refresh</button> <button data-gleave>Leave</button>${accessLoaded&&!canEdit()?' <button class="pri" id="unlock">Enter password</button>':''}`}
-function setSync(c){cs=c;const g=$('#gbar');if(g)g.innerHTML=gbarHtml();const ii=$('#ind');if(ii)ii.innerHTML=indHtml();const t=$('#ttl');if(t)t.textContent=gid?(groupName||gid.slice(0,6)+'…'):''}
+ return`${accessLoaded&&!canEdit()?'<button class="pri" id="unlock">🔑 Enter password</button>':''}<button data-gcopy>📋 Copy Group Code</button>${canEdit()?'<button data-grename>✎ Rename group</button>':''}<button data-gswitch>🔀 Switch group</button><button data-gleave>🚪 Leave</button>`}
+function setSync(c){cs=c;const g=$('#gbar');if(g)g.innerHTML=gbarHtml();const ii=$('#ind');if(ii)ii.innerHTML=indHtml();const t=$('#ttl');if(t)t.textContent=gid?(groupName||gid.slice(0,6)+'…'):'';const dn=$('#dname');if(dn)dn.textContent=gid?(groupName||gid.slice(0,6)+'…'):''}
 function joinScreen(){
  if(adminOpen)return`<div class="jn">${adminGroups.length?adminGroups.map(g=>`<div class="grow"><span><b>${E(g.name||g.code.slice(0,8))}</b><small class="mut">${E(g.code.slice(0,8))}…</small></span><button class="pri" data-gadm="${E(g.code)}">Enter</button></div>`).join(''):'<div class="mut" style="text-align:center">No groups yet</div>'}<button class="pri" id="gnew2">＋ New group</button><button id="gback">Back</button></div>`;
  return`<div class="jn"><input id="gc_in" placeholder="Group Code" autocomplete="off" autocapitalize="off" spellcheck="false"><input id="gp_in" type="password" placeholder="Password" autocomplete="off"><button class="pri" id="gjoin">Join</button><button id="gadminlogin">🔑 Admin</button></div>`}
@@ -969,6 +989,7 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
+<div id="scrim"></div><aside id="drawer" aria-label="Group menu"><div class="dh"><img src="icon-192.png" alt=""><div><b id="dname"></b><small class="mut">Group menu</small></div></div><div id="gbar"></div></aside><button id="fab" type="button" aria-label="Group menu"><img src="icon-192.png" alt=""></button>
 <script>(function(){var w=document.getElementById('welcome');if(!w)return;var seen=false;try{seen=sessionStorage.getItem('welcomed')==='1'}catch(e){}
 if(seen){w.remove();return}
 document.getElementById('enterBtn').addEventListener('click',function(){try{sessionStorage.setItem('welcomed','1')}catch(e){}w.classList.add('hide');setTimeout(function(){w.remove()},600)})})();</script>
