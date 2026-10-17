@@ -104,6 +104,7 @@ input:focus,select:focus{outline:3px solid var(--g2);outline-offset:1px}
 #toast{background:linear-gradient(135deg,var(--g1),var(--g2));color:#fff;border:2px solid var(--tx);border-radius:999px;font-weight:700}
 @media(prefers-reduced-motion:reduce){main,h1 img{animation:none}}
 .intro{display:none}
+h1{min-width:0}h1 .ttl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 h1{font-size:24px}
 .nogrp h1{justify-content:center;margin:30px 0 14px}
 .nogrp h1 .ttl{display:none}
@@ -120,7 +121,7 @@ h1{font-size:24px}
 .tool i{font-style:normal;font-size:26px}
 @media(min-width:640px){.tools{grid-template-columns:repeat(4,1fr)}}
 </style></head><body><div id="welcome"><img src="icon-512.png" alt=""><h2>Welcome Folks! 👑</h2><button id="enterBtn" type="button">Enter</button></div><main>
-<h1><img src="icon-192.png" alt="" style="height:1.15em;width:1.15em;border-radius:22%;vertical-align:-0.2em;margin-right:.3em"><span class="ttl">Session Tracker</span></h1>
+<h1><img src="icon-192.png" alt="" style="height:1.15em;width:1.15em;border-radius:22%;vertical-align:-0.2em;margin-right:.3em"><span class="ttl" id="ttl"></span></h1>
 <div class="intro mut">Add sessions, track loans and expenses.</div>
 <div class="pw" id="gbar" style="margin:0 0 10px"></div>
 <div class="tabs"><button data-t="hist">History</button><button data-t="add">New session</button><button data-t="loans">Loans</button><button data-t="expenses">Expenses</button><button data-t="dash">Dashboard</button><button data-t="backup">Backups</button><button data-t="readme">Readme</button><button data-t="rules">Rules</button></div>
@@ -369,10 +370,10 @@ function drawDash0(d){
  const axes=(X0,X1,Y0,Y1,l,h,xt)=>{d.setDrawColor(210).setLineWidth(.2).rect(X0,Y0,X1-X0,Y1-Y0);d.setFontSize(6).setTextColor(110);
   for(let i=0;i<4;i++){const v=l+(h-l)*i/3;d.text(Math.round(v).toLocaleString(),X0-1,Y1-(v-l)/(h-l)*(Y1-Y0)+1,{align:'right'})}
   xt.forEach(q=>d.text(q[0],X0+q[1]*(X1-X0),Y1+4,{align:'center'}));const zy=Y1-(0-l)/(h-l)*(Y1-Y0);d.setDrawColor(130).line(X0,zy,X1,zy)};
- const pp=(items,x,y,w,h,hole)=>{const r=Math.min(h/2,w*.38,40),cx=x+r+1,cy=y+h/2,sp=Math.min(4.5,h/Math.max(1,items.length));
+ const pp=(items,x,y,w,h,hole)=>{const r=Math.min(h/2,w*.38,60),cx=x+r+1,cy=y+h/2,sp=Math.min(4.5,h/Math.max(1,items.length));
   pdfPie(d,items,cx,cy,r,x+2*r+5,y+Math.max(0,(h-items.length*sp)/2)+3,sp);
   if(hole&&items.length){d.setFillColor(255,255,255).circle(cx,cy,r*.55,'F');d.setFontSize(9).setTextColor(20).text(String(items.reduce((a,b)=>a+b.v,0)),cx,cy+1.5,{align:'center'})}};
- const hb=(x,y,w,h,it,fm,clr)=>{fm=fm||(v=>v.toLocaleString());const neg=it.some(i=>i.v<0),nw=Math.min(22,w*.3),vw=16,iw=w-nw-vw,cx=neg?x+nw+iw/2:x+nw,mx=Math.max(1,...it.map(i=>Math.abs(i.v))),sc=(neg?iw/2-1:iw-1)/mx,rh=Math.min(9,h/Math.max(1,it.length)),fs=Math.min(9,rh*2);
+ const hb=(x,y,w,h,it,fm,clr)=>{fm=fm||(v=>v.toLocaleString());const neg=it.some(i=>i.v<0),nw=Math.min(22,w*.3),vw=16,iw=w-nw-vw,cx=neg?x+nw+iw/2:x+nw,mx=Math.max(1,...it.map(i=>Math.abs(i.v))),sc=(neg?iw/2-1:iw-1)/mx,rh=Math.min(20,h/Math.max(1,it.length)),fs=Math.min(12,rh*1.8);
   it.forEach((s,i)=>{const yy=y+i*rh,bw=Math.abs(s.v)*sc,p=s.v>=0;d.setFontSize(fs).setTextColor(40).text(s.p,x,yy+rh*.7);d.setFillColor(...(clr||(p?[21,128,61]:[220,38,38]))).rect(p?cx:cx-bw,yy+rh*.15,Math.max(bw,.3),rh*.65,'F');d.text(fm(s.v),x+w,yy+rh*.7,{align:'right'})});
   d.setDrawColor(170).line(cx,y-1,cx,y+it.length*rh)};
  const DR={
@@ -384,14 +385,14 @@ function drawDash0(d){
      const raw=j==n+1?tot(ps[r]):sessions[si[j-1]].v[ps[r]];if(num(raw))q.cell.styles.textColor=raw<0?[220,38,38]:raw>0?[21,128,61]:[40,40,40];if(j==n+1)q.cell.styles.fontStyle='bold'}})},
   loans(x,y,w,h){if(!game){d.setFontSize(8).setTextColor(110).text('No game in progress',x,y+4);return}hb(x,y,w,h,loanRows(game.players).map(r=>({p:r.p,v:ng(r.cur)})))},
   loantbl(x,y,w,h){if(!gp().length){d.setFontSize(8).setTextColor(110).text('No game in progress',x,y+4);return}
-   const r=loanRows(gp()).map(z=>({p:z.p,i:ng(z.init),b:ng(z.bank),n:ng(z.bor-z.len),c:ng(z.cur)})),sg=m=>(m>0?'+':'')+m.toLocaleString(),S=k=>r.reduce((a,z)=>a+z[k],0),sz=Math.max(4,Math.min(7,(h/(r.length+2)-1.4)/(.3528*1.15)));
+   const r=loanRows(gp()).map(z=>({p:z.p,i:ng(z.init),b:ng(z.bank),n:ng(z.bor-z.len),c:ng(z.cur)})),sg=m=>(m>0?'+':'')+m.toLocaleString(),S=k=>r.reduce((a,z)=>a+z[k],0),rT=h/(r.length+2),sz=Math.max(4,Math.min(7,(rT-1.4)/(.3528*1.15))),pd=Math.max(.6,(rT-sz*.3528*1.15)/2-.05);
    const body=r.map(z=>[z.p,sg(z.i),sg(z.b),sg(z.n),sg(z.c)]);body.push(['Total',sg(S('i')),sg(S('b')),sg(S('n')),sg(S('c'))]);
-   d.autoTable({startY:y,margin:{left:x,right:297-x-w},head:[['Player','Initial','From bank','From/to players','Current standing']],body,headStyles:{fillColor:[217,119,6]},styles:{fontSize:sz,cellPadding:.7},columnStyles:{4:{fontStyle:'bold'}},
+   d.autoTable({startY:y,margin:{left:x,right:297-x-w},head:[['Player','Initial','From bank','From/to players','Current standing']],body,headStyles:{fillColor:[217,119,6]},styles:{fontSize:sz,cellPadding:{top:pd,bottom:pd,left:.7,right:.7}},columnStyles:{4:{fontStyle:'bold'}},
     didParseCell:q=>{if(q.section!='body')return;const i=q.row.index;if(i==body.length-1){q.cell.styles.fontStyle='bold';return}const j=q.column.index;if(j>0){const v=[0,r[i].i,r[i].b,r[i].n,r[i].c][j];q.cell.styles.textColor=v<0?[220,38,38]:v>0?[21,128,61]:[40,40,40]}}})},
-  trends(x,y,w,h){const T2=trends(),tp=aiTipsNow(),rh=Math.min(tp?7:8,h/Math.max(1,T2.length)),nw=Math.min(22,w*.2),c1=(w-nw)*.45;
-   T2.forEach((t,i)=>{const yy=y+i*rh+rh*.7,l1=t.w+': '+t.txt,fs=Math.max(3.5,Math.min(7,rh*2,(tp?c1:w-nw)/(l1.length*.19)));
-    d.setFontSize(Math.min(7,rh*2)).setTextColor(40).text(t.p,x,yy,{maxWidth:nw-1});d.setFontSize(fs).setTextColor(...(t.dir>0?[21,128,61]:t.dir<0?[220,38,38]:[110,110,110])).text(l1,x+nw,yy);
-    if(tp&&tp[t.p]){const l2=tipLbl(t.p)+': '+tp[t.p],c2=w-nw-c1-2,f2=Math.max(3.2,Math.min(6.5,rh*1.8,c2/(l2.length*.19)));d.setFontSize(f2).setTextColor(70).text(l2,x+nw+c1+2,yy)}})},
+  trends(x,y,w,h){const T2=trends(),tp=aiTipsNow(),rh=Math.min(tp?12:15,h/Math.max(1,T2.length)),nw=Math.min(22,w*.2),c1=(w-nw)*.45;
+   T2.forEach((t,i)=>{const yy=y+i*rh+rh*.7,l1=t.w+': '+t.txt,fs=Math.max(3.5,Math.min(9,rh*1.9,(tp?c1:w-nw)/(l1.length*.19)));
+    d.setFontSize(Math.min(9,rh*1.9)).setTextColor(40).text(t.p,x,yy,{maxWidth:nw-1});d.setFontSize(fs).setTextColor(...(t.dir>0?[21,128,61]:t.dir<0?[220,38,38]:[110,110,110])).text(l1,x+nw,yy);
+    if(tp&&tp[t.p]){const l2=tipLbl(t.p)+': '+tp[t.p],c2=w-nw-c1-2,f2=Math.max(3.2,Math.min(8,rh*1.6,c2/(l2.length*.19)));d.setFontSize(f2).setTextColor(70).text(l2,x+nw+c1+2,yy)}})},
   avg(x,y,w,h){hb(x,y,w,h,sr.avg)},wr(x,y,w,h){hb(x,y,w,h,sr.wrI,v=>v+'%',[15,118,110])},latest(x,y,w,h){hb(x,y,w,h,sr.latestI)},
   rec(x,y,w,h){const nw=Math.min(22,w*.3),iw=w-nw-24,mx=Math.max(1,...st.map(s=>s.n)),sc=iw/mx,rh=Math.min(9,h/st.length),fs=Math.min(9,rh*2);
    st.forEach((s,i)=>{const yy=y+i*rh,z=s.n-s.w-s.l;let xx=x+nw;d.setFontSize(fs).setTextColor(40).text(s.p,x,yy+rh*.7);
@@ -419,26 +420,40 @@ function drawDash0(d){
     sessions.forEach((s,j)=>{const v=s.v[p],xx=x+nw+j*cw;if(!num(v)){d.setTextColor(150).text('-',xx+cw/2,yy+rh*.7,{align:'center'});return}
      if(v){const a=.12+.7*Math.abs(v)/mx;d.setFillColor(...[v>0?[21,128,61]:[220,38,38]][0].map(q=>Math.round(255-(255-q)*a))).rect(xx+.2,yy+.2,cw-.4,rh-.4,'F')}
      d.setTextColor(30).text(v.toLocaleString(),xx+cw/2,yy+rh*.7,{align:'center'})})})},
-  table(x,y,w,h){const sz=Math.max(4,Math.min(7,(h/(players.length+1)-1.4)/(.3528*1.15))),TR=Object.fromEntries(trends().map(t=>[t.p,t])),sg=m=>m==null?'-':(m>0?'+':'')+fmtN(m);
+  table(x,y,w,h){const rT=h/(players.length+1),sz=Math.max(4,Math.min(7,(rT-1.4)/(.3528*1.15))),pd=Math.max(.6,(rT-sz*.3528*1.15)/2-.05),TR=Object.fromEntries(trends().map(t=>[t.p,t])),sg=m=>m==null?'-':(m>0?'+':'')+fmtN(m);
    d.autoTable({startY:y,margin:{left:x,right:297-x-w},head:[['#','Player','Total','Sessions','Win %','Best','Worst','Avg ('+PERIOD.sh+')','Avg win ('+PERIOD.sh+')','Avg loss ('+PERIOD.sh+')','Trend','Recent avg (last ≤3 sess)','Earlier avg (rest of '+PERIOD.sh+')','Latest','Streak']],
     body:st.map((s,i)=>{const t=TR[s.p]||{};return[i+1,s.p,s.t.toLocaleString(),s.n,Math.round(wp(s))+'%',s.best.toLocaleString(),s.worst.toLocaleString(),Math.round(s.avg).toLocaleString(),s.aw==null?'-':'+'+fmtN(s.aw),s.al==null?'-':fmtN(s.al),t.w||'',t.k?sg(t.ar):'-',t.k?sg(t.ao):'-',sg(t.last),t.st>=2?t.st+(t.last>0?' wins':' losses'):'-']}),
-    headStyles:{fillColor:[15,118,110]},styles:{fontSize:sz,cellPadding:.7},columnStyles:{2:{fontStyle:'bold'},10:{fontStyle:'bold'}},
+    headStyles:{fillColor:[15,118,110]},styles:{fontSize:sz,cellPadding:{top:pd,bottom:pd,left:.7,right:.7}},columnStyles:{2:{fontStyle:'bold'},10:{fontStyle:'bold'}},
     didParseCell:q=>{if(q.section!='body')return;const i=q.row.index,j=q.column.index;if(j==2)q.cell.styles.textColor=st[i].t<0?[220,38,38]:[21,128,61];if(j==8)q.cell.styles.textColor=[21,128,61];if(j==9)q.cell.styles.textColor=[220,38,38];if(j==10){const t=TR[st[i].p]||{};q.cell.styles.textColor=t.dir>0?[21,128,61]:t.dir<0?[220,38,38]:[110,110,110]}}})}};
  d.setFont('helvetica','bold').setFontSize(16).setTextColor(20).text('Session Dashboard',10,13);d.setFont('helvetica','normal');
  d.setFontSize(9).setTextColor(110).text(`${n} sessions${per} · ${players.length} players${Object.keys(excl).filter(q=>ALLP.includes(q)).length?` (${Object.keys(excl).filter(q=>ALLP.includes(q)).length} excluded)`:''}`+(ds.length?` · ${ds[0]} to ${ds[ds.length-1]}`:''),287,13,{align:'right'});
-  const M=10,W=277,g=5,BOT=197,np=Math.max(1,players.length),tipsOn=aiTipsNow();let y=20,pg=1;
-  const foot=()=>d.setFontSize(7).setTextColor(130).text('Generated '+new Date().toLocaleDateString('en-CA')+' · Positive = winning balance, negative = losing balance',10,205).text('Page '+pg,287,205,{align:'right'});
-  const need=h=>{if(y+h>BOT&&y>24){foot();d.addPage();pg++;d.setFont('helvetica','bold').setFontSize(10).setTextColor(110).text('Session Dashboard',10,10);d.setFont('helvetica','normal');y=15}};
-  const fit=(t,w,m)=>Math.max(4,Math.min(m,w/(String(t).length*.19)));
+  const M=10,W=277,g=5,BOT=197,np=Math.max(1,players.length),tipsOn=aiTipsNow();
+  const T0=(t)=>t,fit=(t,w,m)=>Math.max(4,Math.min(m,w/(String(t).length*.19)));
+  const gk=['bars','pieW','pieL'].filter(q=>sel[q]),lr=gp().length;
+  const drawRow=(y,h)=>{if(gk.length==3&&h>=105){const lw=W*.5-g/2,rw=W-lw-g,ph=(h-g)/2;box(M,y,lw,h);T(TT.bars,M+3,y+6);DR.bars(M+3,y+10,lw-6,h-13);
+    ['pieW','pieL'].forEach((q,i)=>{const yy=y+i*(ph+g);box(M+lw+g,yy,rw,ph);T(TT[q],M+lw+g+3,yy+6);DR[q](M+lw+g+3,yy+10,rw-6,ph-13)})}
+   else{const c=gk.length,cw=(W-g*(c-1))/c;gk.forEach((q,i)=>{const x=M+i*(cw+g);box(x,y,cw,h);T(TT[q],x+3,y+6);DR[q](x+3,y+10,cw-6,h-13)})}};
+  const full=(q,title)=>(y,h)=>{box(M,y,W,h);T(title,13,y+6);DR[q](13,y+10,271,h-13)};
+  const B=[];
+  if(gk.length)B.push({mn:Math.max(50,np*4+13),mx:Math.min(184,np*20+30),draw:drawRow});
+  if(sel.trends||sel.ai)B.push({mn:np*(tipsOn?5:3.9)+13,mx:Math.min(184,np*18+16),draw:full('trends',tipsOn?(tipsAreAI()?'Trend Comments · AI suggestions':'Trend Comments · Suggestions'):TT.trends)});
+  if(sel.table)B.push({mn:(np+1)*4.3+13,mx:Math.min(184,(np+1)*14+15),draw:full('table',TT.table)});
+  if(sel.loantbl&&lr)B.push({mn:(lr+2)*4.3+13,mx:Math.min(184,(lr+2)*14+15),draw:full('loantbl',TT.loantbl)});
+  const start0=sel.kpi?31:20,av=p=>BOT-(p?15:start0);
+  // choose the page split that wastes the least space
+  let best=null;const nb=B.length;
+  for(let m=0;m<(1<<Math.max(0,nb-1));m++){const pages=[[]];B.forEach((b,i)=>{pages[pages.length-1].push(b);if(i<nb-1&&(m>>i&1))pages.push([])});
+   let ok=true,cost=30*pages.length;pages.forEach((p,pi)=>{const gp0=g*(p.length-1),mn=p.reduce((s,b)=>s+b.mn,0)+gp0,mx=p.reduce((s,b)=>s+b.mx,0)+gp0;if(mn>av(pi)+.01)ok=false;cost+=Math.max(0,av(pi)-mx)})
+   if(ok&&(!best||cost<best.cost))best={cost,pages}}
+  if(!best){const pages=[[]];let used=start0;B.forEach(b=>{if(pages[pages.length-1].length&&used+g+b.mn>BOT){pages.push([]);used=15}used+=(pages[pages.length-1].length?g:0)+b.mn;pages[pages.length-1].push(b)});best={pages}}
+  const foot=pn=>d.setFontSize(7).setTextColor(130).text('Generated '+new Date().toLocaleDateString('en-CA')+' · Positive = winning balance, negative = losing balance',10,205).text('Page '+pn,287,205,{align:'right'});
   if(sel.kpi){k.forEach((c,i)=>{const x=10+i*70.3,lab=c[0]=='Best single session'?'Best session':c[0],val=String(c[1])+(c[2]?(i==0?' · ':' ')+c[2]:''),lw=lab.length*1.25+3;
-   box(x,18,66,9);d.setFontSize(6.5).setTextColor(110).text(lab,x+3,23.6);d.setFontSize(fit(val,62-lw,8.5)).setTextColor(20).text(val,x+3+lw,23.8)});y=31}
-  const gk=['bars','pieW','pieL'].filter(q=>sel[q]);
-  if(gk.length){const h=Math.min(184,Math.max(70,np*6.2+22));need(h);const c=gk.length,cw=(W-g*(c-1))/c;gk.forEach((q,i)=>{const x=M+i*(cw+g);box(x,y,cw,h);T(TT[q],x+3,y+6);DR[q](x+3,y+10,cw-6,h-13)});y+=h+g}
-  if(sel.trends||sel.ai){const h=Math.min(184,np*(tipsOn?7.5:6.2)+16);need(h);box(M,y,W,h);T(tipsOn?(tipsAreAI()?'Trend Comments · AI suggestions':'Trend Comments · Suggestions'):TT.trends,13,y+6);DR.trends(13,y+10,271,h-13);y+=h+g}
-  if(sel.table){const h=Math.min(184,(np+1)*4.9+15);need(h);box(M,y,W,h);T(TT.table,13,y+6);DR.table(13,y+10,271,h-13);y+=h+g}
-  if(sel.loantbl&&gp().length){const h=Math.min(184,(gp().length+2)*4.9+15);need(h);box(M,y,W,h);T(TT.loantbl,13,y+6);DR.loantbl(13,y+10,271,h-13);y+=h+g}
-  if(!sel.kpi&&y==20)d.setFontSize(10).setTextColor(110).text('No visualizations selected',148,100,{align:'center'});
-  foot()}
+   box(x,18,66,9);d.setFontSize(6.5).setTextColor(110).text(lab,x+3,23.6);d.setFontSize(fit(val,62-lw,8.5)).setTextColor(20).text(val,x+3+lw,23.8)})}
+  if(!nb)d.setFontSize(10).setTextColor(110).text('No visualizations selected',148,100,{align:'center'});
+  best.pages.forEach((p,pi)=>{if(!p.length&&pi)return;if(pi){d.addPage();d.setFont('helvetica','bold').setFontSize(10).setTextColor(110).text('Session Dashboard',10,10);d.setFont('helvetica','normal')}
+   const hs=p.map(b=>b.mn);let slack=av(pi)-hs.reduce((s,v)=>s+v,0)-g*(p.length-1);
+   for(let it=0;it<4&&slack>.05;it++){const cap=p.map((b,i)=>b.mx-hs[i]),tc=cap.reduce((s,v)=>s+v,0);if(tc<=0)break;const give=Math.min(slack,tc);p.forEach((b,i)=>{hs[i]+=give*cap[i]/tc});slack-=give}
+   const gap=p.length>1?g+Math.min(6,slack/(p.length-1)):g;let y=pi?15:start0;p.forEach((b,i)=>{b.draw(y,hs[i]);y+=hs[i]+gap});foot(pi+1)})}
 function pdfBuf(){const d=new jspdf.jsPDF({orientation:'landscape'});drawDash(d);return d.output('arraybuffer')}
 function countPages(){let n=1;const dry=new Proxy({},{get:(t,p)=>p=='addPage'?()=>{n++;return dry}:()=>dry});try{drawDash(dry)}catch(e){}return n}
 function canvasDoc(S=12,P=1){
@@ -453,7 +468,7 @@ function canvasDoc(S=12,P=1){
   circle(a,b,r,m){x.beginPath();x.arc(a*S,b*S,r*S,0,7);d.paint(m);return d},
   triangle(a,b,c,e,f,g,m){x.beginPath();x.moveTo(a*S,b*S);x.lineTo(c*S,e*S);x.lineTo(f*S,g*S);x.closePath();d.paint(m);return d},
   text(t,a,b,o={}){x.font=`${bold?'700 ':''}${fs*.3528*S}px Helvetica,Arial,sans-serif`;x.fillStyle=tc;x.textAlign=o.align=='right'?'right':o.align=='center'?'center':'left';x.fillText(String(t),a*S,b*S,o.maxWidth?o.maxWidth*S:undefined);return d},
-  autoTable(o){const L=o.margin.left,W=297-L-o.margin.right,sz=o.styles.fontSize,pd=o.styles.cellPadding,rh=sz*.3528+2*pd+.8,
+  autoTable(o){const L=o.margin.left,W=297-L-o.margin.right,sz=o.styles.fontSize,cp=o.styles.cellPadding,pd=typeof cp=='object'?cp.left:cp,pv=typeof cp=='object'?cp.top:cp,rh=sz*.3528*1.15+2*pv,
    cs=o.head[0].map((_,j)=>Math.max(...[o.head[0][j],...o.body.map(r=>r[j])].map(v=>String(v).length))+2),tw=cs.reduce((a,b)=>a+b,0),ws=cs.map(c=>c/tw*W);let y=o.startY;
    const row=(cells,bg,sec,ri)=>{let xx=L;cells.forEach((v,j)=>{if(bg)d.setFillColor(...bg).rect(xx,y,ws[j],rh,'F');let colr=sec=='head'?[255,255,255]:[40,40,40],fb=false;
     if(sec=='body'&&o.didParseCell){const h={section:'body',column:{index:j},row:{index:ri},cell:{styles:{}}};o.didParseCell(h);if(h.cell.styles.textColor)colr=h.cell.styles.textColor;fb=h.cell.styles.fontStyle=='bold'}
@@ -584,8 +599,8 @@ function getRecent(){try{return JSON.parse(localStorage.getItem('ptc_recent')||'
 function saveRecent(code,label){let r=getRecent().filter(x=>x.code!==code);r.unshift({code,label:label||code.slice(0,8),last:Date.now()});if(r.length>12)r=r.slice(0,12);try{localStorage.setItem('ptc_recent',JSON.stringify(r))}catch(e){}}
 function gbarHtml(){if(!gid)return'';const m={live:['#15803d','Live'],saving:['#d97706','Saving…'],connecting:['#d97706','Connecting…'],offline:['#dc2626','Offline: changes not saved yet'],error:['#dc2626','Connection problem']}[cs]||['#6b7686',''];
  const nm=groupName?E(groupName):E(gid.slice(0,6))+'…';
- return`<span style="color:${m[0]}">●</span> ${m[1]} <span class="mut">· <b>${nm}</b></span>${canEdit()?` <button data-grename title="Rename group">✎</button>`:''} <button data-gcopy>Copy Group Code</button> <button data-gswitch>Switch group</button> <button id="gref" title="Refresh data from cloud">↻ Refresh</button> <button data-gleave>Leave</button>${viewLoaded&&!canView()?' <span class="neg">🔒 Locked</span>':(accessLoaded?(canEdit()?(access?' <span class="pos">✏️ Editor</span>':''):' <span class="neg">👁 View only</span> <button class="pri" id="unlock">Enter password</button>'):'')}`}
-function setSync(c){cs=c;const g=$('#gbar');if(g)g.innerHTML=gbarHtml()}
+ return`<span style="color:${m[0]}">●</span> ${m[1]} ${canEdit()?` <button data-grename title="Rename group">✎</button>`:''} <button data-gcopy>Copy Group Code</button> <button data-gswitch>Switch group</button> <button id="gref" title="Refresh data from cloud">↻ Refresh</button> <button data-gleave>Leave</button>${viewLoaded&&!canView()?' <span class="neg">🔒 Locked</span>':(accessLoaded?(canEdit()?(access?' <span class="pos">✏️ Editor</span>':''):' <span class="neg">👁 View only</span> <button class="pri" id="unlock">Enter password</button>'):'')}`}
+function setSync(c){cs=c;const g=$('#gbar');if(g)g.innerHTML=gbarHtml();const t=$('#ttl');if(t)t.textContent=gid?(groupName||gid.slice(0,6)+'…'):''}
 function joinScreen(){
  if(adminOpen)return`<div class="jn">${adminGroups.length?adminGroups.map(g=>`<div class="grow"><span><b>${E(g.name||g.code.slice(0,8))}</b><small class="mut">${E(g.code.slice(0,8))}…</small></span><button class="pri" data-gadm="${E(g.code)}">Enter</button></div>`).join(''):'<div class="mut" style="text-align:center">No groups yet</div>'}<button class="pri" id="gnew2">＋ New group</button><button id="gback">Back</button></div>`;
  return`<div class="jn"><input id="gc_in" placeholder="Group Code" autocomplete="off" autocapitalize="off" spellcheck="false"><input id="gp_in" type="password" placeholder="Password" autocomplete="off"><button class="pri" id="gjoin">Join</button><button id="gadminlogin">🔑 Admin</button></div>`}
