@@ -294,7 +294,7 @@ const toolsHtml=()=>`<div class="tools"><label class="tool" id="uplbl" for="up" 
 function dash(){let ui=toolsHtml();const N=sessions.length;
  if(N){const v=view(sessions),[a,b]=ix(N),opt=x=>sessions.map((s,i)=>`<option value="${i}" ${i==x?'selected':''}>${i+1}. ${E(nm(s,i))}</option>`).join(''),
   M=[['all','All sessions'],['sess','Last N sessions'],['mon','Last N months'],['custom','Custom range']],Q=[['sess',3,'Last 3 sessions'],['sess',6,'Last 6 sessions'],['sess',10,'Last 10'],['mon',1,'Last month'],['mon',3,'Last 3 months'],['mon',6,'Last 6 months'],['all',0,'All']];
-  ui=`<div class="card"><b>Analysis period</b> <span class="mut">— ${v.idx.length} of ${N} sessions · ${E(v.txt)}</span>
+  ui+=`<div class="card"><b>Analysis period</b> <span class="mut">— ${v.idx.length} of ${N} sessions · ${E(v.txt)}</span>
   <div class="pw">${Q.map(q=>`<button data-q="${q[0]}:${q[1]}">${q[2]}</button>`).join('')}</div>
   <div class="pw"><label>Show <select data-mode>${M.map(o=>`<option value="${o[0]}" ${mode==o[0]?'selected':''}>${o[1]}</option>`).join('')}</select></label>
   ${mode=='sess'||mode=='mon'?`<label>N <input type="number" min="1" max="99" value="${pn}" data-pn style="width:70px"></label>`:''}
@@ -892,7 +892,7 @@ function backupTab(){const when=x=>new Date(x.savedAt).toLocaleString();
  <button class="pri" id="gadmin" ${adminGroupsBusy?'disabled':''}>${adminGroupsBusy?'Loading…':'Load / refresh group list'}</button>${adminGroupsErr?`<p class="neg" style="margin-top:8px">Could not load the group list (${E(adminGroupsErr)}). Tap the button to try again.</p>`:''}
  ${adminGroupsLoaded?(adminGroups.length?adminGroups.map(g=>`<div class="row" style="justify-content:space-between;flex-wrap:wrap;margin-top:8px;gap:6px"><span><b>${E(g.name||g.code.slice(0,8))}</b> <span class="mut">${E(g.code.slice(0,8))}…</span>${g.code===gid?' <span class="pos">· current</span>':''}</span><span style="display:flex;gap:6px">${g.code!==gid?`<button data-gopen="${E(g.code)}">Open</button>`:''}<button class="x" data-gdel="${E(g.code)}">Delete</button></span></div>`).join(''):'<p class="mut" style="margin-top:8px">No groups registered yet. Create or open groups while organiser is set — they appear here.</p>'):''}
  </div>
- <button id="bkref">Refresh</button>${bk.err?`<p class="neg">Could not load backups (${E(bk.err)}).</p>`:''}`}
+ ${bk.err?`<p class="neg">Could not load backups (${E(bk.err)}). Tap ↻ Refresh at the top to try again.</p>`:''}`}
 function startCloud(){if(!gid)return;
  if(!window.cloud){window.addEventListener('cloudready',startCloud,{once:true});setTimeout(()=>{if(!window.cloud){cloudErr='Could not load Google services. Check your internet connection and reload.';cs='error';render()}},15000);return}
  cloudOn=true;cs='connecting';access=null;accessLoaded=false;viewAccess=null;viewLoaded=false;
