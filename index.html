@@ -104,6 +104,10 @@ input:focus,select:focus{outline:3px solid var(--g2);outline-offset:1px}
 #toast{background:linear-gradient(135deg,var(--g1),var(--g2));color:#fff;border:2px solid var(--tx);border-radius:999px;font-weight:700}
 @media(prefers-reduced-motion:reduce){main,h1 img{animation:none}}
 .intro{display:none}
+.srt{display:flex;gap:8px;margin:0 0 8px;font-size:12px}.srt label{flex:1;display:flex;align-items:center;gap:5px;min-width:0;margin:0}.srt select{flex:1;min-width:0;font-size:12px;padding:3px 6px;border-width:1.5px}
+.hd{display:flex;align-items:center;gap:8px;min-width:0}.hd h1{margin:0}
+.ind{font-size:10px;color:var(--mut);white-space:nowrap;border:1.5px solid var(--bd);border-radius:999px;padding:2px 7px;background:var(--card);font-weight:600}.ind:empty{display:none}
+.nogrp .hd{justify-content:center}
 h1{min-width:0}h1 .ttl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 h1{font-size:24px}
 .nogrp h1{justify-content:center;margin:30px 0 14px}
@@ -121,7 +125,7 @@ h1{font-size:24px}
 .tool i{font-style:normal;font-size:26px}
 @media(min-width:640px){.tools{grid-template-columns:repeat(4,1fr)}}
 </style></head><body><div id="welcome"><img src="icon-512.png" alt=""><h2>Welcome Folks! 👑</h2><button id="enterBtn" type="button">Enter</button></div><main>
-<h1><img src="icon-192.png" alt="" style="height:1.15em;width:1.15em;border-radius:22%;vertical-align:-0.2em;margin-right:.3em"><span class="ttl" id="ttl"></span></h1>
+<div class="hd"><h1><img src="icon-192.png" alt="" style="height:1.15em;width:1.15em;border-radius:22%;vertical-align:-0.2em;margin-right:.3em"><span class="ttl" id="ttl"></span></h1><span id="ind" class="ind"></span></div>
 <div class="intro mut">Add sessions, track loans and expenses.</div>
 <div class="pw" id="gbar" style="margin:0 0 10px"></div>
 <div class="tabs"><button data-t="hist">History</button><button data-t="add">New session</button><button data-t="loans">Loans</button><button data-t="expenses">Expenses</button><button data-t="dash">Dashboard</button><button data-t="backup">Backups</button><button data-t="readme">Readme</button><button data-t="rules">Rules</button></div>
@@ -149,10 +153,10 @@ function render0(){
 function hist(){
  if(!players.length)return'<p class="mut">No data yet. Add players in “New session”.</p>';
  const si=sOrd(sessions.map((_,i)=>i)),ps=pOrd(players),o=(v,l,c)=>`<option value="${v}" ${c==v?'selected':''}>${l}</option>`,admin=canOrganise();
- let h=settleCard()+`<div class="pw" style="margin:0 0 10px"><label>Sessions <select data-hs>${o('desc','Newest first',hsort)}${o('asc','Oldest first',hsort)}</select></label><label>Players <select data-hp>${o('file','As in file',hpl)}${o('name','A–Z',hpl)}${o('total','Highest total first',hpl)}</select></label>
- ${admin?'':'<span class="mut">History is view-only. Organiser can unlock editing.</span> <button id="orghist">Organiser unlock</button>'}</div><div class="sc"><table><thead><tr><th>Player</th>`+si.map(i=>{const s=sessions[i];return`<th><div class="lb">${E(s.date?'':s.label||'Session '+(i+1))}${admin?`<button class="x" data-del="${i}" title="Delete session">✕</button>`:''}</div>${admin?`<input type="date" data-d="${i}" value="${s.date}">`:`<div class="mut">${E(s.date||'—')}</div>`}</th>`}).join('')+'<th>Total</th></tr></thead><tbody>';
+ let h=settleCard()+`<div class="srt"><label>Sessions <select data-hs>${o('desc','Newest first',hsort)}${o('asc','Oldest first',hsort)}</select></label><label>Players <select data-hp>${o('file','As in file',hpl)}${o('name','A–Z',hpl)}${o('total','Highest total first',hpl)}</select></label>
+ </div><div class="sc"><table><thead><tr><th>Player</th>`+si.map(i=>{const s=sessions[i];return`<th><div class="lb">${E(s.date?'':s.label||'Session '+(i+1))}${admin?`<button class="x" data-del="${i}" title="Delete session">✕</button>`:''}</div>${admin?`<input type="date" data-d="${i}" value="${s.date}">`:`<div class="mut">${E(s.date||'—')}</div>`}</th>`}).join('')+'<th>Total</th></tr></thead><tbody>';
  ps.forEach(p=>h+=`<tr><td>${E(p)}</td>`+si.map(i=>{const s=sessions[i],v=s.v[p];return admin?`<td><input class="c ${cls(v)}" inputmode="decimal" data-p="${E(p)}" data-s="${i}" value="${num(v)?v:''}"></td>`:`<td class="${cls(v)}">${num(v)?f(v):'<span class="mut">–</span>'}</td>`}).join('')+`<td class="${cls(tot(p))}"><b>${f(tot(p))}</b></td></tr>`);
- return h+'</tbody><tfoot><tr><td>Net</td>'+si.map(i=>`<td>${f(net(sessions[i]))}</td>`).join('')+`<td>${f(players.reduce((a,p)=>a+tot(p),0))}</td></tr></tfoot></table></div><p class="mut">${admin?'Tap any cell to correct it. Blank = didn\'t play. Sessions are kept in date order.':'Only the admin can edit or delete sessions in History.'}</p>`}
+ return h+'</tbody><tfoot><tr><td>Net</td>'+si.map(i=>`<td>${f(net(sessions[i]))}</td>`).join('')+`<td>${f(players.reduce((a,p)=>a+tot(p),0))}</td></tr></tfoot></table></div>`}
 function loanRows(P){return P.map(p=>{let bank=0,bor=0,len=0;loans.forEach(l=>{if(l.done)return;if(l.who==p){if(l.src)bor+=l.amt;else bank+=l.amt}if(l.src==p)len+=l.amt});return{p,init:initLoan,bank,bor,len,cur:initLoan+bank+bor-len}})}
 const ng=n=>n?-n:0;
 function loantable(P){const r=loanRows(P).map(x=>({p:x.p,i:ng(x.init),b:ng(x.bank),n:ng(x.bor-x.len),c:ng(x.cur)})),S=k=>r.reduce((a,x)=>a+x[k],0),td=v=>`<td class="${cls(v)}">${v>0?'+':''}${f(v)}</td>`;
@@ -597,10 +601,11 @@ function mergeState(b,l,r){const o=norm(JSON.parse(JSON.stringify(r)));b=norm(b)
  if(l.initLoan!==b.initLoan)o.initLoan=l.initLoan;if(canon(l.settle)!==canon(b.settle))o.settle=l.settle;if(l.readme!==b.readme)o.readme=l.readme;if(l.rules!==b.rules)o.rules=l.rules;if(l.groupName!==b.groupName)o.groupName=l.groupName;if(canon(l.game)!==canon(b.game))o.game=l.game;return o}
 function getRecent(){try{return JSON.parse(localStorage.getItem('ptc_recent')||'[]')}catch(e){return[]}}
 function saveRecent(code,label){let r=getRecent().filter(x=>x.code!==code);r.unshift({code,label:label||code.slice(0,8),last:Date.now()});if(r.length>12)r=r.slice(0,12);try{localStorage.setItem('ptc_recent',JSON.stringify(r))}catch(e){}}
-function gbarHtml(){if(!gid)return'';const m={live:['#15803d','Live'],saving:['#d97706','Saving…'],connecting:['#d97706','Connecting…'],offline:['#dc2626','Offline: changes not saved yet'],error:['#dc2626','Connection problem']}[cs]||['#6b7686',''];
- const nm=groupName?E(groupName):E(gid.slice(0,6))+'…';
- return`<span style="color:${m[0]}">●</span> ${m[1]} ${canEdit()?` <button data-grename title="Rename group">✎</button>`:''} <button data-gcopy>Copy Group Code</button> <button data-gswitch>Switch group</button> <button id="gref" title="Refresh data from cloud">↻ Refresh</button> <button data-gleave>Leave</button>${viewLoaded&&!canView()?' <span class="neg">🔒 Locked</span>':(accessLoaded?(canEdit()?(access?' <span class="pos">✏️ Editor</span>':''):' <span class="neg">👁 View only</span> <button class="pri" id="unlock">Enter password</button>'):'')}`}
-function setSync(c){cs=c;const g=$('#gbar');if(g)g.innerHTML=gbarHtml();const t=$('#ttl');if(t)t.textContent=gid?(groupName||gid.slice(0,6)+'…'):''}
+function indHtml(){if(!gid)return'';const m={live:['#15803d','Live'],saving:['#d97706','Saving'],connecting:['#d97706','Connecting'],offline:['#dc2626','Offline'],error:['#dc2626','Error']}[cs]||['#6b7686',''];
+ const mode=!accessLoaded?'':canOrganise()?'✏️ Admin':canEdit()?'✏️ Write':'👁 View';return`<span style="color:${m[0]}">●</span> ${m[1]}${mode?' · '+mode:''}`}
+function gbarHtml(){if(!gid)return'';
+ return`${canEdit()?'<button data-grename title="Rename group">✎ Rename</button> ':''}<button data-gcopy>Copy Group Code</button> <button data-gswitch>Switch group</button> <button id="gref" title="Refresh data from cloud">↻ Refresh</button> <button data-gleave>Leave</button>${accessLoaded&&!canEdit()?' <button class="pri" id="unlock">Enter password</button>':''}`}
+function setSync(c){cs=c;const g=$('#gbar');if(g)g.innerHTML=gbarHtml();const ii=$('#ind');if(ii)ii.innerHTML=indHtml();const t=$('#ttl');if(t)t.textContent=gid?(groupName||gid.slice(0,6)+'…'):''}
 function joinScreen(){
  if(adminOpen)return`<div class="jn">${adminGroups.length?adminGroups.map(g=>`<div class="grow"><span><b>${E(g.name||g.code.slice(0,8))}</b><small class="mut">${E(g.code.slice(0,8))}…</small></span><button class="pri" data-gadm="${E(g.code)}">Enter</button></div>`).join(''):'<div class="mut" style="text-align:center">No groups yet</div>'}<button class="pri" id="gnew2">＋ New group</button><button id="gback">Back</button></div>`;
  return`<div class="jn"><input id="gc_in" placeholder="Group Code" autocomplete="off" autocapitalize="off" spellcheck="false"><input id="gp_in" type="password" placeholder="Password" autocomplete="off"><button class="pri" id="gjoin">Join</button><button id="gadminlogin">🔑 Admin</button></div>`}
@@ -902,6 +907,7 @@ function backupTab(){const when=x=>new Date(x.savedAt).toLocaleString();
  else b='<div class="mut">No standing saved yet. It is saved automatically while a game is in progress, and it replaces the previous one.</div>';
  return`<div class="card"><b>Last completed game backup</b><div class="mut" style="margin:4px 0 8px">Everything: sessions, players, loans. Restoring replaces the shared data for everyone.</div>${a}</div>
  <div class="card"><b>Current standing backup</b><div class="mut" style="margin:4px 0 8px">The game in progress and its loans. Restoring brings that game back and leaves your sessions alone.</div>${b}</div>
+ ${canOrganise()?'':`<div class="card"><b>Admin</b><div class="mut" style="margin:4px 0 8px">Unlock History editing, uploads and restores.</div><button class="pri" id="unlockorg">Enter admin password</button></div>`}
  <div class="card"><b>Password</b><div class="mut" style="margin:4px 0 8px">${access?'Only people with the password can make changes. Everyone else can view and export.':'Everyone can edit. Create a password so only people who have it can change data.'} Needs the admin password.</div><button class="pri" id="gencode">${access?'Generate a new password':'Create a password'}</button>${access?' <button id="allowall">Allow everyone to edit</button>':''}${lastCode?`<div style="margin-top:10px">Share this password (shown once):<div style="font-size:24px;font-weight:700;letter-spacing:2px;margin:4px 0">${lastCode}</div><button id="copycode">Copy password</button></div>`:''}</div>
  <div class="card"><b>Admin password</b><div class="mut" style="margin:4px 0 8px">${orgInfo?'Needed to restore backups, delete data and manage groups.':'Not set.'}</div><button class="pri" id="orgset">${orgInfo?'Change':'Set'}</button>${orgInfo?' <button id="orgrm">Remove</button>':''}</div>
  <div class="card"><b>All groups (admin)</b><div class="mut" style="margin:4px 0 8px">After entering the admin password you can open any registered group or permanently delete one (history, loans, expenses and backups).</div>
