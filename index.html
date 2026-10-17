@@ -182,31 +182,34 @@ function loantable(P){const r=loanRows(P).map(x=>({p:x.p,i:ng(x.init),b:ng(x.ban
 function loglist(){const log=loans.map((l,i)=>({l,i})).sort((a,b)=>a.l.date<b.l.date?1:a.l.date>b.l.date?-1:b.i-a.i);
  return'<p><b>Loan log</b></p>'+(log.length?'<div class="sc"><table><tbody>'+log.map(o=>`<tr><td>${o.l.date}</td><td>${E(o.l.who)}</td><td class="${cls(ng(o.l.amt))}">${o.l.amt>0?'−':'+'}${f(Math.abs(o.l.amt))}</td><td>${o.l.amt<0?'repaid to ':'borrowed from '}${o.l.src?E(o.l.src):'Bank'}</td><td>${o.l.done?'<span class="mut">settled</span>':`<button class="x" data-ldel="${o.i}" title="Delete">✕</button>`}</td></tr>`).join('')+'</tbody></table></div>':'<p class="mut">No fresh loans yet.</p>')}
 function joinCard(){const out=players.filter(p=>!game.players.includes(p));
- return`<div class="card"><b>Add a player to this game</b><div class="mut">For someone joining late. Type a new name, or pick someone who sat out. They start with the initial loan (${f(initLoan)}).</div><div class="row"><input id="jn" list="jl" placeholder="Player name" style="text-align:left;flex:1"><button id="jb">Add to game</button></div><datalist id="jl">${out.map(p=>`<option value="${E(p)}">`).join('')}</datalist></div>
- <div class="card"><b>Remove a player from this game</b><div class="mut" style="margin:4px 0 8px">Removes them from the current game only (not from History). Open loans involving them stay in the log.</div>
+ return`<div class="card"><b>Add a player to this game</b><div class="row"><input id="jn" list="jl" placeholder="Player name" style="text-align:left;flex:1"><button id="jb">Add to game</button></div><datalist id="jl">${out.map(p=>`<option value="${E(p)}">`).join('')}</datalist></div>
+ <div class="card"><b>Remove a player from this game</b>
  ${game.players.map(p=>`<div class="row" style="justify-content:space-between"><span>${E(p)}</span><button class="x" data-prm="${E(p)}" title="Remove from game">Remove</button></div>`).join('')||'<p class="mut">No players in this game.</p>'}</div>`}
-function gcPanel(P,cur){return`<div class="card"><b>Game completion</b><div class="mut">Enter what each player finished with. Result = final amount + current standing (standing is negative while a loan is owed). Saved results go to the History tab.</div>
+function gcPanel(P,cur){return`<div class="card" id="gcPanel" style="border:3px solid var(--ac);box-shadow:0 8px 28px rgba(0,0,0,.18)"><b>Game completion</b>
  ${P.map(p=>`<div class="row"><span>${E(p)} <small class="mut">(${f(ng(cur[p]))})</small></span><input inputmode="decimal" placeholder="final amount" data-fa="${E(p)}" value="${E(finals[p]===undefined?'':finals[p])}"><b class="res" data-rp="${E(p)}"></b></div>`).join('')}
  <div class="sum" id="gsum"></div><button class="pri" id="gfin" style="width:100%">Complete game &amp; save to History</button></div>`}
 function loansTab(){
- if(!game)return`<div class="card"><b>No game in progress</b><p class="mut">Start one in “New session” by choosing who is playing. Loans and Game completion work on that game.</p></div>`+loglist();
+ if(!game)return`<div class="card"><b>No game in progress</b><p class="mut">Start one in “New session”.</p></div>`+loglist();
  const P=game.players,cur=Object.fromEntries(loanRows(P).map(r=>[r.p,r.cur])),opts=p=>'<option value="">Bank (borrow)</option><option value="__repay" '+((loanDraft[p]||{}).src=='__repay'?'selected':'')+'>Repay bank</option>'+P.filter(q=>q!=p).map(q=>`<option value="${E(q)}" ${(loanDraft[p]||{}).src==q?'selected':''}>${E(q)}</option>`).join('');
- return`<div class="card"><label><b>Initial loan per player</b> <input type="number" data-il value="${initLoan}" style="width:110px;text-align:right"></label><div class="mut">Every player starts the game with this loan. You can change it any time; standings update.</div></div>
+ return`<div class="card"><label><b>Initial loan per player</b> <input type="number" data-il value="${initLoan}" style="width:110px;text-align:right"></label></div>
  ${joinCard()}
- <div class="card"><b>Fresh loan</b> <span class="mut">· game on ${game.date}</span><label style="display:block;margin:8px 0">Date <input type="date" id="ld" value="${ld}"></label>
+ <div class="card"><b>Fresh loan</b> <span class="mut">· ${game.date}</span><label style="display:block;margin:8px 0">Date <input type="date" id="ld" value="${ld}"></label>
  ${P.map(p=>`<div class="row" style="flex-wrap:wrap"><span>${E(p)}</span><input inputmode="decimal" placeholder="amount" style="width:90px" data-la="${E(p)}" value="${E((loanDraft[p]||{}).amt||'')}"><button data-lsg="${E(p)}" title="Switch + / −">±</button><select data-ls="${E(p)}">${opts(p)}</select></div>`).join('')}
- <div class="mut">Bank: adds to the player's loan. Repay bank: reduces it. Another player: the borrower's loan goes up and the lender's goes down (a negative amount does the reverse). Standing shows negative while a loan is owed.</div>
  <button class="pri" id="lsave" style="width:100%;margin-top:10px">Save fresh loans</button></div>
- <p style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><b>Current standing</b><span style="display:flex;gap:6px;flex-wrap:wrap"><button id="ginvite">Copy game invite</button><button id="sxl">⬇ Export session</button><button class="pri" id="gcb">${gc?'Hide game completion':'Game completion'}</button></span></p><div class="mut" style="margin:-6px 0 8px">Copy game invite shares a link for this specific game (group + date). Export the session file as a safety copy. If this page closes, load the file from the New session tab.</div>${loantable(P)}${gc?gcPanel(P,cur):''}${loglist()}`}
+ <p><b>Current standing</b></p>
+ ${loantable(P)}
+ ${gc?gcPanel(P,cur):''}
+ ${loglist()}
+ <div id="gcFab" style="position:sticky;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:20;margin-top:16px"><button class="pri" id="gcb" style="width:100%;padding:14px;font-size:16px;box-shadow:0 6px 20px rgba(0,0,0,.25)">${gc?'Hide game completion':'Game completion'}</button></div>`}
 function entry(){
- if(game)return`<div class="card"><b>Game in progress</b><div class="mut">${game.date} · ${game.players.length} playing: ${game.players.map(E).join(', ')}</div><p>Add loans and finish the game from the Loans tab. The final results are saved to History.</p><button class="pri" data-t="loans">Go to Loans</button> <button id="gdisc">Discard game</button></div>${joinCard()}`;
- return`<div class="card"><b>Start a new game in this group</b><div class="mut" style="margin:4px 0 8px">This group keeps one continuous history. If a completely different set of players is playing, switch to (or create) another group from the top bar.</div>
+ if(game)return`<div class="card"><b>Game in progress</b><div class="mut">${game.date} · ${game.players.length} playing: ${game.players.map(E).join(', ')}</div><button class="pri" data-t="loans">Go to Loans</button> <button id="gdisc">Discard game</button></div>${joinCard()}`;
+ return`<div class="card"><b>Start a new game</b>
  <label>Date played <input type="date" id="nd" value="${dd}"></label>
- <div style="margin-top:10px">${players.map(p=>`<div class="row"><label style="flex:1;display:flex;align-items:center;gap:8px"><input type="checkbox" data-pl="${E(p)}" ${plays[p]===false?'':'checked'}> <span>${E(p)}</span></label><button class="x" data-pdel="${E(p)}" title="Delete player (admin password)">✕</button></div>`).join('')||'<p class="mut">Add your first player below.</p>'}</div>
+ <div style="margin-top:10px">${players.map(p=>`<div class="row"><label style="flex:1;display:flex;align-items:center;gap:8px"><input type="checkbox" data-pl="${E(p)}" ${plays[p]===false?'':'checked'}> <span>${E(p)}</span></label><button class="x" data-pdel="${E(p)}" title="Delete player">✕</button></div>`).join('')||'<p class="mut">Add your first player below.</p>'}</div>
  <div class="row"><input id="np" placeholder="New player name" style="text-align:left;flex:1"><button id="ap">Add player</button></div>
- <div class="mut" style="margin-top:6px">✕ deletes a player from the roster (needs admin password). Past session results stay in History.</div></div>
+ </div>
  <button class="pri" id="save" style="width:100%">Start game</button>
- <div class="card" style="margin-top:14px"><b>Resume a saved session</b><div class="mut" style="margin:4px 0 10px">If you exported your session from the Loans tab, load that file here to carry on. Upload your history Excel first so earlier sessions are kept.</div><label class="btn" for="lg">📂 Load existing session</label><input id="lg" type="file" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"></div>`}
+ <div class="card" style="margin-top:14px"><b>Resume a saved session</b><label class="btn" for="lg">📂 Load existing session</label><input id="lg" type="file" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"></div>`}
 function upd(){const el=$('#gsum');if(!el||!game)return;const cur=Object.fromEntries(loanRows(game.players).map(r=>[r.p,r.cur]));let t=0,all=1;
  document.querySelectorAll('[data-rp]').forEach(c=>{const p=c.dataset.rp,a=parseFloat(finals[p]);if(isNaN(a)){all=0;c.textContent='';return}const r=a-cur[p];t+=r;c.textContent=(r>0?'+':'')+f(Math.round(r*100)/100);c.className='res '+cls(r)});
  t=Math.round(t*100)/100;el.className='sum '+(all&&t?'warn':'ok');el.textContent=all?(t?`Results net to ${t.toLocaleString()} (should be 0)`:'Results net to 0 ✓'):"Enter every player's final amount"}
@@ -285,9 +288,15 @@ function trendHtml(){const tp=aiTipsNow(),T=trends();
  const bar='';
  return bar+T.map(t=>`<div style="padding:6px 0;border-bottom:1px solid var(--bd)"><b>${E(t.p)}</b> <b class="${t.dir>0?'pos':t.dir<0?'neg':'mut'}">${t.w}</b> <span class="mut">— ${E(t.txt)}</span>${tp&&tp[t.p]?`<div style="padding-top:3px;font-size:14px">${tipLbl(t.p)=='AI tip'?'💡':'📊'} ${tipLbl(t.p)}: ${E(tp[t.p])}</div>`:''}</div>`).join('')+(tp?`<div class="mut" style="padding-top:6px;font-size:12px">${tipsAreAI()?'AI-generated tips based only on these results, just for fun.':'Built-in tips based on these results.'}</div>`:'')}
 function dash0(){
- const pick=`<div class="card"><b>Choose visualizations</b> <span class="mut">— applies to this view, the PDF and the image</span><div class="pw">${OPTS.map(o=>`<label class="chip"><input type="checkbox" data-v="${o[0]}" ${sel[o[0]]?'checked':''}> ${o[1]}</label>`).join('')}</div><div class="pw"><button data-all="1">Select all</button><button data-all="0">Clear</button></div></div>`;
- if(!sessions.length||!players.length)return pick+'<p class="mut">Nothing to show yet. Check the period and the players shown.</p>';
- const st=stats(),[win,loss]=split(st),c=(t,x)=>`<div class="card"><b>${t}</b>${x}</div>`;let h=pick;
+ const pick=`<div class="card"><b>Choose visualizations</b><div class="pw">${OPTS.map(o=>`<label class="chip"><input type="checkbox" data-v="${o[0]}" ${sel[o[0]]?'checked':''}> ${o[1]}</label>`).join('')}</div><div class="pw"><button data-all="1">Select all</button><button data-all="0">Clear</button></div></div>`;
+ let h=pick;
+ // Current standing can show even with zero completed sessions (game in progress)
+ if(sel.loantbl){h+='<p><b>Current standing</b></p>'+(game&&gp().length?loantable(gp()):'<p class="mut">No game in progress.</p>')+'<div style="height:14px"></div>';}
+ if(!sessions.length||!players.length){
+  if(!sel.loantbl||!game)return h+'<p class="mut">Nothing to show yet.</p>';
+  return h;
+ }
+ const st=stats(),[win,loss]=split(st),c=(t,x)=>`<div class="card"><b>${t}</b>${x}</div>`;
  if(sel.kpi)h+='<div class="kp">'+kpis().map(k=>`<div><small>${k[0]}</small><b>${E(k[1])}</b><small>${E(k[2])}</small></div>`).join('')+'</div>';
  if(sel.bars)h+=c('Total balance by player',chart(st));
  const ps=[sel.pieW&&pie(win,'Share of total winnings'),sel.pieL&&pie(loss,'Share of total losses')].filter(Boolean);
@@ -295,7 +304,7 @@ function dash0(){
  if(sel.table){const TR=Object.fromEntries(trends().map(t=>[t.p,t])),sg=n=>n==null?'–':(n>0?'+':'')+fmtN(n);
   h+=`<div class="sc"><table><thead><tr><th>Player</th><th>Total</th><th>Played</th><th>Win %</th><th>Best</th><th>Worst</th><th>Avg<br><small class="mut" style="font-weight:400">${PERIOD.sh}</small></th><th>Avg win<br><small class="mut" style="font-weight:400">${PERIOD.sh}</small></th><th>Avg loss<br><small class="mut" style="font-weight:400">${PERIOD.sh}</small></th><th>Trend</th><th>Recent avg<br><small class="mut" style="font-weight:400">last ≤3 sess</small></th><th>Earlier avg<br><small class="mut" style="font-weight:400">rest of ${PERIOD.sh}</small></th><th>Latest</th><th>Streak</th></tr></thead><tbody>`+st.map(s=>{const t=TR[s.p]||{};return`<tr><td>${E(s.p)}</td><td class="${cls(s.t)}"><b>${f(s.t)}</b></td><td>${s.n}</td><td>${Math.round(wp(s))}%</td><td>${f(s.best)}</td><td>${f(s.worst)}</td><td>${f(Math.round(s.avg))}</td><td class="pos">${s.aw==null?'–':'+'+fmtN(s.aw)}</td><td class="neg">${s.al==null?'–':fmtN(s.al)}</td><td class="${t.dir>0?'pos':t.dir<0?'neg':'mut'}"><b>${t.w||''}</b></td><td>${t.k?sg(t.ar):'–'}</td><td>${t.k?sg(t.ao):'–'}</td><td>${sg(t.last)}</td><td>${t.st>=2?t.st+(t.last>0?' wins':' losses'):'–'}</td></tr>`}).join('')+'</tbody></table></div><div class="mut" style="font-size:12px;padding:4px 2px 10px">Period: '+E(PERIOD.txt)+'. Avg, Avg win and Avg loss cover that period (win / loss = average of the winning / losing sessions). Recent avg = average of the latest sessions (up to 3) compared with Earlier avg. Streak = current run of wins or losses.</div>'}
  if(sel.trends||sel.ai)h+=c('Trend Comments',trendHtml());
- if(sel.loantbl)h+='<p><b>Current standing</b> <span class="mut">(game in progress)</span></p>'+(gp().length?loantable(gp()):'<p class="mut">No game in progress.</p>')+'<div style="height:14px"></div>';
+
  const openEx=expenses.filter(e=>!e.done);
  if(openEx.length){const cand=game?game.players:players,names=[...new Set([...cand,...openEx.flatMap(e=>[e.paidBy,...(e.split||[])])])],sp=expenseSplit(cand,openEx),tot=k=>names.reduce((a,p)=>a+(sp[k][p]||0),0)/100;
   h+='<div class="card"><b>Open expenses (separate from session balances)</b><div class="mut" style="margin:4px 0 8px">These never affect History or the totals above. They only count in the settlement when the game is completed.</div><div class="sc"><table><thead><tr><th>Player</th><th>Paid</th><th>Their share</th><th>Net</th></tr></thead><tbody>'+names.map(p=>{const a=(sp.paid[p]||0)/100,b=(sp.share[p]||0)/100,n=Math.round((a-b)*100)/100;return`<tr><td>${E(p)}</td><td>${fmtA(a)}</td><td>${fmtA(b)}</td><td class="${cls(n)}"><b>${n>0?'+':''}${fmtA(n)}</b></td></tr>`}).join('')+`</tbody><tfoot><tr><td>Total</td><td>${fmtA(tot('paid'))}</td><td>${fmtA(tot('share'))}</td><td></td></tr></tfoot></table></div></div>`}
@@ -317,13 +326,13 @@ const toolsHtml=()=>`<div class="tools"><label class="tool" id="uplbl" for="up" 
 function dash(){let ui=toolsHtml();const N=sessions.length;
  if(N){const v=view(sessions),[a,b]=ix(N),opt=x=>sessions.map((s,i)=>`<option value="${i}" ${i==x?'selected':''}>${i+1}. ${E(nm(s,i))}</option>`).join(''),
   M=[['all','All sessions'],['sess','Last N sessions'],['mon','Last N months'],['custom','Custom range']],Q=[['sess',3,'Last 3 sessions'],['sess',6,'Last 6 sessions'],['sess',10,'Last 10'],['mon',1,'Last month'],['mon',3,'Last 3 months'],['mon',6,'Last 6 months'],['all',0,'All']];
-  ui+=`<div class="card"><b>Analysis period</b> <span class="mut">— ${v.idx.length} of ${N} sessions · ${E(v.txt)}</span>
+  ui+=`<div class="card"><b>Analysis period</b> <span class="mut">${v.idx.length} of ${N}</span>
   <div class="pw">${Q.map(q=>`<button data-q="${q[0]}:${q[1]}">${q[2]}</button>`).join('')}</div>
   <div class="pw"><label>Show <select data-mode>${M.map(o=>`<option value="${o[0]}" ${mode==o[0]?'selected':''}>${o[1]}</option>`).join('')}</select></label>
   ${mode=='sess'||mode=='mon'?`<label>N <input type="number" min="1" max="99" value="${pn}" data-pn style="width:70px"></label>`:''}
   ${mode=='custom'?`<label>From <select data-rf>${opt(a)}</select></label><label>To <select data-rt>${opt(b)}</select></label>`:''}</div>
-  ${mode=='mon'?'<div class="mut">Counted back from the most recent dated session; undated sessions are skipped.</div>':''}</div>`}
- if(players.length)ui+=`<div class="card"><b>Players shown</b> <span class="mut">— untick to exclude from the dashboard and exports</span><div class="pw">${players.map(p=>`<label class="chip"><input type="checkbox" data-x="${E(p)}" ${excl[p]?'':'checked'}> ${E(p)}</label>`).join('')}</div>${Object.keys(excl).length?'<div class="pw"><button data-xall="1">Include everyone</button></div>':''}</div>`;
+  </div>`}
+ if(players.length)ui+=`<div class="card"><b>Players shown</b><div class="pw">${players.map(p=>`<label class="chip"><input type="checkbox" data-x="${E(p)}" ${excl[p]?'':'checked'}> ${E(p)}</label>`).join('')}</div>${Object.keys(excl).length?'<div class="pw"><button data-xall="1">Include everyone</button></div>':''}</div>`;
  return ui+withView(dash0)}
 function drawDash(d){withView(()=>{if(!sessions.length||!players.length){d.setFontSize(12).setTextColor(110).text('Nothing to show for this period / player selection',10,20);return}drawDash0(d)})}
 // ---- import / export ----
@@ -568,7 +577,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(t.id=='jb'){if(!game)return;let n=($('#jn').value||'').trim();if(!n)return toast('Enter a player name');n=players.find(q=>q.toLowerCase()==n.toLowerCase())||n;
   if(game.players.includes(n))return toast(n+' is already in this game');if(!players.includes(n))players.push(n);game.players.push(n);plays[n]=true;render();toast(n+' added to the game')}
  else if(t.id=='gfin'){if(!game)return;const rows=loanRows(game.players),res={};let miss=0;rows.forEach(r=>{const a=parseFloat(finals[r.p]);if(isNaN(a)){miss=1;return}res[r.p]=Math.round((a-r.cur)*100)/100});
-  if(miss)return toast("Enter every player's final amount");const n=Math.round(Object.values(res).reduce((a,b)=>a+b,0)*100)/100;if(n&&!confirm(`Results net to ${n}, not 0. Save anyway?`))return;
+  if(miss)return toast("Enter every player's final amount");if(!confirm('Are you sure you want to complete this game and save results to History?'))return;const n=Math.round(Object.values(res).reduce((a,b)=>a+b,0)*100)/100;if(n&&!confirm(`Results net to ${n}, not 0. Save anyway?`))return;
   sessions.push({date:game.date,label:'',v:res});settle=computeSettle(res,expenses.filter(e=>!e.done),game.players,game.date);loans.forEach(l=>{if(!l.done){l.done=true;l.g=game.date}});expenses.forEach(e=>{if(!e.done){e.done=true;e.g=game.date}});sortS();game=null;gc=false;finals={};loanDraft={};tab='hist';wantFull=true;render();toast('Game saved. The settlement is at the top of History.')}
  else if(t.id=='lsave'){const add=[];let bad=0;if(!game)return;game.players.forEach(p=>{const x=loanDraft[p]||{},a=parseFloat(x.amt);if(x.amt===undefined||x.amt==='')return;if(!isFinite(a)||a===0){bad=1;return}add.push({date:ld,who:p,amt:x.src=='__repay'?-Math.abs(a):a,src:x.src=='__repay'?null:(x.src||null),g:game.date,done:false})});
   if(!ld)return toast('Pick the date');if(bad)return toast('Enter a valid amount that is not 0 (use − for a repayment)');if(!add.length)return toast('Enter at least one amount');
@@ -641,7 +650,7 @@ async function adminCreate(){const n=prompt('Group name:');if(n===null)return;
  let ep=null;if(confirm('Generate a Password for players now? You can also do it later from Backups.')){const a='ABCDEFGHJKMNPQRSTUVWXYZ23456789';ep='';crypto.getRandomValues(new Uint8Array(8)).forEach(x=>{ep+=a[x%a.length]})}
  pendingOrgPass=adminPw;pendingSetGlobal=false;pendingEditPw=ep;adminOpen=false;adminPw=null;
  setGroup(randCode(),(n||'').trim(),{register:true});toast(ep?'Group created. Open Backups to copy the Password.':'Group created.')}
-function connectCard(){return`<div class="card"><b>${cs=='error'?'Could not connect':'Connecting…'}</b><div class="mut" style="margin:6px 0">${E(cloudErr)}</div>${cs=='error'?'<p>Check that you are online and that the Firestore rules are published (Database, then Rules, then Publish).</p>':''}<button data-gleave>Use a different group code</button></div>`}
+function connectCard(){return`<div class="card"><b>${cs=='error'?'Could not connect':'Connecting…'}</b>${cloudErr?`<div class="mut" style="margin:6px 0">${E(cloudErr)}</div>`:''}${cs=='error'?`<p class="mut">Check that you are online and try again.</p><button data-gleave>Use a different group code</button>`:''}</div>`}
 function render(){document.body.classList.toggle('nogrp',!gid);
  if(!gid){$('#v').innerHTML=joinScreen();return}
  if(!synced){$('#v').innerHTML=connectCard();setSync(cs);return}
@@ -896,17 +905,17 @@ function expensesTab(){if(!players.length)return'<p class="mut">Add players firs
  const cand=game?game.players:players,open=expenses.filter(e=>!e.done),done=expenses.filter(e=>e.done),paid=exDraft.paid&&players.includes(exDraft.paid)?exDraft.paid:cand[0];
  const names=[...new Set([...cand,...open.flatMap(e=>[e.paidBy,...(e.split||[])])])],sp=expenseSplit(cand,open),row=e=>`<tr><td>${E(e.date)}</td><td>${E(e.desc)}</td><td>${E(e.paidBy)}</td><td>${fmtA(e.amt)}</td><td>${e.split&&e.split.length?E(e.split.join(', ')):'Everyone'}</td><td>${e.done?'<span class="mut">settled</span>':`<button class="x" data-exdel="${e.id}" title="Delete">✕</button>`}</td></tr>`;
  const tot=k=>names.reduce((a,p)=>a+(sp[k][p]||0),0)/100;
- return`<div class="card"><b>Add an expense</b><div class="mut" style="margin:4px 0 8px">Food, drinks, venue and so on. Expenses stay completely separate from session results and the Dashboard totals. They only appear in the settlement when you complete the game.</div>
+ return`<div class="card"><b>Add an expense</b>
  <div class="row"><input data-ed placeholder="What for? (e.g. snacks)" style="text-align:left;flex:1;width:auto" value="${E(exDraft.desc)}"></div>
  <div class="row"><input data-ea inputmode="decimal" placeholder="Amount" value="${E(exDraft.amt)}"></div>
- <div style="margin:10px 0 4px"><b>Who paid?</b> <span class="mut">(this person will be reimbursed in the settlement)</span></div>
+ <div style="margin:10px 0 4px"><b>Who paid?</b></div>
  <div class="row"><select data-ep style="flex:1">${players.map(p=>`<option value="${E(p)}" ${p==paid?'selected':''}>${E(p)}</option>`).join('')}</select></div>
- <div style="margin:10px 0 4px"><b>Who should share the cost?</b> <span class="mut">${game?'(players in this game)':''}</span></div>
+ <div style="margin:10px 0 4px"><b>Who should share the cost?</b></div>
  <div class="pw">${cand.map(p=>`<label class="chip"><input type="checkbox" data-es="${E(p)}" ${exDraft.shared[p]===false?'':'checked'}> ${E(p)}</label>`).join('')}</div>
  <button class="pri" id="exadd" style="width:100%;margin-top:12px">Add expense</button></div>
- <p><b>Open expenses</b> <span class="mut">${game?'for the game on '+E(game.date):'(no game in progress yet; they will count at the next completion)'}</span></p>
+ <p><b>Open expenses</b>${game?` <span class="mut">${E(game.date)}</span>`:''}</p>
  ${open.length?`<div class="sc"><table><thead><tr><th>Date</th><th>What</th><th>Who paid</th><th>Amount</th><th>Shared by</th><th></th></tr></thead><tbody>${open.map(row).join('')}</tbody></table></div>
- <p><b>Expense summary (separate from session balances)</b></p><div class="sc"><table><thead><tr><th>Player</th><th>Paid</th><th>Their share</th><th>Net (owed / owes)</th></tr></thead><tbody>${names.map(p=>{const a=(sp.paid[p]||0)/100,b=(sp.share[p]||0)/100,n=Math.round((a-b)*100)/100;return`<tr><td>${E(p)}</td><td>${fmtA(a)}</td><td>${fmtA(b)}</td><td class="${cls(n)}"><b>${n>0?'+':''}${fmtA(n)}</b></td></tr>`}).join('')}</tbody><tfoot><tr><td>Total</td><td>${fmtA(tot('paid'))}</td><td>${fmtA(tot('share'))}</td><td></td></tr></tfoot></table></div><div class="mut" style="font-size:12px;margin-top:4px">Net + means the player is owed money back for what they paid; − means they still owe their share. These numbers never mix into History or Dashboard session totals.</div>`:'<p class="mut">No open expenses.</p>'}
+ <p><b>Expense summary</b></p><div class="sc"><table><thead><tr><th>Player</th><th>Paid</th><th>Their share</th><th>Net</th></tr></thead><tbody>${names.map(p=>{const a=(sp.paid[p]||0)/100,b=(sp.share[p]||0)/100,n=Math.round((a-b)*100)/100;return`<tr><td>${E(p)}</td><td>${fmtA(a)}</td><td>${fmtA(b)}</td><td class="${cls(n)}"><b>${n>0?'+':''}${fmtA(n)}</b></td></tr>`}).join('')}</tbody><tfoot><tr><td>Total</td><td>${fmtA(tot('paid'))}</td><td>${fmtA(tot('share'))}</td><td></td></tr></tfoot></table></div>`:'<p class="mut">No open expenses.</p>'}
  ${done.length?`<details style="margin-top:10px"><summary class="mut">Earlier settled expenses (${done.length})</summary><div class="sc" style="margin-top:6px"><table><tbody>${done.map(row).join('')}</tbody></table></div></details>`:''}`}
 function exSheet(openOnly){const rows=expenses.filter(e=>!openOnly||!e.done);return XLSX.utils.aoa_to_sheet([['Date','Description','Paid by','Amount','Shared by','Game','Status'],...rows.map(e=>[iso2ser(e.date||'1970-01-01'),e.desc,e.paidBy,e.amt,e.split&&e.split.length?e.split.join(','):'All',e.g?iso2ser(e.g):null,e.done?'Settled':'Open'])])}
 function readExpenses(ws,openOnly){const out=[];XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null}).slice(1).forEach(r=>{const d=num(r[0])?ser2iso(r[0]):(typeof r[0]=='string'?r[0].slice(0,10):''),a=Number(r[3]),p=typeof r[2]=='string'?r[2].trim():'',sh=typeof r[4]=='string'?r[4].trim():'All',op=/^open/i.test(String(r[6]||''));
@@ -922,11 +931,11 @@ function backupTab(){const when=x=>new Date(x.savedAt).toLocaleString();
  if(bk.busy&&bk.full===undefined)return'<p class="mut">Loading backups…</p>';
  let a,b;
  if(bk.full){const d=norm(JSON.parse(bk.full.json));a=`<div class="mut">Saved ${E(when(bk.full))} · ${d.sessions.length} sessions · ${d.players.length} players</div><button class="pri" id="bkfull" style="margin-top:8px">Restore this backup</button>`}
- else a='<div class="mut">No backup yet. One is saved automatically each time you complete a game, and it replaces the previous one.</div>';
+ else a='<div class="mut">No backup yet.</div>';
  if(bk.standing){const d=JSON.parse(bk.standing.json);b=`<div class="mut">Saved ${E(when(bk.standing))} · game of ${E(d.game.date)} · ${d.game.players.length} players · ${d.loans.length} loan entries</div><button class="pri" id="bkstd" style="margin-top:8px">Restore this standing</button>`}
- else b='<div class="mut">No standing saved yet. It is saved automatically while a game is in progress, and it replaces the previous one.</div>';
- return`<div class="card"><b>Last completed game backup</b><div class="mut" style="margin:4px 0 8px">Everything: sessions, players, loans. Restoring replaces the shared data for everyone.</div>${a}</div>
- <div class="card"><b>Current standing backup</b><div class="mut" style="margin:4px 0 8px">The game in progress and its loans. Restoring brings that game back and leaves your sessions alone.</div>${b}</div>
+ else b='<div class="mut">No standing saved yet.</div>';
+ return`<div class="card"><b>Last completed game backup</b>${a}</div>
+ <div class="card"><b>Current standing backup</b>${b}</div>
  ${canOrganise()?'':`<div class="card"><b>Admin</b><div class="mut" style="margin:4px 0 8px">Unlock History editing, uploads and restores.</div><button class="pri" id="unlockorg">Enter admin password</button></div>`}
  <div class="card"><b>Password</b><div class="mut" style="margin:4px 0 8px">${access?'Only people with the password can make changes. Everyone else can view and export.':'Everyone can edit. Create a password so only people who have it can change data.'} Needs the admin password.</div><button class="pri" id="gencode">${access?'Generate a new password':'Create a password'}</button>${access?' <button id="allowall">Allow everyone to edit</button>':''}${lastCode?`<div style="margin-top:10px">Share this password (shown once):<div style="font-size:24px;font-weight:700;letter-spacing:2px;margin:4px 0">${lastCode}</div><button id="copycode">Copy password</button></div>`:''}</div>
  <div class="card"><b>Admin password</b><div class="mut" style="margin:4px 0 8px">${orgInfo?'Needed to restore backups, delete data and manage groups.':'Not set.'}</div><button class="pri" id="orgset">${orgInfo?'Change':'Set'}</button>${orgInfo?' <button id="orgrm">Remove</button>':''}</div>
