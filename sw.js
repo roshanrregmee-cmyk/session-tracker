@@ -1,5 +1,5 @@
 // Basic Service Worker for Session Tracker PWA
-const CACHE_NAME = 'session-tracker-v19';
+const CACHE_NAME = 'session-tracker-v17';
 const ASSETS = [
   './',
   './index.html',
@@ -7,8 +7,7 @@ const ASSETS = [
   './icon-192.png',
   './icon-512.png',
   './icon-maskable-512.png',
-  './apple-touch-icon.png',
-  './icon-1024.png'
+  './apple-touch-icon.png'
 ];
 
 // Install - cache core assets
