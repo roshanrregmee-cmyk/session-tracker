@@ -57,7 +57,7 @@ select{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--bd
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:10px 16px;border-radius:8px;display:none}
 html{overscroll-behavior-y:none}body{overscroll-behavior-y:none}
 #welcome{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:linear-gradient(135deg,#ff2878,#ff9600 55%,#ffdc28);transition:opacity .5s ease,visibility .5s}
-#welcome.hide{opacity:0;visibility:hidden}
+#welcome.hide{opacity:0;visibility:hidden;pointer-events:none}
 #welcome img{width:min(46vw,200px);height:auto;border-radius:22%;box-shadow:0 14px 40px rgba(0,0,0,.35);animation:kingIn .9s cubic-bezier(.34,1.56,.64,1) both,kingWave 1.4s ease-in-out .9s 1}
 #welcome h2{margin:0;font-size:clamp(28px,8vw,44px);color:#fff;text-shadow:0 3px 12px rgba(0,0,0,.3);animation:txtIn .6s ease .6s both}
 @keyframes kingIn{from{transform:scale(.2) rotate(-25deg);opacity:0}to{transform:none;opacity:1}}
@@ -143,7 +143,7 @@ body.dopen #drawer{transform:none}body.dopen #scrim{opacity:1;pointer-events:aut
 #drawer #gbar button{width:100%;font-size:15px;padding:12px 16px;text-align:left;box-shadow:0 3px 0 var(--tx)}
 .nogrp #fab,.nogrp #drawer,.nogrp #scrim,.nogrp .rbtn,.nogrp .ind{display:none}
 @media(prefers-reduced-motion:reduce){#drawer,#scrim{transition:none}}
-</style></head><body><div id="welcome"><img src="icon-1024.png" alt="" width="200" height="200"><h2>Welcome Folks! 👑</h2><button id="enterBtn" type="button">Enter</button></div><main>
+</style></head><body><div id="welcome"><img src="icon-512.png" alt="" width="200" height="200" onerror="this.src='icon-192.png'"><h2>Welcome Folks! 👑</h2><button id="enterBtn" type="button">Enter</button></div><main>
 <div class="hd"><h1><img src="icon-512.png" alt="" style="height:1.15em;width:1.15em;border-radius:22%;vertical-align:-0.2em;margin-right:.3em"><span class="ttl" id="ttl"></span></h1><span id="ind" class="ind"></span><button id="gref" class="rbtn" title="Refresh data from cloud" aria-label="Refresh">↻</button></div>
 <div class="intro mut">Add sessions, track loans and expenses.</div>
 <div class="tabs"><button data-t="hist">History</button><button data-t="add">New session</button><button data-t="loans">Loans</button><button data-t="expenses">Expenses</button><button data-t="dash">Dashboard</button><button data-t="backup">Backups</button><button data-t="rules">Rules</button></div>
@@ -1003,16 +1003,18 @@ window.dispatchEvent(new Event('cloudready'));
 
   function tone(freq, dur, type, vol, delay){
     if(!enabled)return;
-    const a=ensure(); if(!a)return;
-    const t0=a.currentTime+(delay||0);
-    const o=a.createOscillator(), g=a.createGain();
-    o.type=type||'sine';
-    o.frequency.setValueAtTime(freq, t0);
-    g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(vol||0.12, t0+0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
-    o.connect(g); g.connect(a.destination);
-    o.start(t0); o.stop(t0+dur+0.02);
+    try{
+      const a=ensure(); if(!a)return;
+      const t0=a.currentTime+(delay||0);
+      const o=a.createOscillator(), g=a.createGain();
+      o.type=type||'sine';
+      o.frequency.setValueAtTime(freq, t0);
+      g.gain.setValueAtTime(0.001, t0);
+      g.gain.linearRampToValueAtTime(vol||0.12, t0+0.02);
+      g.gain.linearRampToValueAtTime(0.001, t0+dur);
+      o.connect(g); g.connect(a.destination);
+      o.start(t0); o.stop(t0+dur+0.05);
+    }catch(err){}
   }
 
   window.playClick=function(){
@@ -1047,26 +1049,25 @@ window.dispatchEvent(new Event('cloudready'));
 
   // Global click sounds on interactive elements
   document.addEventListener('click',function(e){
-    const t=e.target.closest('button,.btn,label.chip,.tabs button,#fab,#enterBtn,#soundToggle');
-    if(!t)return;
-    if(t.id==='soundToggle'){
-      window.setSoundOn(!enabled);
-      if(enabled)window.playClick();
-      return;
-    }
-    window.playClick();
+    try{
+      const t=e.target.closest('button,.btn,label.chip,.tabs button,#fab,#soundToggle');
+      if(!t)return;
+      if(t.id==='soundToggle'){
+        window.setSoundOn(!enabled);
+        if(enabled)window.playClick();
+        return;
+      }
+      // skip welcome enter — handled separately
+      if(t.id==='enterBtn')return;
+      window.playClick();
+    }catch(err){}
   }, true);
 
   // Welcome open sound when Enter is pressed (and unlock audio on mobile)
   document.addEventListener('DOMContentLoaded',function(){
-    const btn=document.getElementById('enterBtn');
-    if(btn)btn.addEventListener('click',function(){
-      ensure();
-      window.playOpen();
-    });
-    // If welcome already dismissed, still unlock on first user gesture
     document.body.addEventListener('touchstart',function once(){
-      ensure(); document.body.removeEventListener('touchstart',once);
+      try{ensure()}catch(e){}
+      document.body.removeEventListener('touchstart',once);
     },{passive:true});
   });
 })();
@@ -1082,7 +1083,29 @@ if ('serviceWorker' in navigator) {
 }
 </script>
 <div id="scrim"></div><aside id="drawer" aria-label="Group menu"><div class="dh"><img src="icon-512.png" alt=""><div><b id="dname"></b><small class="mut">Group menu</small></div></div><div id="gbar"></div></aside><button id="fab" type="button" aria-label="Group menu"><img src="icon-512.png" alt=""></button>
-<script>(function(){var w=document.getElementById('welcome');if(!w)return;var seen=false;try{seen=sessionStorage.getItem('welcomed')==='1'}catch(e){}
-if(seen){w.remove();return}
-document.getElementById('enterBtn').addEventListener('click',function(){try{sessionStorage.setItem('welcomed','1')}catch(e){}w.classList.add('hide');setTimeout(function(){w.remove()},600)})})();</script>
+<script>
+(function(){
+  var w=document.getElementById('welcome');
+  if(!w)return;
+  var seen=false;
+  try{seen=sessionStorage.getItem('welcomed')==='1'}catch(e){}
+  if(seen){w.remove();return;}
+
+  function dismiss(){
+    try{sessionStorage.setItem('welcomed','1')}catch(e){}
+    try{if(window.playOpen)window.playOpen()}catch(e){}
+    w.classList.add('hide');
+    setTimeout(function(){try{w.remove()}catch(e){}},500);
+  }
+
+  var btn=document.getElementById('enterBtn');
+  if(btn){
+    btn.onclick=function(e){e.preventDefault();e.stopPropagation();dismiss();};
+  }
+  // Also allow tapping the background
+  w.addEventListener('click',function(e){
+    if(e.target===w || e.target.tagName==='H2' || e.target.tagName==='IMG')dismiss();
+  });
+})();
+</script>
 </body></html>
