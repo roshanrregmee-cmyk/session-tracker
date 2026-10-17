@@ -426,25 +426,26 @@ function drawDash0(d){
     didParseCell:q=>{if(q.section!='body')return;const i=q.row.index,j=q.column.index;if(j==2)q.cell.styles.textColor=st[i].t<0?[220,38,38]:[21,128,61];if(j==8)q.cell.styles.textColor=[21,128,61];if(j==9)q.cell.styles.textColor=[220,38,38];if(j==10){const t=TR[st[i].p]||{};q.cell.styles.textColor=t.dir>0?[21,128,61]:t.dir<0?[220,38,38]:[110,110,110]}}})}};
  d.setFont('helvetica','bold').setFontSize(16).setTextColor(20).text('Session Dashboard',10,13);d.setFont('helvetica','normal');
  d.setFontSize(9).setTextColor(110).text(`${n} sessions${per} · ${players.length} players${Object.keys(excl).filter(q=>ALLP.includes(q)).length?` (${Object.keys(excl).filter(q=>ALLP.includes(q)).length} excluded)`:''}`+(ds.length?` · ${ds[0]} to ${ds[ds.length-1]}`:''),287,13,{align:'right'});
- let top=20;const others=['bars','pieW','pieL','table','trends','loantbl'].filter(q=>(sel[q]||(q=='trends'&&sel.ai))&&!(q=='loantbl'&&!gp().length)).length>0;
- if(sel.kpi&&others){top=31;const fit=(t,w,m)=>Math.max(4,Math.min(m,w/(String(t).length*.19)));
-  k.forEach((c,i)=>{const x=10+i*70.3,lab=c[0]=='Best single session'?'Best session':c[0],val=String(c[1])+(c[2]?(i==0?' · ':' ')+c[2]:''),lw=lab.length*1.25+3;
-   box(x,18,66,9);d.setFontSize(6.5).setTextColor(110).text(lab,x+3,23.6);d.setFontSize(fit(val,62-lw,8.5)).setTextColor(20).text(val,x+3+lw,23.8)})}
- if(sel.kpi&&!others){top=42;k.forEach((c,i)=>{const x=10+i*70.3;box(x,18,66,20);d.setFontSize(7).setTextColor(110).text(c[0],x+3,23);d.setFontSize(12).setTextColor(20).text(String(c[1]),x+3,30,{maxWidth:60});d.setFontSize(7).setTextColor(110).text(String(c[2]),x+3,35,{maxWidth:60})})}
- let keys=['bars','pieW','pieL','table','trends','loantbl'].filter(q=>(sel[q]||(q=='trends'&&sel.ai))&&!(q=='loantbl'&&!gp().length));const tipsOn=aiTipsNow(),g=4,wideKeys=['table'].concat(tipsOn?['trends']:[]).filter(q=>keys.includes(q));keys=keys.filter(q=>!wideKeys.includes(q));
- const N=keys.length,Hall=200-top,np=Math.max(1,players.length),want=wideKeys.map(q=>q=='table'?Math.max(34,(np+1)*4.6+13):Math.max(40,np*5.6+16)),wsum=want.reduce((a,b)=>a+b,0)+g*wideKeys.length,room=N?Hall-72:Hall+g,sc=wsum>room?room/wsum:1,hw=want.map(v=>v*sc),H=N?Hall-hw.reduce((a,b)=>a+b,0)-g*wideKeys.length:0;
- if(N){let best=1,bs=9;for(let c=1;c<=4;c++){const r=Math.ceil(N/c),q=Math.abs(Math.log(((277-g*(c-1))/c)/((H-g*(r-1))/r)/1.7));if(q<bs){bs=q;best=c}}
-  const rows=Math.ceil(N/best),ch=(H-g*(rows-1))/rows;
-  keys.forEach((q,i)=>{const r=Math.floor(i/best),ir=Math.min(best,N-r*best),cw=(277-g*(ir-1))/ir,x=10+(i%best)*(cw+g),y=top+r*(ch+g);box(x,y,cw,ch);T(TT[q],x+3,y+6);DR[q](x+3,y+10,cw-6,ch-13)})}
- else if(!sel.kpi&&!wideKeys.length)d.setFontSize(10).setTextColor(110).text('No visualizations selected',148,100,{align:'center'});
- if(wideKeys.length){let y=top+(N?H+g:0);wideKeys.forEach((q,i)=>{box(10,y,277,hw[i]);T(q=='trends'?(tipsAreAI()?'Trend Comments · AI suggestions':'Trend Comments · Suggestions'):TT[q],13,y+6);DR[q](13,y+10,271,hw[i]-13);y+=hw[i]+g})}
- d.setFontSize(7).setTextColor(130).text('Generated '+new Date().toLocaleDateString('en-CA')+' · Positive = winning balance, negative = losing balance',10,205)}
+  const M=10,W=277,g=5,BOT=197,np=Math.max(1,players.length),tipsOn=aiTipsNow();let y=20,pg=1;
+  const foot=()=>d.setFontSize(7).setTextColor(130).text('Generated '+new Date().toLocaleDateString('en-CA')+' · Positive = winning balance, negative = losing balance',10,205).text('Page '+pg,287,205,{align:'right'});
+  const need=h=>{if(y+h>BOT&&y>24){foot();d.addPage();pg++;d.setFont('helvetica','bold').setFontSize(10).setTextColor(110).text('Session Dashboard',10,10);d.setFont('helvetica','normal');y=15}};
+  const fit=(t,w,m)=>Math.max(4,Math.min(m,w/(String(t).length*.19)));
+  if(sel.kpi){k.forEach((c,i)=>{const x=10+i*70.3,lab=c[0]=='Best single session'?'Best session':c[0],val=String(c[1])+(c[2]?(i==0?' · ':' ')+c[2]:''),lw=lab.length*1.25+3;
+   box(x,18,66,9);d.setFontSize(6.5).setTextColor(110).text(lab,x+3,23.6);d.setFontSize(fit(val,62-lw,8.5)).setTextColor(20).text(val,x+3+lw,23.8)});y=31}
+  const gk=['bars','pieW','pieL'].filter(q=>sel[q]);
+  if(gk.length){const h=Math.min(184,Math.max(70,np*6.2+22));need(h);const c=gk.length,cw=(W-g*(c-1))/c;gk.forEach((q,i)=>{const x=M+i*(cw+g);box(x,y,cw,h);T(TT[q],x+3,y+6);DR[q](x+3,y+10,cw-6,h-13)});y+=h+g}
+  if(sel.trends||sel.ai){const h=Math.min(184,np*(tipsOn?7.5:6.2)+16);need(h);box(M,y,W,h);T(tipsOn?(tipsAreAI()?'Trend Comments · AI suggestions':'Trend Comments · Suggestions'):TT.trends,13,y+6);DR.trends(13,y+10,271,h-13);y+=h+g}
+  if(sel.table){const h=Math.min(184,(np+1)*4.9+15);need(h);box(M,y,W,h);T(TT.table,13,y+6);DR.table(13,y+10,271,h-13);y+=h+g}
+  if(sel.loantbl&&gp().length){const h=Math.min(184,(gp().length+2)*4.9+15);need(h);box(M,y,W,h);T(TT.loantbl,13,y+6);DR.loantbl(13,y+10,271,h-13);y+=h+g}
+  if(!sel.kpi&&y==20)d.setFontSize(10).setTextColor(110).text('No visualizations selected',148,100,{align:'center'});
+  foot()}
 function pdfBuf(){const d=new jspdf.jsPDF({orientation:'landscape'});drawDash(d);return d.output('arraybuffer')}
-function canvasDoc(S=12){
- const cv=document.createElement('canvas');cv.width=297*S;cv.height=210*S;const x=cv.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,cv.width,cv.height);
+function countPages(){let n=1;const dry=new Proxy({},{get:(t,p)=>p=='addPage'?()=>{n++;return dry}:()=>dry});try{drawDash(dry)}catch(e){}return n}
+function canvasDoc(S=12,P=1){
+ const cv=document.createElement('canvas');cv.width=297*S;cv.height=210*S*P;const x=cv.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,cv.width,cv.height);let page=0;
  const C=(a,b,c)=>b===undefined?(typeof a=='string'?a:`rgb(${a},${a},${a})`):`rgb(${a},${b},${c})`;
  let fs=7,bold=false,fill='#000',stroke='#000',tc='#000',lw=.2;
- const d={cv,setFont(n,st){bold=st=='bold';return d},setFontSize(v){fs=v;return d},setTextColor(a,b,c){tc=C(a,b,c);return d},setDrawColor(a,b,c){stroke=C(a,b,c);return d},setFillColor(a,b,c){fill=C(a,b,c);return d},setLineWidth(v){lw=v;return d},
+ const d={cv,addPage(){page++;x.setTransform(1,0,0,1,0,page*210*S);return d},setFont(n,st){bold=st=='bold';return d},setFontSize(v){fs=v;return d},setTextColor(a,b,c){tc=C(a,b,c);return d},setDrawColor(a,b,c){stroke=C(a,b,c);return d},setFillColor(a,b,c){fill=C(a,b,c);return d},setLineWidth(v){lw=v;return d},
   paint(m){if(m&&m.includes('F')){x.fillStyle=fill;x.fill()}if(!m||m=='S'||m.includes('D')){x.strokeStyle=stroke;x.lineWidth=lw*S;x.stroke()}},
   rect(a,b,w,h,m){x.beginPath();x.rect(a*S,b*S,w*S,h*S);d.paint(m);return d},
   roundedRect(a,b,w,h,r){x.beginPath();if(x.roundRect)x.roundRect(a*S,b*S,w*S,h*S,r*S);else x.rect(a*S,b*S,w*S,h*S);d.paint();return d},
@@ -461,7 +462,7 @@ function canvasDoc(S=12){
    row(o.head[0],o.headStyles.fillColor,'head');o.body.forEach((r,i)=>row(r,i%2?[245,247,250]:null,'body',i))}};
  return d}
 async function shareImg(){
- const d=canvasDoc();drawDash(d);const blob=await new Promise(r=>d.cv.toBlob(r,'image/jpeg',.92)),name=`Session_Dashboard_${last()}.jpg`,file=new File([blob],name,{type:'image/jpeg'});
+ const pgs=countPages(),d=canvasDoc(pgs>2?8:12,pgs);drawDash(d);const blob=await new Promise(r=>d.cv.toBlob(r,'image/jpeg',.92)),name=`Session_Dashboard_${last()}.jpg`,file=new File([blob],name,{type:'image/jpeg'});
  try{if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'Session Dashboard'});return}}catch(e){if(e.name=='AbortError')return}
  await save(name,blob)}
 async function save(name,data){
