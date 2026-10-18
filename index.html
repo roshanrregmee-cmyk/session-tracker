@@ -57,7 +57,7 @@ select{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--bd
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:10px 16px;border-radius:8px;display:none}
 html{overscroll-behavior-y:none}body{overscroll-behavior-y:none}
 #welcome{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:linear-gradient(135deg,#ff2878,#ff9600 55%,#ffdc28);transition:opacity .5s ease,visibility .5s}
-#welcome.hide{opacity:0;visibility:hidden}
+#welcome.hide{opacity:0;visibility:hidden;pointer-events:none!important}
 #welcome img{width:min(46vw,200px);height:auto;border-radius:22%;box-shadow:0 14px 40px rgba(0,0,0,.35);animation:kingIn .9s cubic-bezier(.34,1.56,.64,1) both,kingWave 1.4s ease-in-out .9s 1}
 #welcome h2{margin:0;font-size:clamp(28px,8vw,44px);color:#fff;text-shadow:0 3px 12px rgba(0,0,0,.3);animation:txtIn .6s ease .6s both}
 @keyframes kingIn{from{transform:scale(.2) rotate(-25deg);opacity:0}to{transform:none;opacity:1}}
@@ -872,8 +872,10 @@ async function adminCreate(){const n=prompt('Group name:');if(n===null)return;
  pendingOrgPass=adminPw;pendingSetGlobal=false;pendingEditPw=ep;adminOpen=false;adminPw=null;
  setGroup(randCode(),(n||'').trim(),{register:true});toast(ep?'Group created. Open Backups to copy the Password.':'Group created.')}
 function connectCard(){return`<div class="card"><b>${cs=='error'?'Could not connect':'Connecting…'}</b>${cloudErr?`<div class="mut" style="margin:6px 0">${E(cloudErr)}</div>`:''}${cs=='error'?`<p class="mut">Check that you are online and try again.</p><button data-gleave>Use a different group code</button>`:''}</div>`}
-function render(){document.body.classList.toggle('nogrp',!gid);
- if(!gid){$('#v').innerHTML=joinScreen();return}
+function render(){try{
+ document.body.classList.toggle('nogrp',!gid);
+ const vEl=$('#v');if(!vEl){console.error('Missing #v');return}
+ if(!gid){vEl.innerHTML=joinScreen();return}
  if(!synced){$('#v').innerHTML=connectCard();setSync(cs);return}
  if(!accessLoaded){$('#v').innerHTML=`<div class="card"><b>Checking access…</b><div class="mut" style="margin:6px 0">Loading access for this group.</div></div>`;setSync(cs);['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el)el.disabled=true});return}
  const locked=!canView();
@@ -905,7 +907,9 @@ function render(){document.body.classList.toggle('nogrp',!gid);
  render0();setSync(cs);document.body.classList.toggle('viewonly',!canEdit());if(!canEdit())lockUI();
  ['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el){el.disabled=!canEdit()||!sessions.length||!players.length;el.style.display=canEdit()?'':'none'}});
  syncUploadBtn();
- queueMicrotask(persist)}
+ queueMicrotask(persist)
+}catch(err){console.error(err);try{toast('Display error')}catch(e){}}
+}
 function renderSafe(){const a=document.activeElement;if(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)){pendingRender=true;return}render()}
 function reconcile(S){base=norm(S);lastSent='';if(canon(getState())!==canon(base)){applying=true;applyState(base);applying=false;renderSafe()}setSync(navigator.onLine===false?'offline':'live')}
 async function persist(){if(!cloudOn||!synced||applying||!window.cloud)return;const L=getState(),c=canon(L);if(c===canon(base||EMPTY())||c===lastSent)return;
@@ -1206,8 +1210,8 @@ function randCode(){const a='abcdefghjkmnpqrstuvwxyz23456789';let s='';crypto.ge
 function copyLink(){const u=gid;if(navigator.clipboard)navigator.clipboard.writeText(u).then(()=>toast('Group code copied')).catch(()=>prompt('Copy this group code',u));else prompt('Copy this group code',u)}
 document.addEventListener('focusout',()=>{if(pendingRender)setTimeout(()=>{const a=document.activeElement;if(!(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName))){pendingRender=false;render()}},60)});
 window.addEventListener('online',()=>{if(cloudOn){setSync('live');persist()}});window.addEventListener('offline',()=>setSync('offline'));
-if(gid){const boot=gid;gid='';(async()=>{await openExistingGroup(boot);if(!gid)render()})()}
-else render();
+if(gid){const boot=gid;gid='';(async()=>{try{await openExistingGroup(boot)}catch(e){console.error(e);toast('Could not open group')}finally{if(!gid)render();else if(!synced)render()}})()}
+else{try{render()}catch(e){console.error(e);document.body.insertAdjacentHTML('beforeend','<pre style="padding:16px;color:red">Start error: '+e.message+'</pre>')}}
 </script>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
@@ -1238,7 +1242,36 @@ if ('serviceWorker' in navigator) {
 }
 </script>
 <div id="scrim"></div><aside id="drawer" aria-label="Group menu"><div class="dh"><img src="icon-192.png" alt=""><div><b id="dname"></b><small class="mut">Group menu</small></div></div><div id="gbar"></div></aside><button id="fab" type="button" aria-label="Group menu"><img src="icon-192.png" alt=""></button>
-<script>(function(){var w=document.getElementById('welcome');if(!w)return;var seen=false;try{seen=sessionStorage.getItem('welcomed')==='1'}catch(e){}
-if(seen){w.remove();return}
-document.getElementById('enterBtn').addEventListener('click',function(){try{sessionStorage.setItem('welcomed','1')}catch(e){}w.classList.add('hide');setTimeout(function(){w.remove()},600)})})();</script>
+<script>
+(function(){
+  var w=document.getElementById('welcome');
+  if(!w)return;
+  var seen=false;
+  try{seen=sessionStorage.getItem('welcomed')==='1'}catch(e){}
+  if(seen){try{w.remove()}catch(e){}return;}
+  function dismiss(ev){
+    if(ev){try{ev.preventDefault();ev.stopPropagation()}catch(e){}}
+    try{sessionStorage.setItem('welcomed','1')}catch(e){}
+    w.classList.add('hide');
+    setTimeout(function(){try{w.remove()}catch(e){}},400);
+  }
+  var btn=document.getElementById('enterBtn');
+  if(btn){
+    btn.onclick=dismiss;
+    btn.addEventListener('touchend',function(e){dismiss(e)},{passive:false});
+  }
+  w.addEventListener('click',function(e){
+    var t=e.target;
+    if(t===w||t.tagName==='H2'||t.tagName==='IMG'||t.id==='enterBtn')dismiss(e);
+  });
+  // Failsafe: if still visible after 30s of interaction attempts, force remove on any touch
+  setTimeout(function(){
+    if(!document.getElementById('welcome'))return;
+    document.body.addEventListener('click',function once(){
+      if(document.getElementById('welcome'))dismiss();
+      document.body.removeEventListener('click',once);
+    },true);
+  },500);
+})();
+</script>
 </body></html>
