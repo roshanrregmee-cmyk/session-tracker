@@ -145,9 +145,9 @@ body.dopen #drawer{transform:none}body.dopen #scrim{opacity:1;pointer-events:aut
 @media(prefers-reduced-motion:reduce){#drawer,#scrim{transition:none}}
 
 /* Smooth tab / content transitions */
-#v{transition:opacity .28s ease, transform .28s cubic-bezier(.22,1,.36,1);will-change:opacity,transform}
-#v.v-out{opacity:0;transform:translateY(10px) scale(.985);pointer-events:none}
-#v.v-in{opacity:0;transform:translateY(8px)}
+#v{/* transitions disabled for stability */}
+#v.v-out{/* no-op */}
+#v.v-in{/* no-op */}
 #v.v-show{opacity:1;transform:none}
 .tabs button{transition:background .2s ease,color .2s ease,transform .15s ease,box-shadow .15s ease}
 @media(prefers-reduced-motion:reduce){
@@ -241,106 +241,8 @@ function kpis(){const st=stats();let b=null;sessions.forEach((s,i)=>players.forE
 
 function swapView(buildFn){
   const v=$('#v');
-  if(!v){if(buildFn)buildFn();return}
-  if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches){
-    if(buildFn)buildFn();return;
-  }
-  v.classList.remove('v-show','v-in');
-  v.classList.add('v-out');
-  const done=()=>{
-    v.removeEventListener('transitionend', onEnd);
-    if(buildFn)buildFn();
-    v.classList.remove('v-out');
-    v.classList.add('v-in');
-    void v.offsetWidth;
-    requestAnimationFrame(()=>{v.classList.remove('v-in');v.classList.add('v-show')});
-  };
-  let fired=false;
-  const onEnd=(e)=>{if(e.target!==v||e.propertyName!=='opacity')return;if(fired)return;fired=true;done()};
-  v.addEventListener('transitionend', onEnd);
-  setTimeout(()=>{if(fired)return;fired=true;done()},320);
-}
-
-
-function hubScreen(){
- return`<div class="hub">
-  <button type="button" class="hub-card" data-mode="poker"><div class="hub-ico">🃏</div><b>Poker</b><span>Sessions, loans &amp; game expenses</span></button>
-  <button type="button" class="hub-card" data-mode="bills"><div class="hub-ico">🧾</div><b>Expenses</b><span>Shared bills, independent of games</span></button>
- </div>
- <p class="mut" style="text-align:center;margin-top:8px">Choose a section for this group</p>`;
-}
-function billsNav(){
- return`<div class="bills-nav">
-  <button type="button" class="back-hub" data-mode="hub">← Home</button>
-  <button type="button" data-btab="list" class="${billTab=='list'?'on':''}">Expenses</button>
-  <button type="button" data-btab="dash" class="${billTab=='dash'?'on':''}">Dashboard</button>
- </div>`;
-}
-function billsList(){
- if(!players.length)return billsNav()+`<div class="card"><b>Add people first</b><p class="mut">Add player names once under <b>Poker → New session</b>, then come back here.</p><button class="pri" data-mode="poker">Go to Poker</button></div>`;
- const open=bills.filter(e=>!e.done),done=bills.filter(e=>e.done);
- const paid=billDraft.paid&&players.includes(billDraft.paid)?billDraft.paid:players[0];
- const names=[...new Set([...players,...open.flatMap(e=>[e.paidBy,...(e.split||[])])])];
- const sp=expenseSplit(players,open);
- const row=e=>`<tr><td>${E(e.date)}</td><td>${E(e.desc)}</td><td>${E(e.paidBy)}</td><td>${fmtA(e.amt)}</td><td>${e.split&&e.split.length?E(e.split.join(', ')):'Everyone'}</td><td>${e.done?'<span class="mut">settled</span>':`<button class="x" data-billdel="${e.id}" title="Delete">✕</button>`}</td></tr>`;
- const tot=k=>names.reduce((a,p)=>a+(sp[k][p]||0),0)/100;
- let h=billsNav();
- h+=`<div class="card"><b>Add an expense</b>
- <div class="row"><input data-bd placeholder="What for? (e.g. rent, groceries)" style="text-align:left;flex:1;width:auto" value="${E(billDraft.desc)}"></div>
- <div class="row"><input data-ba inputmode="decimal" placeholder="Amount" value="${E(billDraft.amt)}"></div>
- <div style="margin:10px 0 4px"><b>Who paid?</b></div>
- <div class="row"><select data-bp style="flex:1">${players.map(p=>`<option value="${E(p)}" ${p==paid?'selected':''}>${E(p)}</option>`).join('')}</select></div>
- <div style="margin:10px 0 4px"><b>Who should share?</b></div>
- <div class="pw">${players.map(p=>`<label class="chip"><input type="checkbox" data-bs="${E(p)}" ${billDraft.shared[p]===false?'':'checked'}> ${E(p)}</label>`).join('')}</div>
- <button class="pri" id="billadd" style="width:100%;margin-top:12px">Add expense</button></div>`;
- h+=`<p><b>Open expenses</b></p>`;
- if(open.length){
-  h+=`<div class="sc"><table><thead><tr><th>Date</th><th>What</th><th>Who paid</th><th>Amount</th><th>Shared by</th><th></th></tr></thead><tbody>${open.map(row).join('')}</tbody></table></div>
-  <p><b>Summary</b></p><div class="sc"><table><thead><tr><th>Player</th><th>Paid</th><th>Share</th><th>Net</th></tr></thead><tbody>${names.map(p=>{const a=(sp.paid[p]||0)/100,b=(sp.share[p]||0)/100,n=Math.round((a-b)*100)/100;return`<tr><td>${E(p)}</td><td>${fmtA(a)}</td><td>${fmtA(b)}</td><td class="${cls(n)}"><b>${n>0?'+':''}${fmtA(n)}</b></td></tr>`}).join('')}</tbody><tfoot><tr><td>Total</td><td>${fmtA(tot('paid'))}</td><td>${fmtA(tot('share'))}</td><td></td></tr></tfoot></table></div>
-  <button class="pri" id="billsettle" style="width:100%;margin-top:12px">Settle open expenses</button>`;
- }else h+='<p class="mut">No open expenses.</p>';
- if(billSettle&&billSettle.items){
-  h+=`<div class="card" style="margin-top:14px"><b>Last settlement · ${E(billSettle.date||'')}</b>`;
-  h+=billSettle.items.length?billSettle.items.map(x=>`<div style="padding:6px 0;border-bottom:1px solid var(--bd)"><b>${E(x.f)}</b> pays <b>${E(x.t)}</b> <b class="pos" style="float:right">${fmtA(x.a)}</b></div>`).join(''):'<p class="mut">Everyone was square.</p>';
-  h+=`</div>`;
- }
- if(done.length)h+=`<details style="margin-top:10px"><summary class="mut">Settled earlier (${done.length})</summary><div class="sc" style="margin-top:6px"><table><tbody>${done.map(row).join('')}</tbody></table></div></details>`;
- return h;
-}
-function billsDash(){
- const open=bills.filter(e=>!e.done),all=bills;
- const sp=expenseSplit(players,open);
- const names=players.length?players:[...new Set(all.flatMap(e=>[e.paidBy,...(e.split||[])]))];
- const nets=names.map(p=>{const a=(sp.paid[p]||0)/100,b=(sp.share[p]||0)/100;return{p,paid:a,share:b,net:Math.round((a-b)*100)/100}});
- const totalSpent=all.reduce((s,e)=>s+(+e.amt||0),0);
- const openTotal=open.reduce((s,e)=>s+(+e.amt||0),0);
- let h=billsNav();
- h+=`<div class="kp">
-  <div><small>Total recorded</small><b>${fmtA(totalSpent)}</b><small>${all.length} expenses</small></div>
-  <div><small>Still open</small><b>${fmtA(openTotal)}</b><small>${open.length} items</small></div>
-  <div><small>People</small><b>${names.length}</b><small>in this group</small></div>
- </div>`;
- if(!names.length)return h+'<p class="mut">No data yet.</p>';
- h+=`<div class="card"><b>Balances (open only)</b><div class="sc" style="margin-top:8px"><table><thead><tr><th>Player</th><th>Paid</th><th>Share</th><th>Net</th></tr></thead><tbody>`;
- h+=nets.sort((a,b)=>b.net-a.net).map(x=>`<tr><td>${E(x.p)}</td><td>${fmtA(x.paid)}</td><td>${fmtA(x.share)}</td><td class="${cls(x.net)}"><b>${x.net>0?'+':''}${fmtA(x.net)}</b></td></tr>`).join('');
- h+=`</tbody></table></div><div class="mut" style="margin-top:6px;font-size:12px">+ means owed money back · − means still owes</div></div>`;
- if(all.length){
-  h+=`<div class="card"><b>Recent expenses</b><div class="sc" style="margin-top:8px"><table><thead><tr><th>Date</th><th>What</th><th>Paid by</th><th>Amount</th><th></th></tr></thead><tbody>`;
-  h+=[...all].sort((a,b)=>a.date<b.date?1:a.date>b.date?-1:0).slice(0,15).map(e=>`<tr><td>${E(e.date)}</td><td>${E(e.desc)}</td><td>${E(e.paidBy)}</td><td>${fmtA(e.amt)}</td><td>${e.done?'<span class="mut">settled</span>':'open'}</td></tr>`).join('');
-  h+=`</tbody></table></div></div>`;
- }
- return h;
-}
-function billsView(){return billTab=='dash'?billsDash():billsList()}
-
-
-function syncUploadBtn(){
-  const upl=$('#uplbl');
-  if(!upl)return;
-  const show=!!(typeof canOrganise==='function'&&canOrganise()&&appMode==='poker');
-  upl.style.display=show?'':'none';
-  const inp=$('#up');
-  if(inp){inp.disabled=!show;inp.style.pointerEvents=show?'auto':'none'}
+  if(buildFn)buildFn();
+  if(v){v.classList.remove('v-out','v-in');v.classList.add('v-show');v.style.opacity='';v.style.transform='';}
 }
 
 function render0(){
@@ -841,7 +743,7 @@ const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).sli
 const canon=x=>JSON.stringify(x,(k,v)=>v&&typeof v=='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(q=>[q,v[q]])):v);
 const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],expenses:S.expenses||[],settle:S.settle||null,initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:null,groupName:typeof S.groupName=='string'?S.groupName:'',bills:(S.bills||[]),billSettle:S.billSettle||null});
 function getState(){sessions.forEach(x=>{if(!x.id)x.id=uid()});loans.forEach(l=>{if(!l.id)l.id=uid()});expenses.forEach(e=>{if(!e.id)e.id=uid()});bills.forEach(e=>{if(!e.id)e.id=uid()});
- return{players:[...players],sessions:sessions.map(x=>({id:x.id,date:x.date||'',label:x.label||'',v:{...x.v}})),loans:loans.map(l=>({id:l.id,date:l.date,who:l.who,amt:l.amt,src:l.src||null,g:l.g||'',done:!!l.done})),initLoan,game:game?{date:game.date,players:[...game.players],exited:game.exited?{...game.exited}:{}}:null,readme,rules,groupName,expenses:expenses.map(e=>({id:e.id,date:e.date||'',desc:e.desc||'',paidBy:e.paidBy,amt:e.amt,split:e.split&&e.split.length?[...e.split]:null,g:e.g||'',done:!!e.done})),settle:settle?JSON.parse(JSON.stringify(settle)):null,bills:bills.map(e=>({id:e.id,date:e.date||'',desc:e.desc||'',paidBy:e.paidBy,amt:e.amt,split:e.split&&e.split.length?[...e.split]:null,done:!!e.done})),billSettle:billSettle?JSON.parse(JSON.stringify(billSettle)):null}}
+ return{players:[...players],sessions:sessions.map(x=>({id:x.id,date:(x.date||''),label:(x.label||''),v:(x.v&&typeof x.v==='object')?{...x.v}:{}})),loans:loans.map(l=>({id:l.id,date:l.date,who:l.who,amt:l.amt,src:l.src||null,g:l.g||'',done:!!l.done})),initLoan,game:game?{date:game.date,players:Array.isArray(game.players)?[...game.players]:[],exited:(game.exited&&typeof game.exited==='object')?{...game.exited}:{}}:null,readme,rules,groupName,expenses:expenses.map(e=>({id:e.id,date:e.date||'',desc:e.desc||'',paidBy:e.paidBy,amt:e.amt,split:e.split&&e.split.length?[...e.split]:null,g:e.g||'',done:!!e.done})),settle:settle?JSON.parse(JSON.stringify(settle)):null,bills:bills.map(e=>({id:e.id,date:e.date||'',desc:e.desc||'',paidBy:e.paidBy,amt:e.amt,split:e.split&&e.split.length?[...e.split]:null,done:!!e.done})),billSettle:billSettle?JSON.parse(JSON.stringify(billSettle)):null}}
 function applyState(S){S=norm(S);players=Array.isArray(S.players)?[...S.players]:[];
  sessions=(Array.isArray(S.sessions)?S.sessions:[]).map(x=>{const v=(x&&x.v&&typeof x.v==='object')?{...x.v}:{};return{...(x||{}),v}});
  loans=(Array.isArray(S.loans)?S.loans:[]).map(l=>({...(l||{})}));
@@ -920,8 +822,8 @@ function render(){try{
 }catch(err){console.error(err);try{toast('Display error')}catch(e){}}
 }
 function renderSafe(){const a=document.activeElement;if(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)){pendingRender=true;return}render()}
-function reconcile(S){base=norm(S);lastSent='';if(canon(getState())!==canon(base)){applying=true;applyState(base);applying=false;renderSafe()}setSync(navigator.onLine===false?'offline':'live')}
-async function persist(){if(!cloudOn||!synced||applying||!window.cloud)return;const L=getState(),c=canon(L);if(c===canon(base||EMPTY())||c===lastSent)return;
+function reconcile(S){base=norm(S);lastSent='';try{if(canon(getState())!==canon(base)){applying=true;try{applyState(base)}catch(e){console.error(e)}applying=false;renderSafe()}}catch(e){console.error('reconcile',e);applying=false;renderSafe()}setSync(navigator.onLine===false?'offline':'live')}
+async function persist(){if(!cloudOn||!synced||applying||!window.cloud)return;let L,c;try{L=getState();c=canon(L)}catch(e){console.error('getState',e);return}if(c===canon(base||EMPTY())||c===lastSent)return;
  if(!canEdit()){applying=true;applyState(base||EMPTY());applying=false;toast('View only: enter the password to make changes');renderSafe();return}
  lastSent=c;inflight++;setSync('saving');
  try{const out=await cloud.commit(gid,rj=>JSON.stringify(mergeState(base||EMPTY(),L,rj?JSON.parse(rj):EMPTY())));base=norm(JSON.parse(out));cs=navigator.onLine===false?'offline':'live';saveBackups()}
@@ -1276,14 +1178,13 @@ if ('serviceWorker' in navigator) {
     var t=e.target;
     if(t===w||t.tagName==='H2'||t.tagName==='IMG'||t.id==='enterBtn')dismiss(e);
   });
-  // Failsafe: if still visible after 30s of interaction attempts, force remove on any touch
+  // Failsafe only if still stuck after 8s
   setTimeout(function(){
-    if(!document.getElementById('welcome'))return;
-    document.body.addEventListener('click',function once(){
-      if(document.getElementById('welcome'))dismiss();
-      document.body.removeEventListener('click',once);
-    },true);
-  },500);
+    var w2=document.getElementById('welcome');
+    if(!w2||w2.classList.contains('hide'))return;
+    w2.style.cursor='pointer';
+    w2.insertAdjacentHTML('beforeend','<p style="color:#fff;font-weight:700;margin:0">Tap anywhere to continue</p>');
+  },8000);
 })();
 </script>
 </body></html>
