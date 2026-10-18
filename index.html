@@ -321,6 +321,14 @@ function gcPanel(P,cur){return`<div class="card" id="gcPanel" style="border:3px 
  <div class="sum" id="gsum"></div><button class="pri" id="gfin" style="width:100%">Complete game &amp; save to History</button></div>`}
 function loansTab(){
  if(!game)return`<div class="card"><b>No game in progress</b><p class="mut">Start one in “New session”.</p></div>`+loglist();
+ if(!game.players.length&&game.exited&&Object.keys(game.exited).length){
+  const res=game.exited;const n=Math.round(Object.values(res).reduce((a,b)=>a+b,0)*100)/100;
+  return`<div class="card"><b>Everyone has cashed out</b><div class="mut" style="margin:6px 0 10px">Save these early results to History to finish the game.</div>
+  ${Object.entries(res).map(([p,r])=>`<div class="row"><span>${E(p)}</span><b class="${cls(r)}">${r>0?'+':''}${f(r)}</b></div>`).join('')}
+  <div class="sum ${n?'warn':'ok'}">Net ${n>0?'+':''}${f(n)}</div>
+  <button class="pri" id="gfin-early" style="width:100%">Save to History</button>
+  <button id="gdisc" style="width:100%;margin-top:8px">Discard game</button></div>`+loglist();
+ }
  const P=game.players,cur=Object.fromEntries(loanRows(P).map(r=>[r.p,r.cur])),opts=p=>'<option value="">Bank (borrow)</option><option value="__repay" '+((loanDraft[p]||{}).src=='__repay'?'selected':'')+'>Repay bank</option>'+P.filter(q=>q!=p).map(q=>`<option value="${E(q)}" ${(loanDraft[p]||{}).src==q?'selected':''}>${E(q)}</option>`).join('');
  return`<div class="card"><label><b>Initial loan per player</b> <input type="number" data-il value="${initLoan}" style="width:110px;text-align:right"></label></div>
  ${joinCard()}
@@ -329,6 +337,10 @@ function loansTab(){
  <button class="pri" id="lsave" style="width:100%;margin-top:10px">Save fresh loans</button></div>
  <p><b>Current standing</b></p>
  ${loantable(P)}
+ <div class="card"><b>Cash out early</b><div class="mut" style="margin:4px 0 8px">If a player leaves before the game ends, settle their result now. They are removed from this game; others continue.</div>
+ ${P.map(p=>`<div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:6px"><span>${E(p)} <small class="mut">(${f(ng(cur[p]))})</small></span><button data-cashout="${E(p)}">Cash out</button></div>`).join('')}
+ ${game.exited&&Object.keys(game.exited).length?`<div class="mut" style="margin-top:10px">Already cashed out:</div>`+Object.entries(game.exited).map(([p,r])=>`<div class="row"><span>${E(p)}</span><b class="${cls(r)}">${r>0?'+':''}${f(r)}</b></div>`).join(''):''}
+ </div>
  ${gc?gcPanel(P,cur):''}
  ${loglist()}
  <div id="gcFab" style="position:sticky;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:20;margin-top:16px"><button class="pri" id="gcb" style="width:100%;padding:14px;font-size:16px;box-shadow:0 6px 20px rgba(0,0,0,.25)">${gc?'Hide game completion':'Game completion'}</button></div>`}
@@ -385,8 +397,8 @@ function line(){const W=600,H=300,l=60,r=20,t=15,b=35,C=cum(),all=C.flatMap(c=>c
  return g+'</svg><div class="pw">'+C.map(c=>`<div class="lg"><i style="background:${col(c.p)}"></i>${E(c.p)}</div>`).join('')+'</div><div class="mut">X-axis = session number, in History order</div>'}
 function heat(){const mx=Math.max(1,...sessions.flatMap(s=>players.map(p=>Math.abs(s.v[p]||0))));
  return'<div class="sc"><table><thead><tr><th>Player</th>'+sessions.map((s,i)=>`<th style="text-align:center">${E(sh(s,i))}</th>`).join('')+'</tr></thead><tbody>'+players.map(p=>`<tr><td>${E(p)}</td>`+sessions.map(s=>{const v=s.v[p];if(!num(v))return'<td class="mut" style="text-align:center">–</td>';const a=.12+.7*Math.abs(v)/mx;return`<td style="text-align:center;background:${v>0?`rgba(21,128,61,${a})`:v<0?`rgba(220,38,38,${a})`:'transparent'}">${f(v)}</td>`}).join('')+'</tr>').join('')+'</tbody></table></div>'}
-const OPTS=[['kpi','Summary cards'],['bars','Balance bars'],['pieW','Winnings pie'],['pieL','Losses pie'],['table','Stats table'],['trends','Trend Comments'],['ai','Suggestions (tips)'],['loantbl','Current standing table']];
-let sel={kpi:1,bars:1,pieW:1,pieL:1,table:1,trends:1,ai:0,loantbl:1};
+const OPTS=[['kpi','Summary cards'],['bars','Balance bars'],['pieW','Winnings pie'],['pieL','Losses pie'],['hist','History table'],['table','Stats table'],['trends','Trend Comments'],['ai','Suggestions (tips)'],['loantbl','Current standing table']];
+let sel={kpi:1,bars:1,pieW:1,pieL:1,hist:1,table:1,trends:1,ai:0,loantbl:1};
 function recs(){const vs=sessions.flatMap(s=>players.map(p=>s.v[p]).filter(num));return[{p:'Wins',v:vs.filter(x=>x>0).length,c:'#15803d'},{p:'Losses',v:vs.filter(x=>x<0).length,c:'#dc2626'},{p:'Break-even',v:vs.filter(x=>x===0).length,c:'#94a3b8'}].filter(i=>i.v)}
 function trends(){const sg=n=>(n>0?'+':'')+Math.round(n).toLocaleString(),av=a=>a.reduce((x,y)=>x+y,0)/a.length;
  return stats().map(s=>{const v=sessions.map(x=>x.v[s.p]).filter(num),n=v.length;
@@ -434,6 +446,7 @@ function dash0(){
  if(ps.length)h+='<div class="g2">'+ps.join('')+'</div>';
  if(sel.table){const TR=Object.fromEntries(trends().map(t=>[t.p,t])),sg=n=>n==null?'–':(n>0?'+':'')+fmtN(n);
   h+=`<div class="sc"><table><thead><tr><th>Player</th><th>Total</th><th>Played</th><th>Win %</th><th>Best</th><th>Worst</th><th>Avg<br><small class="mut" style="font-weight:400">${PERIOD.sh}</small></th><th>Avg win<br><small class="mut" style="font-weight:400">${PERIOD.sh}</small></th><th>Avg loss<br><small class="mut" style="font-weight:400">${PERIOD.sh}</small></th><th>Trend</th><th>Recent avg<br><small class="mut" style="font-weight:400">last ≤3 sess</small></th><th>Earlier avg<br><small class="mut" style="font-weight:400">rest of ${PERIOD.sh}</small></th><th>Latest</th><th>Streak</th></tr></thead><tbody>`+st.map(s=>{const t=TR[s.p]||{};return`<tr><td>${E(s.p)}</td><td class="${cls(s.t)}"><b>${f(s.t)}</b></td><td>${s.n}</td><td>${Math.round(wp(s))}%</td><td>${f(s.best)}</td><td>${f(s.worst)}</td><td>${f(Math.round(s.avg))}</td><td class="pos">${s.aw==null?'–':'+'+fmtN(s.aw)}</td><td class="neg">${s.al==null?'–':fmtN(s.al)}</td><td class="${t.dir>0?'pos':t.dir<0?'neg':'mut'}"><b>${t.w||''}</b></td><td>${t.k?sg(t.ar):'–'}</td><td>${t.k?sg(t.ao):'–'}</td><td>${sg(t.last)}</td><td>${t.st>=2?t.st+(t.last>0?' wins':' losses'):'–'}</td></tr>`}).join('')+'</tbody></table></div><div class="mut" style="font-size:12px;padding:4px 2px 10px">Period: '+E(PERIOD.txt)+'. Avg, Avg win and Avg loss cover that period (win / loss = average of the winning / losing sessions). Recent avg = average of the latest sessions (up to 3) compared with Earlier avg. Streak = current run of wins or losses.</div>'}
+ if(sel.hist)h+=c('History',sumtable());
  if(sel.trends||sel.ai)h+=c('Trend Comments',trendHtml());
 
  const openEx=expenses.filter(e=>!e.done);
@@ -714,12 +727,27 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(g('data-gsw')){openExistingGroup(g('data-gsw').dataset.gsw)}
  else if(t.id=='sxl'){if(!game)return;if(!canEdit())return toast('View only: export is for editors');save(`Current_Session_${game.date}.xlsx`,sessionBuf())}
  else if(t.id=='ginvite'){if(!game)return;const u=location.origin+location.pathname+'#g='+gid+'&game='+game.date;const msg='Join our session tracker game on '+game.date+': '+u;if(navigator.clipboard)navigator.clipboard.writeText(msg).then(()=>toast('Game invite copied — includes group + date')).catch(()=>prompt('Copy this game invite',msg));else prompt('Copy this game invite',msg)}
+ else if(g('data-cashout')){if(!game||!canEdit())return toast('View only');
+  const p=g('data-cashout').dataset.cashout;if(!game.players.includes(p))return;
+  const cur=Object.fromEntries(loanRows(game.players).map(r=>[r.p,r.cur]));
+  const fa=prompt('Final amount for '+p+' (chips they leave with):');if(fa===null)return;
+  const a=parseFloat(fa);if(!isFinite(a))return toast('Enter a valid number');
+  const result=Math.round((a-cur[p])*100)/100;
+  if(!confirm(p+' result: '+(result>0?'+':'')+result+'. Remove them from this game?'))return;
+  if(!game.exited)game.exited={};game.exited[p]=result;
+  game.players=game.players.filter(x=>x!==p);
+  delete finals[p];delete loanDraft[p];
+  if(gc&&!game.players.length)gc=false;
+  render();toast(p+' cashed out · '+(result>0?'+':'')+result)}
  else if(t.id=='gcb'){gc=!gc;render();if(gc){requestAnimationFrame(()=>{const el=document.getElementById('gcPanel');if(el)el.scrollIntoView({behavior:'smooth',block:'center'})})}}
 
  else if(t.id=='jb'){if(!game)return;let n=($('#jn').value||'').trim();if(!n)return toast('Enter a player name');n=players.find(q=>q.toLowerCase()==n.toLowerCase())||n;
   if(game.players.includes(n))return toast(n+' is already in this game');if(!players.includes(n))players.push(n);game.players.push(n);plays[n]=true;render();toast(n+' added to the game')}
- else if(t.id=='gfin'){if(!game)return;const rows=loanRows(game.players),res={};let miss=0;rows.forEach(r=>{const a=parseFloat(finals[r.p]);if(isNaN(a)){miss=1;return}res[r.p]=Math.round((a-r.cur)*100)/100});
-  if(miss)return toast("Enter every player's final amount");if(!confirm('Are you sure you want to complete this game and save results to History?'))return;const n=Math.round(Object.values(res).reduce((a,b)=>a+b,0)*100)/100;if(n&&!confirm(`Results net to ${n}, not 0. Save anyway?`))return;
+ else if(t.id=='gfin-early'){if(!game||!game.exited)return;const res={...game.exited};if(!confirm('Save cashed-out results to History?'))return;
+  const n=Math.round(Object.values(res).reduce((a,b)=>a+b,0)*100)/100;if(n&&!confirm('Results net to '+n+', not 0. Save anyway?'))return;
+  sessions.push({date:game.date,label:'',v:res});settle=computeSettle(res,expenses.filter(e=>!e.done),Object.keys(res),game.date);loans.forEach(l=>{if(!l.done){l.done=true;l.g=game.date}});expenses.forEach(e=>{if(!e.done){e.done=true;e.g=game.date}});sortS();game=null;gc=false;finals={};loanDraft={};tab='hist';wantFull=true;render();toast('Game saved. The settlement is at the top of History.')}
+ else if(t.id=='gfin'){if(!game)return;const rows=loanRows(game.players),res={...(game.exited||{})};let miss=0;rows.forEach(r=>{const a=parseFloat(finals[r.p]);if(isNaN(a)){miss=1;return}res[r.p]=Math.round((a-r.cur)*100)/100});
+  if(miss)return toast("Enter every remaining player's final amount");if(!confirm('Are you sure you want to complete this game and save results to History?'))return;const n=Math.round(Object.values(res).reduce((a,b)=>a+b,0)*100)/100;if(n&&!confirm(`Results net to ${n}, not 0. Save anyway?`))return;
   sessions.push({date:game.date,label:'',v:res});settle=computeSettle(res,expenses.filter(e=>!e.done),game.players,game.date);loans.forEach(l=>{if(!l.done){l.done=true;l.g=game.date}});expenses.forEach(e=>{if(!e.done){e.done=true;e.g=game.date}});sortS();game=null;gc=false;finals={};loanDraft={};tab='hist';wantFull=true;render();toast('Game saved. The settlement is at the top of History.')}
  else if(t.id=='lsave'){const add=[];let bad=0;if(!game)return;game.players.forEach(p=>{const x=loanDraft[p]||{},a=parseFloat(x.amt);if(x.amt===undefined||x.amt==='')return;if(!isFinite(a)||a===0){bad=1;return}add.push({date:ld,who:p,amt:x.src=='__repay'?-Math.abs(a):a,src:x.src=='__repay'?null:(x.src||null),g:game.date,done:false})});
   if(!ld)return toast('Pick the date');if(bad)return toast('Enter a valid amount that is not 0 (use − for a repayment)');if(!add.length)return toast('Enter at least one amount');
@@ -764,8 +792,8 @@ const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).sli
 const canon=x=>JSON.stringify(x,(k,v)=>v&&typeof v=='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(q=>[q,v[q]])):v);
 const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],expenses:S.expenses||[],settle:S.settle||null,initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:null,groupName:typeof S.groupName=='string'?S.groupName:'',bills:(S.bills||[]),billSettle:S.billSettle||null});
 function getState(){sessions.forEach(x=>{if(!x.id)x.id=uid()});loans.forEach(l=>{if(!l.id)l.id=uid()});expenses.forEach(e=>{if(!e.id)e.id=uid()});bills.forEach(e=>{if(!e.id)e.id=uid()});
- return{players:[...players],sessions:sessions.map(x=>({id:x.id,date:x.date||'',label:x.label||'',v:{...x.v}})),loans:loans.map(l=>({id:l.id,date:l.date,who:l.who,amt:l.amt,src:l.src||null,g:l.g||'',done:!!l.done})),initLoan,game:game?{date:game.date,players:[...game.players]}:null,readme,rules,groupName,expenses:expenses.map(e=>({id:e.id,date:e.date||'',desc:e.desc||'',paidBy:e.paidBy,amt:e.amt,split:e.split&&e.split.length?[...e.split]:null,g:e.g||'',done:!!e.done})),settle:settle?JSON.parse(JSON.stringify(settle)):null,bills:bills.map(e=>({id:e.id,date:e.date||'',desc:e.desc||'',paidBy:e.paidBy,amt:e.amt,split:e.split&&e.split.length?[...e.split]:null,done:!!e.done})),billSettle:billSettle?JSON.parse(JSON.stringify(billSettle)):null}}
-function applyState(S){S=norm(S);players=[...S.players];sessions=S.sessions.map(x=>({...x,v:{...x.v}}));loans=S.loans.map(l=>({...l}));initLoan=S.initLoan;game=S.game?{date:S.game.date,players:[...S.game.players]}:null;readme=S.readme;rules=S.rules;groupName=S.groupName||'';expenses=S.expenses.map(e=>({...e}));settle=S.settle;bills=(S.bills||[]).map(e=>({...e}));billSettle=S.billSettle||null;if(!game){gc=false;finals={}}sortS();if(gid&&groupName)saveRecent(gid,groupName)}
+ return{players:[...players],sessions:sessions.map(x=>({id:x.id,date:x.date||'',label:x.label||'',v:{...x.v}})),loans:loans.map(l=>({id:l.id,date:l.date,who:l.who,amt:l.amt,src:l.src||null,g:l.g||'',done:!!l.done})),initLoan,game:game?{date:game.date,players:[...game.players],exited:game.exited?{...game.exited}:{}}:null,readme,rules,groupName,expenses:expenses.map(e=>({id:e.id,date:e.date||'',desc:e.desc||'',paidBy:e.paidBy,amt:e.amt,split:e.split&&e.split.length?[...e.split]:null,g:e.g||'',done:!!e.done})),settle:settle?JSON.parse(JSON.stringify(settle)):null,bills:bills.map(e=>({id:e.id,date:e.date||'',desc:e.desc||'',paidBy:e.paidBy,amt:e.amt,split:e.split&&e.split.length?[...e.split]:null,done:!!e.done})),billSettle:billSettle?JSON.parse(JSON.stringify(billSettle)):null}}
+function applyState(S){S=norm(S);players=[...S.players];sessions=S.sessions.map(x=>({...x,v:{...x.v}}));loans=S.loans.map(l=>({...l}));initLoan=S.initLoan;game=S.game?{date:S.game.date,players:[...S.game.players],exited:S.game.exited?{...S.game.exited}:{}}:null;readme=S.readme;rules=S.rules;groupName=S.groupName||'';expenses=S.expenses.map(e=>({...e}));settle=S.settle;bills=(S.bills||[]).map(e=>({...e}));billSettle=S.billSettle||null;if(!game){gc=false;finals={}}sortS();if(gid&&groupName)saveRecent(gid,groupName)}
 function mergeState(b,l,r){const o=norm(JSON.parse(JSON.stringify(r)));b=norm(b);
  l.players.forEach(p=>{if(!o.players.includes(p))o.players.push(p)});b.players.forEach(p=>{if(!l.players.includes(p))o.players=o.players.filter(x=>x!==p)});
  ['sessions','loans','expenses','bills'].forEach(k=>{const bm=new Map(b[k].map(x=>[x.id,canon(x)])),lm=new Set(l[k].map(x=>x.id));
