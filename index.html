@@ -842,7 +842,16 @@ const canon=x=>JSON.stringify(x,(k,v)=>v&&typeof v=='object'&&!Array.isArray(v)?
 const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],expenses:S.expenses||[],settle:S.settle||null,initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:null,groupName:typeof S.groupName=='string'?S.groupName:'',bills:(S.bills||[]),billSettle:S.billSettle||null});
 function getState(){sessions.forEach(x=>{if(!x.id)x.id=uid()});loans.forEach(l=>{if(!l.id)l.id=uid()});expenses.forEach(e=>{if(!e.id)e.id=uid()});bills.forEach(e=>{if(!e.id)e.id=uid()});
  return{players:[...players],sessions:sessions.map(x=>({id:x.id,date:x.date||'',label:x.label||'',v:{...x.v}})),loans:loans.map(l=>({id:l.id,date:l.date,who:l.who,amt:l.amt,src:l.src||null,g:l.g||'',done:!!l.done})),initLoan,game:game?{date:game.date,players:[...game.players],exited:game.exited?{...game.exited}:{}}:null,readme,rules,groupName,expenses:expenses.map(e=>({id:e.id,date:e.date||'',desc:e.desc||'',paidBy:e.paidBy,amt:e.amt,split:e.split&&e.split.length?[...e.split]:null,g:e.g||'',done:!!e.done})),settle:settle?JSON.parse(JSON.stringify(settle)):null,bills:bills.map(e=>({id:e.id,date:e.date||'',desc:e.desc||'',paidBy:e.paidBy,amt:e.amt,split:e.split&&e.split.length?[...e.split]:null,done:!!e.done})),billSettle:billSettle?JSON.parse(JSON.stringify(billSettle)):null}}
-function applyState(S){S=norm(S);players=[...S.players];sessions=S.sessions.map(x=>({...x,v:{...x.v}}));loans=S.loans.map(l=>({...l}));initLoan=S.initLoan;game=S.game?{date:S.game.date,players:[...S.game.players],exited:S.game.exited?{...S.game.exited}:{}}:null;readme=S.readme;rules=S.rules;groupName=S.groupName||'';expenses=S.expenses.map(e=>({...e}));settle=S.settle;bills=(S.bills||[]).map(e=>({...e}));billSettle=S.billSettle||null;if(!game){gc=false;finals={}}sortS();if(gid&&groupName)saveRecent(gid,groupName)}
+function applyState(S){S=norm(S);players=Array.isArray(S.players)?[...S.players]:[];
+ sessions=(Array.isArray(S.sessions)?S.sessions:[]).map(x=>{const v=(x&&x.v&&typeof x.v==='object')?{...x.v}:{};return{...(x||{}),v}});
+ loans=(Array.isArray(S.loans)?S.loans:[]).map(l=>({...(l||{})}));
+ initLoan=num(S.initLoan)?S.initLoan:500;
+ if(S.game&&typeof S.game==='object'){const gp=Array.isArray(S.game.players)?[...S.game.players]:[];game={date:S.game.date||'',players:gp,exited:(S.game.exited&&typeof S.game.exited==='object')?{...S.game.exited}:{}};}
+ else game=null;
+ readme=S.readme;rules=S.rules;groupName=S.groupName||'';
+ expenses=(Array.isArray(S.expenses)?S.expenses:[]).map(e=>({...(e||{})}));settle=S.settle||null;
+ bills=(Array.isArray(S.bills)?S.bills:[]).map(e=>({...(e||{})}));billSettle=S.billSettle||null;
+ if(!game){gc=false;finals={}}sortS();if(gid&&groupName)saveRecent(gid,groupName)}
 function mergeState(b,l,r){const o=norm(JSON.parse(JSON.stringify(r)));b=norm(b);
  l.players.forEach(p=>{if(!o.players.includes(p))o.players.push(p)});b.players.forEach(p=>{if(!l.players.includes(p))o.players=o.players.filter(x=>x!==p)});
  ['sessions','loans','expenses','bills'].forEach(k=>{const bm=new Map(b[k].map(x=>[x.id,canon(x)])),lm=new Set(l[k].map(x=>x.id));
@@ -871,7 +880,7 @@ async function adminCreate(){const n=prompt('Group name:');if(n===null)return;
  let ep=null;if(confirm('Generate a Password for players now? You can also do it later from Backups.')){const a='ABCDEFGHJKMNPQRSTUVWXYZ23456789';ep='';crypto.getRandomValues(new Uint8Array(8)).forEach(x=>{ep+=a[x%a.length]})}
  pendingOrgPass=adminPw;pendingSetGlobal=false;pendingEditPw=ep;adminOpen=false;adminPw=null;
  setGroup(randCode(),(n||'').trim(),{register:true});toast(ep?'Group created. Open Backups to copy the Password.':'Group created.')}
-function connectCard(){return`<div class="card"><b>${cs=='error'?'Could not connect':'Connecting…'}</b>${cloudErr?`<div class="mut" style="margin:6px 0">${E(cloudErr)}</div>`:''}${cs=='error'?`<p class="mut">Check that you are online and try again.</p><button data-gleave>Use a different group code</button>`:''}</div>`}
+function connectCard(){return`<div class="card"><b>${cs=='error'?'Could not connect':'Connecting…'}</b>${cloudErr?`<div class="mut" style="margin:6px 0">${E(cloudErr)}</div>`:''}${cs=='error'?`<p class="mut">Check that you are online and try again.</p><button class="pri" id="gref2" style="width:100%;margin-bottom:8px">Try again</button><button data-gleave style="width:100%">Use a different group code</button>`:`<p class="mut" style="margin-top:8px">Loading group data…</p><button data-gleave style="width:100%;margin-top:10px">Cancel</button>`}</div>`}
 function render(){try{
  document.body.classList.toggle('nogrp',!gid);
  const vEl=$('#v');if(!vEl){console.error('Missing #v');return}
@@ -1189,13 +1198,16 @@ function backupTab(){const when=x=>new Date(x.savedAt).toLocaleString();
  ${bk.err?`<p class="neg">Could not load backups (${E(bk.err)}). Tap ↻ Refresh at the top to try again.</p>`:''}`}
 function startCloud(){if(!gid)return;
  if(!window.cloud){window.addEventListener('cloudready',startCloud,{once:true});setTimeout(()=>{if(!window.cloud){cloudErr='Could not load Google services. Check your internet connection and reload.';cs='error';render()}},15000);return}
- cloudOn=true;cs='connecting';access=null;accessLoaded=false;viewAccess=null;viewLoaded=false;
+ cloudOn=true;cs='connecting';cloudErr='';access=null;accessLoaded=false;viewAccess=null;viewLoaded=false;
+ if(window._connTimer)clearTimeout(window._connTimer);
+ window._connTimer=setTimeout(()=>{if(!synced&&gid&&cs==='connecting'){cloudErr='Taking too long to reach this group. Check internet or try another group.';cs='error';render()}},20000);
  (async()=>{try{const a=await cloud.get(gid,'access');access=(a&&a.json&&a.json!=='null')?JSON.parse(a.json):null}catch(e){access=null}accessLoaded=true;if(synced)renderSafe()})();
  (async()=>{try{const v=await cloud.get(gid,'viewaccess');viewAccess=(v&&v.json&&v.json!=='null')?JSON.parse(v.json):null}catch(e){viewAccess=null}viewLoaded=true;if(synced)renderSafe()})();
  if(cloud.watch)cloud.watch(gid,'access',json=>{if(json===undefined)return;access=(json&&json!=='null')?JSON.parse(json):null;accessLoaded=true;if(synced)renderSafe()});
  if(cloud.watch)cloud.watch(gid,'viewaccess',json=>{if(json===undefined)return;viewAccess=(json&&json!=='null')?JSON.parse(json):null;viewLoaded=true;if(synced)renderSafe()});
- cloud.listen(gid,json=>{const S=json?norm(JSON.parse(json)):EMPTY();
-  if(!synced){synced=true;cs='live';const keepName=groupName;base=S;lastSent='';applying=true;applyState(S);if(keepName&&!groupName){groupName=keepName;if(gid)saveRecent(gid,groupName)}applying=false;if(hashGame){if(game&&game.date===hashGame){tab='loans';toast('Opened the game of '+hashGame)}else if(game)toast('A different game is in progress ('+game.date+')')}
+ cloud.listen(gid,json=>{let S;
+  try{S=json?norm(JSON.parse(json)):EMPTY()}catch(e){console.error('Bad group data',e);cloudErr='Group data could not be read. It may be damaged.';cs='error';synced=false;render();return}
+  if(!synced){synced=true;cs='live';if(window._connTimer){clearTimeout(window._connTimer);window._connTimer=null}const keepName=groupName;base=S;lastSent='';applying=true;try{applyState(S);if(keepName&&!groupName){groupName=keepName;if(gid)saveRecent(gid,groupName)}}catch(e){console.error('applyState',e);cloudErr='Could not load this group\'s data.';cs='error';synced=false;applying=false;render();return}applying=false;if(hashGame){if(game&&game.date===hashGame){tab='loans';toast('Opened the game of '+hashGame)}else if(game)toast('A different game is in progress ('+game.date+')')}
    ;(async()=>{try{const del=await cloud.get(gid,'deleted');if(del&&del.json&&del.json!=='null'&&!pendingOrgPass){removeRecent(gid);const gone=gid;leaveGroup();toast('Group '+(gone.slice(0,8))+'… no longer exists (deleted by the admin).');return}}catch(e){}
     loadOrg().then(()=>render());
     if(pendingOrgPass){const pw=pendingOrgPass,setG=pendingSetGlobal,ep=pendingEditPw;pendingOrgPass=null;pendingSetGlobal=false;pendingEditPw=null;try{const salt=randHex(16),iter=150000,hash=await hashPass(pw,salt,iter);const payload=JSON.stringify({salt,iter,hash});await cloud.put(gid,'organiser',payload);if(ep){const s2=randHex(16),h2=await hashPass(ep,s2,150000);await cloud.put(gid,'access',JSON.stringify({salt:s2,iter:150000,hash:h2}));access={salt:s2,iter:150000,hash:h2};accessLoaded=true;lastCode=ep.slice(0,4)+'-'+ep.slice(4)}if(setG)await cloud.put(CFG,'createpass',payload);orgInfo={salt,iter,hash};orgLoaded=true;markOrganiser();await registerGroup(gid,groupName);render()}catch(e){toast('Could not save admin password — set it on the Backups tab')}}
