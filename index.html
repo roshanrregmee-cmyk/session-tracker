@@ -285,10 +285,20 @@ function billsDash(){
 }
 function billsView(){return billTab=='dash'?billsDash():billsList()}
 
+
+function syncUploadBtn(){
+  const upl=$('#uplbl');
+  if(!upl)return;
+  const show=!!(typeof canOrganise==='function'&&canOrganise()&&appMode==='poker');
+  upl.style.display=show?'':'none';
+  const inp=$('#up');
+  if(inp){inp.disabled=!show;inp.style.pointerEvents=show?'auto':'none'}
+}
+
 function render0(){
  $('#v').innerHTML=tab=='hist'?hist():tab=='add'?entry():tab=='loans'?loansTab():tab=='expenses'?expensesTab():tab=='backup'?backupTab():tab=='rules'?notesTab('rules'):(tab=='readme'?(tab='hist',hist()):dash());
  document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t==tab));
- {const xb=$('#xl'),jb=$('#jpg'),pb=$('#pdf');if(xb)xb.disabled=!sessions.length;const off=!sessions.length||!players.length||!Object.values(sel).some(Boolean)||players.every(p=>excl[p]);if(jb)jb.disabled=off;if(pb)pb.disabled=off}upd()}
+ {const xb=$('#xl'),jb=$('#jpg'),pb=$('#pdf');if(xb)xb.disabled=!sessions.length;const off=!sessions.length||!players.length||!Object.values(sel).some(Boolean)||players.every(p=>excl[p]);if(jb)jb.disabled=off;if(pb)pb.disabled=off}syncUploadBtn();upd()}
 function hist(){
  if(!players.length)return'<p class="mut">No data yet. Add players in “New session”.</p>';
  const si=sOrd(sessions.map((_,i)=>i)),ps=pOrd(players),o=(v,l,c)=>`<option value="${v}" ${c==v?'selected':''}>${l}</option>`,admin=canOrganise();
@@ -443,7 +453,7 @@ function view(S){const N=S.length,all=[...S.keys()],k=Math.max(1,pn|0);
 const gp=()=>game?game.players.filter(p=>!excl[p]):[];
 function withView(fn){const S=sessions,P=players,v=view(S);ALLP=P;sessions=v.idx.map(i=>S[i]);players=P.filter(p=>!excl[p]&&sessions.some(s=>num(s.v[p])));PERIOD={idx:v.idx,txt:v.txt,sh:v.sh,N:S.length};
  try{return fn()}finally{sessions=S;players=P}}
-const toolsHtml=()=>`<div class="tools"><label class="tool" id="uplbl" for="up" style="display:none"><i>📤</i>Upload Excel</label><input id="up" type="file" accept=".xlsx,.xls" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"><button class="tool" id="xl"><i>📊</i>Export Excel</button><button class="tool" id="pdf"><i>📄</i>Export PDF</button><button class="tool" id="jpg"><i>🖼️</i>Share image</button></div>`;
+const toolsHtml=()=>`<div class="tools"><label class="tool" id="uplbl" for="up" style="display:none"><i>📤</i>Upload Excel</label><input id="up" type="file" accept=".xlsx,.xls" style="position:absolute;width:1px;height:1px;opacity:0"><button class="tool" id="xl"><i>📊</i>Export Excel</button><button class="tool" id="pdf"><i>📄</i>Export PDF</button><button class="tool" id="jpg"><i>🖼️</i>Share image</button></div>`;
 function dash(){let ui=toolsHtml();const N=sessions.length;
  if(N){const v=view(sessions),[a,b]=ix(N),opt=x=>sessions.map((s,i)=>`<option value="${i}" ${i==x?'selected':''}>${i+1}. ${E(nm(s,i))}</option>`).join(''),
   M=[['all','All sessions'],['sess','Last N sessions'],['mon','Last N months'],['custom','Custom range']],Q=[['sess',3,'Last 3 sessions'],['sess',6,'Last 6 sessions'],['sess',10,'Last 10'],['mon',1,'Last month'],['mon',3,'Last 3 months'],['mon',6,'Last 6 months'],['all',0,'All']];
@@ -644,7 +654,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer();if(e.k
 document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']');
  if(g('data-mode')){appMode=g('data-mode').dataset.mode==='hub'?'':g('data-mode').dataset.mode;if(appMode==='poker')tab='hist';if(appMode==='bills')billTab='list';render();return}
  if(g('data-btab')){billTab=g('data-btab').dataset.btab;render();return}
- if(g('data-t')){const nt=g('data-t').dataset.t;if(nt===tab)return;tab=nt;swapView(()=>{render0();upd();if(tab=='backup')loadBackups()});document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t==tab))}
+ if(g('data-t')){const nt=g('data-t').dataset.t;if(nt===tab)return;tab=nt;swapView(()=>{render0();upd();syncUploadBtn();if(tab=='backup')loadBackups()});document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t==tab))}
  else if(g('data-all')){const v=+g('data-all').dataset.all;OPTS.forEach(o=>sel[o[0]]=v);render()}
  else if(g('data-q')){const q=g('data-q').dataset.q.split(':');mode=q[0];if(+q[1])pn=+q[1];render()}
  else if(g('data-xall')){excl={};render()}
@@ -804,21 +814,20 @@ function render(){document.body.classList.toggle('nogrp',!gid);
   $('#v').innerHTML=hubScreen();
   setSync(cs);
   ['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el)el.style.display='none'});
-  const upl=$('#uplbl');if(upl)upl.style.display='none';
+  syncUploadBtn();
   queueMicrotask(persist);return;
  }
  if(appMode==='bills'){
   $('#v').innerHTML=billsView();
   setSync(cs);document.body.classList.toggle('viewonly',!canEdit());if(!canEdit())lockUI();
   ['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el)el.style.display='none'});
-  const upl=$('#uplbl');if(upl)upl.style.display='none';
+  syncUploadBtn();
   queueMicrotask(persist);return;
  }
  // poker mode — existing app
  render0();setSync(cs);document.body.classList.toggle('viewonly',!canEdit());if(!canEdit())lockUI();
  ['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el){el.disabled=!canEdit()||!sessions.length||!players.length;el.style.display=canEdit()?'':'none'}});
- const upl=$('#uplbl');if(upl)upl.style.display=canOrganise()?'':'none';
- // ensure a way back home exists in poker: inject back control near tabs if missing is handled via drawer + header
+ syncUploadBtn();
  queueMicrotask(persist)}
 function renderSafe(){const a=document.activeElement;if(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)){pendingRender=true;return}render()}
 function reconcile(S){base=norm(S);lastSent='';if(canon(getState())!==canon(base)){applying=true;applyState(base);applying=false;renderSafe()}setSync(navigator.onLine===false?'offline':'live')}
@@ -1087,7 +1096,7 @@ function backupTab(){const when=x=>new Date(x.savedAt).toLocaleString();
  else a='<div class="mut">No backup yet.</div>';
  if(bk.standing){const d=JSON.parse(bk.standing.json);b=`<div class="mut">Saved ${E(when(bk.standing))} · game of ${E(d.game.date)} · ${d.game.players.length} players · ${d.loans.length} loan entries</div><button class="pri" id="bkstd" style="margin-top:8px">Restore this standing</button>`}
  else b='<div class="mut">No standing saved yet.</div>';
- return`<div class="card"><b>Last completed game backup</b>${a}</div>
+ return`${canOrganise()?`<div class="card"><b>Upload Excel</b><div class="mut" style="margin:4px 0 10px">Replace all shared poker history for everyone in this group.</div><label class="btn pri" id="uplbl" for="up" style="display:inline-flex;cursor:pointer">📤 Upload Excel</label><input id="up" type="file" accept=".xlsx,.xls" style="position:absolute;width:1px;height:1px;opacity:0"></div>`:''}<div class="card"><b>Last completed game backup</b>${a}</div>
  <div class="card"><b>Current standing backup</b>${b}</div>
  ${canOrganise()?'':`<div class="card"><b>Admin</b><div class="mut" style="margin:4px 0 8px">Unlock History editing, uploads and restores.</div><button class="pri" id="unlockorg">Enter admin password</button></div>`}
  <div class="card"><b>Password</b><div class="mut" style="margin:4px 0 8px">${access?'Only people with the password can make changes. Everyone else can view and export.':'Everyone can edit. Create a password so only people who have it can change data.'} Needs the admin password.</div><button class="pri" id="gencode">${access?'Generate a new password':'Create a password'}</button>${access?' <button id="allowall">Allow everyone to edit</button>':''}${lastCode?`<div style="margin-top:10px">Share this password (shown once):<div style="font-size:24px;font-weight:700;letter-spacing:2px;margin:4px 0">${lastCode}</div><button id="copycode">Copy password</button></div>`:''}</div>
