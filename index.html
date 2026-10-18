@@ -169,10 +169,58 @@ body.mode-bills .tabs,body.mode-bills .intro{display:none!important}
 .bills-nav button{border:2px solid var(--tx);border-radius:999px;background:var(--card);box-shadow:0 3px 0 var(--tx);padding:8px 16px;font-weight:700}
 .bills-nav button.on{background:linear-gradient(135deg,var(--g1),var(--g2));color:#fff}
 .back-hub{margin-right:auto}
+
+/* Sticky floating header + tab pills */
+.topbar{
+  position:sticky;
+  top:0;
+  z-index:200;
+  margin:calc(-1 * env(safe-area-inset-top,0px) - 16px) -16px 12px;
+  padding:calc(env(safe-area-inset-top,0px) + 12px) 16px 10px;
+  background:rgba(255,244,230,.88);
+  backdrop-filter:saturate(1.2) blur(14px);
+  -webkit-backdrop-filter:saturate(1.2) blur(14px);
+  border-bottom:2px solid rgba(42,22,80,.12);
+  box-shadow:0 8px 24px rgba(42,22,80,.08);
+}
+@media(prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) .topbar{
+    background:rgba(26,11,59,.9);
+    border-bottom-color:rgba(138,92,240,.25);
+    box-shadow:0 8px 24px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"] .topbar{
+  background:rgba(26,11,59,.9);
+  border-bottom-color:rgba(138,92,240,.25);
+  box-shadow:0 8px 24px rgba(0,0,0,.35);
+}
+.topbar .tabs{margin-bottom:0;padding-bottom:2px}
+.topbar .hd{margin-bottom:8px}
+/* Bills sub-nav also sticks under main topbar */
+.bills-nav{
+  position:sticky;
+  top:calc(env(safe-area-inset-top,0px) + 108px);
+  z-index:150;
+  margin:0 -4px 12px;
+  padding:8px 4px;
+  background:rgba(255,244,230,.9);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  border-radius:12px;
+}
+@media(prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) .bills-nav{background:rgba(26,11,59,.92)}
+}
+:root[data-theme="dark"] .bills-nav{background:rgba(26,11,59,.92)}
+body.mode-hub .topbar .tabs{display:none}
+body.mode-bills .topbar .tabs{display:none}
 </style></head><body><div id="welcome"><img src="icon-512.png" alt=""><h2>Welcome Folks! 👑</h2><button id="enterBtn" type="button">Enter</button></div><main>
+<div class="topbar">
 <div class="hd"><h1><img src="icon-192.png" alt="" style="height:1.15em;width:1.15em;border-radius:22%;vertical-align:-0.2em;margin-right:.3em"><span class="ttl" id="ttl"></span></h1><span id="ind" class="ind"></span><button id="gref" class="rbtn" title="Refresh data from cloud" aria-label="Refresh">↻</button></div>
 <div class="intro mut">Add sessions, track loans and expenses.</div>
 <div class="tabs"><button data-t="hist">History</button><button data-t="add">New session</button><button data-t="loans">Loans</button><button data-t="expenses">Expenses</button><button data-t="dash">Dashboard</button><button data-t="backup">Backups</button><button data-t="rules">Rules</button></div>
+</div>
 <div id="v"></div></main><div id="toast"></div>
 <script>
 const $=s=>document.querySelector(s),E=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -536,7 +584,7 @@ function pdfPie(d,items,cx,cy,r,x,y,sp){const T=items.reduce((a,b)=>a+b.v,0);if(
  const cc=it=>it.c||col(it.p);let a=-Math.PI/2;items.forEach(it=>{const th=it.v/T*2*Math.PI,n=Math.max(2,Math.ceil(th/.05));d.setFillColor(cc(it));d.setDrawColor(cc(it));
   for(let k=0;k<n;k++){const s=a+th*k/n,e=a+th*(k+1)/n;d.triangle(cx,cy,cx+r*Math.cos(s),cy+r*Math.sin(s),cx+r*Math.cos(e),cy+r*Math.sin(e),'FD')}a+=th});
  items.forEach((it,i)=>{d.setFillColor(cc(it)).rect(x,y+i*sp-2.4,2.6,2.6,'F');d.setFontSize(Math.min(7,sp*2.1)).setTextColor(40).text(`${it.p} ${Math.round(100*it.v/T)}%`,x+4,y+i*sp)})}
-const TT={trends:'Trend Comments',loans:'Current standing',loantbl:'Current standing (table)',sum:'Summary table',avg:'Average per session played',wr:'Win rate ranking',rec:'Win / loss record',latest:'Latest session',turn:'Money moved per session',bars:'Total balance by player',pieW:'Share of winnings',pieL:'Share of losses',donut:'Overall results',scatter:'Win % vs total balance',line:'Cumulative balance by session',heat:'Session-by-session results',table:'Player stats'};
+const TT={trends:'Trend Comments',loans:'Current standing',loantbl:'Current standing (table)',sum:'Summary table',avg:'Average per session played',wr:'Win rate ranking',rec:'Win / loss record',latest:'Latest session',turn:'Money moved per session',bars:'Total balance by player',pieW:'Share of winnings',pieL:'Share of losses',donut:'Overall results',scatter:'Win % vs total balance',line:'Cumulative balance by session',heat:'Session-by-session results',table:'Player stats',hist:'History'};
 function drawDash0(d){
  const st=stats(),k=kpis(),ds=sessions.map(s=>s.date).filter(Boolean).sort(),[win,loss]=split(st),[lo,hi]=rng(st),C=cum(),n=sessions.length,rc=recs();
  const sr=series(),per=PERIOD.N>n?` of ${PERIOD.N} (${PERIOD.txt})`:'';
@@ -613,6 +661,7 @@ function drawDash0(d){
   if(gk.length)B.push({mn:Math.max(50,np*4+13),mx:Math.min(184,np*20+30),draw:drawRow});
   if(sel.trends||sel.ai)B.push({mn:np*(tipsOn?5:3.9)+13,mx:Math.min(184,np*18+16),draw:full('trends',tipsOn?(tipsAreAI()?'Trend Comments · AI suggestions':'Trend Comments · Suggestions'):TT.trends)});
   if(sel.table)B.push({mn:(np+1)*4.3+13,mx:Math.min(184,(np+1)*14+15),draw:full('table',TT.table)});
+  if(sel.hist)B.push({mn:(np+2)*4.2+14,mx:Math.min(184,(np+2)*11+22),draw:full('sum',TT.hist)});
   if(sel.loantbl&&lr)B.push({mn:(lr+2)*4.3+13,mx:Math.min(184,(lr+2)*14+15),draw:full('loantbl',TT.loantbl)});
   const start0=sel.kpi?31:20,av=p=>BOT-(p?15:start0);
   // choose the page split that wastes the least space
