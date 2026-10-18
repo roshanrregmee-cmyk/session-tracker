@@ -978,6 +978,17 @@ async function adminCreate(){const n=prompt('Group name:');if(n===null)return;
  pendingOrgPass=adminPw;pendingSetGlobal=false;pendingEditPw=ep;adminOpen=false;adminPw=null;
  setGroup(randCode(),(n||'').trim(),{register:true});toast(ep?'Group created. Open Backups to copy the Password.':'Group created.')}
 function connectCard(){return`<div class="card"><b>${cs=='error'?'Could not connect':'Connecting…'}</b>${cloudErr?`<div class="mut" style="margin:6px 0">${E(cloudErr)}</div>`:''}${cs=='error'?`<p class="mut">Check that you are online and try again.</p><button class="pri" id="gref2" style="width:100%;margin-bottom:8px">Try again</button><button data-gleave style="width:100%">Use a different group code</button>`:`<p class="mut" style="margin-top:8px">Loading group data…</p><button data-gleave style="width:100%;margin-top:10px">Cancel</button>`}</div>`}
+
+function syncUploadBtn(){
+  try{
+    const upl=$('#uplbl');
+    if(!upl)return;
+    const show=!!(typeof canOrganise==='function'&&canOrganise()&&appMode==='poker');
+    upl.style.display=show?'':'none';
+    const inp=$('#up');
+    if(inp){inp.disabled=!show}
+  }catch(e){console.error('syncUploadBtn',e)}
+}
 function render(){try{
  document.body.classList.toggle('nogrp',!gid);
  const vEl=$('#v');if(!vEl){console.error('Missing #v');return}
@@ -999,21 +1010,21 @@ function render(){try{
   $('#v').innerHTML=hubScreen();
   setSync(cs);
   ['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el)el.style.display='none'});
-  syncUploadBtn();
-  queueMicrotask(persist);return;
+  try{syncUploadBtn()}catch(e){}
+  queueMicrotask(()=>{try{persist()}catch(e){console.error(e)}});return;
  }
  if(appMode==='bills'){
   $('#v').innerHTML=billsView();
   setSync(cs);document.body.classList.toggle('viewonly',!canEdit());if(!canEdit())lockUI();
   ['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el)el.style.display='none'});
-  syncUploadBtn();
-  queueMicrotask(persist);return;
+  try{syncUploadBtn()}catch(e){}
+  queueMicrotask(()=>{try{persist()}catch(e){console.error(e)}});return;
  }
  // poker mode — existing app
  render0();setSync(cs);document.body.classList.toggle('viewonly',!canEdit());if(!canEdit())lockUI();
  ['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el){el.disabled=!canEdit()||!sessions.length||!players.length;el.style.display=canEdit()?'':'none'}});
- syncUploadBtn();
- queueMicrotask(persist)
+ try{syncUploadBtn()}catch(e){}
+ queueMicrotask(()=>{try{persist()}catch(e){console.error(e)}})
 }catch(err){console.error(err);try{toast('Display error: '+(err&&err.message||err))}catch(e){}}
 }
 function renderSafe(){const a=document.activeElement;if(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)){pendingRender=true;return}render()}
