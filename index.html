@@ -225,7 +225,7 @@ body.mode-bills .topbar .tabs{display:none}
 <script>
 const $=s=>document.querySelector(s),E=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let adminPw=null,adminOpen=false,adminGroups=[],pendingEditPw=null;
-let aiFn,aiTips={},aiKey='',aiBusy=false,aiMsg='',excl={},game=null,gc=false,finals={},plays={},initLoan=500,loans=[],loanDraft={},ld=new Date().toLocaleDateString('en-CA'),hsort='desc',hpl='file',ALLP=[],PERIOD={a:0,b:-1,N:0},rf=0,rt=-1,players=[],sessions=[],draft={},tab='hist',dd=new Date().toLocaleDateString('en-CA'),appMode='',billTab='list',bills=[],billDraft={desc:'',amt:'',paid:'',shared:{}},billSettle=null;
+let aiFn,aiTips={},aiKey='',aiBusy=false,aiMsg='',excl={},game=null,gc=false,finals={},plays={},initLoan=500,loans=[],loanDraft={},ld=new Date().toLocaleDateString('en-CA'),hsort='desc',hpl='file',ALLP=[],PERIOD={a:0,b:-1,N:0},rf=0,rt=-1,players=[],sessions=[],draft={},tab='hist',dd=new Date().toLocaleDateString('en-CA'),appMode='',billTab='list',bills=[],billDraft={desc:'',amt:'',paid:'',shared:{}},billSettle=null,xgrp={busy:false,err:'',list:[],picked:{},data:{},combined:null};
 const num=v=>typeof v==='number'&&isFinite(v),f=n=>num(n)?n.toLocaleString():'',cls=n=>n>0?'pos':n<0?'neg':'';
 const iso2ser=d=>Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10))/864e5+25569;
 const ser2iso=n=>new Date(Math.round((n-25569)*864e5)).toISOString().slice(0,10);
@@ -239,6 +239,78 @@ function stats(){return players.map(p=>{const v=sessions.map(s=>s.v[p]).filter(n
 function kpis(){const st=stats();let b=null;sessions.forEach((s,i)=>players.forEach(p=>{const x=s.v[p];if(num(x)&&(!b||x>b.x))b={p,x,n:nm(s,i)}}));
  const a=st[0],z=st[st.length-1];return[['Sessions',sessions.length,players.length+' players'],['Leader',a.p,f(a.t)],['Trailing',z.p,f(z.t)],['Best single session',b?b.p:'-',b?'+'+f(b.x)+' · '+b.n:'']]}
 
+
+function hubScreen(){
+ return`<div class="hub">
+  <button type="button" class="hub-card" data-mode="poker"><div class="hub-ico">🃏</div><b>Poker</b><span>Sessions, loans &amp; game expenses</span></button>
+  <button type="button" class="hub-card" data-mode="bills"><div class="hub-ico">🧾</div><b>Expenses</b><span>Shared bills, independent of games</span></button>
+ </div>
+ <p class="mut" style="text-align:center;margin-top:8px">Choose a section for this group</p>`;
+}
+function billsNav(){
+ return`<div class="bills-nav">
+  <button type="button" class="back-hub" data-mode="hub">← Home</button>
+  <button type="button" data-btab="list" class="${billTab=='list'?'on':''}">Expenses</button>
+  <button type="button" data-btab="dash" class="${billTab=='dash'?'on':''}">Dashboard</button>
+ </div>`;
+}
+function billsList(){
+ if(!players.length)return billsNav()+`<div class="card"><b>Add people first</b><p class="mut">Add player names once under <b>Poker → New session</b>, then come back here.</p><button class="pri" data-mode="poker">Go to Poker</button></div>`;
+ const open=bills.filter(e=>!e.done),done=bills.filter(e=>e.done);
+ const paid=billDraft.paid&&players.includes(billDraft.paid)?billDraft.paid:players[0];
+ const names=[...new Set([...players,...open.flatMap(e=>[e.paidBy,...(e.split||[])])])];
+ const sp=expenseSplit(players,open);
+ const row=e=>`<tr><td>${E(e.date)}</td><td>${E(e.desc)}</td><td>${E(e.paidBy)}</td><td>${fmtA(e.amt)}</td><td>${e.split&&e.split.length?E(e.split.join(', ')):'Everyone'}</td><td>${e.done?'<span class="mut">settled</span>':`<button class="x" data-billdel="${e.id}" title="Delete">✕</button>`}</td></tr>`;
+ const tot=k=>names.reduce((a,p)=>a+(sp[k][p]||0),0)/100;
+ let h=billsNav();
+ h+=`<div class="card"><b>Add an expense</b>
+ <div class="row"><input data-bd placeholder="What for? (e.g. rent, groceries)" style="text-align:left;flex:1;width:auto" value="${E(billDraft.desc||'')}"></div>
+ <div class="row"><input data-ba inputmode="decimal" placeholder="Amount" value="${E(billDraft.amt||'')}"></div>
+ <div style="margin:10px 0 4px"><b>Who paid?</b></div>
+ <div class="row"><select data-bp style="flex:1">${players.map(p=>`<option value="${E(p)}" ${p==paid?'selected':''}>${E(p)}</option>`).join('')}</select></div>
+ <div style="margin:10px 0 4px"><b>Who should share?</b></div>
+ <div class="pw">${players.map(p=>`<label class="chip"><input type="checkbox" data-bs="${E(p)}" ${billDraft.shared[p]===false?'':'checked'}> ${E(p)}</label>`).join('')}</div>
+ <button class="pri" id="billadd" style="width:100%;margin-top:12px">Add expense</button></div>`;
+ h+=`<p><b>Open expenses</b></p>`;
+ if(open.length){
+  h+=`<div class="sc"><table><thead><tr><th>Date</th><th>What</th><th>Who paid</th><th>Amount</th><th>Shared by</th><th></th></tr></thead><tbody>${open.map(row).join('')}</tbody></table></div>
+  <p><b>Summary</b></p><div class="sc"><table><thead><tr><th>Player</th><th>Paid</th><th>Share</th><th>Net</th></tr></thead><tbody>${names.map(p=>{const a=(sp.paid[p]||0)/100,b=(sp.share[p]||0)/100,n=Math.round((a-b)*100)/100;return`<tr><td>${E(p)}</td><td>${fmtA(a)}</td><td>${fmtA(b)}</td><td class="${cls(n)}"><b>${n>0?'+':''}${fmtA(n)}</b></td></tr>`}).join('')}</tbody><tfoot><tr><td>Total</td><td>${fmtA(tot('paid'))}</td><td>${fmtA(tot('share'))}</td><td></td></tr></tfoot></table></div>
+  <button class="pri" id="billsettle" style="width:100%;margin-top:12px">Settle open expenses</button>`;
+ }else h+='<p class="mut">No open expenses.</p>';
+ if(billSettle&&billSettle.items){
+  h+=`<div class="card" style="margin-top:14px"><b>Last settlement · ${E(billSettle.date||'')}</b>`;
+  h+=billSettle.items.length?billSettle.items.map(x=>`<div style="padding:6px 0;border-bottom:1px solid var(--bd)"><b>${E(x.f)}</b> pays <b>${E(x.t)}</b> <b class="pos" style="float:right">${fmtA(x.a)}</b></div>`).join(''):'<p class="mut">Everyone was square.</p>';
+  h+=`</div>`;
+ }
+ if(done.length)h+=`<details style="margin-top:10px"><summary class="mut">Settled earlier (${done.length})</summary><div class="sc" style="margin-top:6px"><table><tbody>${done.map(row).join('')}</tbody></table></div></details>`;
+ return h;
+}
+function billsDash(){
+ const open=bills.filter(e=>!e.done),all=bills;
+ const sp=expenseSplit(players,open);
+ const names=players.length?players:[...new Set(all.flatMap(e=>[e.paidBy,...(e.split||[])]))];
+ const nets=names.map(p=>{const a=(sp.paid[p]||0)/100,b=(sp.share[p]||0)/100;return{p,paid:a,share:b,net:Math.round((a-b)*100)/100}});
+ const totalSpent=all.reduce((s,e)=>s+(+e.amt||0),0);
+ const openTotal=open.reduce((s,e)=>s+(+e.amt||0),0);
+ let h=billsNav();
+ h+=`<div class="kp">
+  <div><small>Total recorded</small><b>${fmtA(totalSpent)}</b><small>${all.length} expenses</small></div>
+  <div><small>Still open</small><b>${fmtA(openTotal)}</b><small>${open.length} items</small></div>
+  <div><small>People</small><b>${names.length}</b><small>in this group</small></div>
+ </div>`;
+ if(!names.length)return h+'<p class="mut">No data yet.</p>';
+ h+=`<div class="card"><b>Balances (open only)</b><div class="sc" style="margin-top:8px"><table><thead><tr><th>Player</th><th>Paid</th><th>Share</th><th>Net</th></tr></thead><tbody>`;
+ h+=nets.sort((a,b)=>b.net-a.net).map(x=>`<tr><td>${E(x.p)}</td><td>${fmtA(x.paid)}</td><td>${fmtA(x.share)}</td><td class="${cls(x.net)}"><b>${x.net>0?'+':''}${fmtA(x.net)}</b></td></tr>`).join('');
+ h+=`</tbody></table></div><div class="mut" style="margin-top:6px;font-size:12px">+ means owed money back · − means still owes</div></div>`;
+ if(all.length){
+  h+=`<div class="card"><b>Recent expenses</b><div class="sc" style="margin-top:8px"><table><thead><tr><th>Date</th><th>What</th><th>Paid by</th><th>Amount</th><th></th></tr></thead><tbody>`;
+  h+=[...all].sort((a,b)=>a.date<b.date?1:a.date>b.date?-1:0).slice(0,15).map(e=>`<tr><td>${E(e.date)}</td><td>${E(e.desc)}</td><td>${E(e.paidBy)}</td><td>${fmtA(e.amt)}</td><td>${e.done?'<span class="mut">settled</span>':'open'}</td></tr>`).join('');
+  h+=`</tbody></table></div></div>`;
+ }
+ return h;
+}
+function billsView(){return billTab=='dash'?billsDash():billsList()}
+
 function swapView(buildFn){
   const v=$('#v');
   if(buildFn)buildFn();
@@ -249,13 +321,131 @@ function render0(){
  $('#v').innerHTML=tab=='hist'?hist():tab=='add'?entry():tab=='loans'?loansTab():tab=='expenses'?expensesTab():tab=='backup'?backupTab():tab=='rules'?notesTab('rules'):(tab=='readme'?(tab='hist',hist()):dash());
  document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t==tab));
  {const xb=$('#xl'),jb=$('#jpg'),pb=$('#pdf');if(xb)xb.disabled=!sessions.length;const off=!sessions.length||!players.length||!Object.values(sel).some(Boolean)||players.every(p=>excl[p]);if(jb)jb.disabled=off;if(pb)pb.disabled=off}syncUploadBtn();upd()}
+
+function nkey(p){return String(p||'').trim().toLowerCase()}
+function xgrpCard(){
+ if(!canOrganise())return'';
+ const list=(xgrp.list||[]).filter(g=>g.code&&g.code!==gid);
+ let h=`<div class="card" style="margin-top:14px"><b>Club results from other groups</b>
+ <div class="mut" style="margin:4px 0 10px">Admin only. Fetch history from groups where the same players also played, then see combined winnings/losses. Names are matched ignoring letter case.</div>`;
+ if(xgrp.busy)h+=`<p class="mut">Loading…</p>`;
+ else{
+  h+=`<button id="xgrp-load"${list.length?'':' class="pri"'}>${list.length?'Refresh group list':'Load your groups'}</button>`;
+  if(xgrp.err)h+=`<p class="neg" style="margin-top:8px">${E(xgrp.err)}</p>`;
+  if(list.length){
+   h+=`<div style="margin-top:10px">${list.map(g=>{
+    const on=!!xgrp.picked[g.code];
+    const d=xgrp.data[g.code];
+    const extra=d?` <span class="mut">· ${d.sessions.length} sessions · ${d.players.length} players</span>`:'';
+    return`<label class="chip" style="display:flex;margin:4px 0"><input type="checkbox" data-xpick="${E(g.code)}" ${on?'checked':''}> <span><b>${E(g.name||g.code.slice(0,8))}</b> <span class="mut">${E(g.code.slice(0,8))}…</span>${extra}</span></label>`;
+   }).join('')}</div>
+   <button class="pri" id="xgrp-fetch" style="width:100%;margin-top:10px">Fetch &amp; combine selected</button>`;
+  }else if(!xgrp.busy)h+=`<p class="mut" style="margin-top:8px">No other groups on your admin list yet.</p>`;
+ }
+ if(xgrp.combined&&xgrp.combined.rows.length){
+  const C=xgrp.combined;
+  h+=`<div style="margin-top:14px"><b>Combined player totals</b>
+  <div class="mut" style="margin:4px 0 8px">This group + ${C.groups.length} other group(s). Only players found in at least one selected source are listed.</div>
+  <div class="sc"><table><thead><tr><th>Player</th><th>This group</th>${C.groups.map(g=>`<th>${E(g.name)}</th>`).join('')}<th>Combined</th></tr></thead><tbody>`;
+  h+=C.rows.map(r=>{
+   return`<tr><td>${E(r.display)}</td><td class="${cls(r.here)}">${f(r.here)}</td>${C.groups.map(g=>{const v=r.by[g.code]||0;return`<td class="${cls(v)}">${f(v)}</td>`}).join('')}<td class="${cls(r.total)}"><b>${f(r.total)}</b></td></tr>`;
+  }).join('');
+  h+=`</tbody></table></div>
+  <button id="xgrp-import" style="width:100%;margin-top:10px">Import other groups' sessions into this History</button>
+  <div class="mut" style="margin-top:6px;font-size:12px">Import copies sessions here (tagged with the source group name). It does not change the other groups.</div></div>`;
+ }
+ h+=`</div>`;
+ return h;
+}
+async function xgrpLoadList(){
+ if(!canOrganise())return toast('Admin only');
+ xgrp.busy=true;xgrp.err='';render();
+ try{
+  if(!window.cloud)throw new Error('Not connected');
+  const list=await loadGroupList(true);
+  xgrp.list=Array.isArray(list)?list:[];
+  xgrp.busy=false;render();
+ }catch(e){xgrp.busy=false;xgrp.err=(e&&e.message)||'Could not load groups';render()}
+}
+async function xgrpFetch(){
+ if(!canOrganise())return toast('Admin only');
+ const codes=Object.keys(xgrp.picked).filter(k=>xgrp.picked[k]&&k!==gid);
+ if(!codes.length)return toast('Select at least one other group');
+ xgrp.busy=true;xgrp.err='';xgrp.combined=null;render();
+ try{
+  if(!window.cloud||!cloud.getState)throw new Error('Not connected');
+  for(const code of codes){
+   const raw=await cloud.getState(code);
+   let S=EMPTY();
+   if(raw&&raw.json&&raw.json!=='null'){try{S=norm(JSON.parse(raw.json))}catch(e){throw new Error('Bad data in '+(code.slice(0,8)))}}
+   const meta=(xgrp.list||[]).find(g=>g.code===code)||{code,name:code.slice(0,8)};
+   xgrp.data[code]={name:meta.name||code.slice(0,8),sessions:S.sessions||[],players:S.players||[]};
+  }
+  xgrp.combined=xgrpBuildCombined(codes);
+  xgrp.busy=false;render();
+  toast('Combined '+codes.length+' group(s)');
+ }catch(e){xgrp.busy=false;xgrp.err=(e&&e.message)||'Fetch failed';render()}
+}
+function xgrpTot(sess,name){
+ const k=nkey(name);let t=0;
+ (sess||[]).forEach(s=>{
+  const v=s.v||{};
+  Object.keys(v).forEach(p=>{if(nkey(p)===k&&num(v[p]))t+=v[p]});
+ });
+ return Math.round(t*100)/100;
+}
+function xgrpBuildCombined(codes){
+ const groups=codes.map(code=>({code,name:(xgrp.data[code]&&xgrp.data[code].name)||code.slice(0,8)}));
+ const nameMap={}; // key -> display name prefer current group
+ players.forEach(p=>{nameMap[nkey(p)]=p});
+ codes.forEach(code=>{(xgrp.data[code].players||[]).forEach(p=>{const k=nkey(p);if(!nameMap[k])nameMap[k]=p})});
+ // also names only appearing in sessions
+ const addFrom=sess=>{(sess||[]).forEach(s=>Object.keys(s.v||{}).forEach(p=>{const k=nkey(p);if(!nameMap[k])nameMap[k]=p}))};
+ addFrom(sessions);codes.forEach(code=>addFrom(xgrp.data[code].sessions));
+ const rows=Object.keys(nameMap).map(k=>{
+  const display=nameMap[k];
+  const here=xgrpTot(sessions,display);
+  const by={};let total=here;
+  codes.forEach(code=>{const v=xgrpTot(xgrp.data[code].sessions,display);by[code]=v;total=Math.round((total+v)*100)/100});
+  return{key:k,display,here,by,total};
+ }).filter(r=>r.here||Object.values(r.by).some(v=>v)).sort((a,b)=>b.total-a.total);
+ return{groups,rows};
+}
+function xgrpImport(){
+ if(!canOrganise())return toast('Admin only');
+ if(!xgrp.combined)return;
+ const codes=xgrp.combined.groups.map(g=>g.code);
+ if(!codes.length)return;
+ if(!confirm('Copy sessions from '+codes.length+' group(s) into this group\'s History? Existing sessions stay. Players will be added if missing.'))return;
+ let added=0;
+ codes.forEach(code=>{
+  const d=xgrp.data[code];if(!d)return;
+  const tag=(d.name||code.slice(0,8)).slice(0,20);
+  (d.players||[]).forEach(p=>{if(p&&!players.some(q=>nkey(q)===nkey(p)))players.push(p)});
+  (d.sessions||[]).forEach(s=>{
+   const v={};Object.keys(s.v||{}).forEach(p=>{if(num(s.v[p]))v[p]=s.v[p]});
+   // map keys to local player names when case differs
+   const v2={};
+   Object.keys(v).forEach(p=>{
+    const local=players.find(q=>nkey(q)===nkey(p))||p;
+    v2[local]=v[p];
+   });
+   sessions.push({id:uid(),date:s.date||'',label:(s.label?s.label+' · ':'')+tag,v:v2});
+   added++;
+  });
+ });
+ sortS();render();toast('Imported '+added+' session(s)');
+}
+
 function hist(){
- if(!players.length)return'<p class="mut">No data yet. Add players in “New session”.</p>';
- const si=sOrd(sessions.map((_,i)=>i)),ps=pOrd(players),o=(v,l,c)=>`<option value="${v}" ${c==v?'selected':''}>${l}</option>`,admin=canOrganise();
+ const admin=canOrganise();
+ if(!players.length&&!sessions.length)return (admin?xgrpCard():'')+'<p class="mut">No data yet. Add players in “New session”.</p>';
+ if(!players.length)return (admin?xgrpCard():'')+'<p class="mut">No players yet.</p>';
+ const si=sOrd(sessions.map((_,i)=>i)),ps=pOrd(players),o=(v,l,c)=>`<option value="${v}" ${c==v?'selected':''}>${l}</option>`;
  let h=settleCard()+`<div class="srt"><label>Sessions <select data-hs>${o('desc','Newest first',hsort)}${o('asc','Oldest first',hsort)}</select></label><label>Players <select data-hp>${o('file','As in file',hpl)}${o('name','A–Z',hpl)}${o('total','Highest total first',hpl)}</select></label>
  </div><div class="sc"><table><thead><tr><th>Player</th>`+si.map(i=>{const s=sessions[i];return`<th><div class="lb">${E(s.date?'':s.label||'Session '+(i+1))}${admin?`<button class="x" data-del="${i}" title="Delete session">✕</button>`:''}</div>${admin?`<input type="date" data-d="${i}" value="${s.date}">`:`<div class="mut">${E(s.date||'—')}</div>`}</th>`}).join('')+'<th>Total</th></tr></thead><tbody>';
  ps.forEach(p=>h+=`<tr><td>${E(p)}</td>`+si.map(i=>{const s=sessions[i],v=s.v[p];return admin?`<td><input class="c ${cls(v)}" inputmode="decimal" data-p="${E(p)}" data-s="${i}" value="${num(v)?v:''}"></td>`:`<td class="${cls(v)}">${num(v)?f(v):'<span class="mut">–</span>'}</td>`}).join('')+`<td class="${cls(tot(p))}"><b>${f(tot(p))}</b></td></tr>`);
- return h+'</tbody><tfoot><tr><td>Net</td>'+si.map(i=>`<td>${f(net(sessions[i]))}</td>`).join('')+`<td>${f(players.reduce((a,p)=>a+tot(p),0))}</td></tr></tfoot></table></div>`}
+ return h+'</tbody><tfoot><tr><td>Net</td>'+si.map(i=>`<td>${f(net(sessions[i]))}</td>`).join('')+`<td>${f(players.reduce((a,p)=>a+tot(p),0))}</td></tr></tfoot></table></div>`+(admin?xgrpCard():'')}
 function loanRows(P){return P.map(p=>{let bank=0,bor=0,len=0;loans.forEach(l=>{if(l.done)return;if(l.who==p){if(l.src)bor+=l.amt;else bank+=l.amt}if(l.src==p)len+=l.amt});return{p,init:initLoan,bank,bor,len,cur:initLoan+bank+bor-len}})}
 const ng=n=>n?-n:0;
 function loantable(P){const r=loanRows(P).map(x=>({p:x.p,i:ng(x.init),b:ng(x.bank),n:ng(x.bor-x.len),c:ng(x.cur)})),S=k=>r.reduce((a,x)=>a+x[k],0),td=v=>`<td class="${cls(v)}">${v>0?'+':''}${f(v)}</td>`;
@@ -616,6 +806,10 @@ const closeDrawer=()=>document.body.classList.remove('dopen');
 document.addEventListener('click',e=>{const t=e.target;if(t.closest('#fab')){document.body.classList.toggle('dopen')}else if(t.closest('#scrim')){closeDrawer()}else if(t.closest('#drawer button')){setTimeout(closeDrawer,60)}});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer();if(e.key==='Enter'&&(e.target.id==='gc_in'||e.target.id==='gp_in')){const b=$('#gjoin');if(b)b.click()}});
 document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']');
+ 
+ if(t.id=='xgrp-load'){xgrpLoadList();return}
+ if(t.id=='xgrp-fetch'){xgrpFetch();return}
+ if(t.id=='xgrp-import'){xgrpImport();return}
  if(g('data-mode')){appMode=g('data-mode').dataset.mode==='hub'?'':g('data-mode').dataset.mode;if(appMode==='poker')tab='hist';if(appMode==='bills')billTab='list';render();return}
  if(g('data-btab')){billTab=g('data-btab').dataset.btab;render();return}
  if(g('data-t')){const nt=g('data-t').dataset.t;if(nt===tab)return;tab=nt;swapView(()=>{render0();upd();syncUploadBtn();if(tab=='backup')loadBackups()});document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t==tab))}
@@ -722,6 +916,7 @@ document.addEventListener('change',e=>{const t=e.target;
  else if(t.dataset.es!==undefined){exDraft.shared[t.dataset.es]=t.checked}
  else if(t.dataset.bp!==undefined){billDraft.paid=t.value}
  else if(t.dataset.bs!==undefined){billDraft.shared[t.dataset.bs]=t.checked}
+ else if(t.dataset.xpick!==undefined){xgrp.picked[t.dataset.xpick]=t.checked}
  else if(t.dataset.ls!==undefined){(loanDraft[t.dataset.ls]=loanDraft[t.dataset.ls]||{}).src=t.value}
  else if(t.dataset.il!==undefined){const v=+t.value;if(isFinite(v)&&v>=0)initLoan=v;render()}
  else if(t.dataset.hs!==undefined){hsort=t.value;render()}
@@ -819,7 +1014,7 @@ function render(){try{
  ['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el){el.disabled=!canEdit()||!sessions.length||!players.length;el.style.display=canEdit()?'':'none'}});
  syncUploadBtn();
  queueMicrotask(persist)
-}catch(err){console.error(err);try{toast('Display error')}catch(e){}}
+}catch(err){console.error(err);try{toast('Display error: '+(err&&err.message||err))}catch(e){}}
 }
 function renderSafe(){const a=document.activeElement;if(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)){pendingRender=true;return}render()}
 function reconcile(S){base=norm(S);lastSent='';try{if(canon(getState())!==canon(base)){applying=true;try{applyState(base)}catch(e){console.error(e)}applying=false;renderSafe()}}catch(e){console.error('reconcile',e);applying=false;renderSafe()}setSync(navigator.onLine===false?'offline':'live')}
@@ -1115,7 +1310,7 @@ function startCloud(){if(!gid)return;
     if(pendingOrgPass){const pw=pendingOrgPass,setG=pendingSetGlobal,ep=pendingEditPw;pendingOrgPass=null;pendingSetGlobal=false;pendingEditPw=null;try{const salt=randHex(16),iter=150000,hash=await hashPass(pw,salt,iter);const payload=JSON.stringify({salt,iter,hash});await cloud.put(gid,'organiser',payload);if(ep){const s2=randHex(16),h2=await hashPass(ep,s2,150000);await cloud.put(gid,'access',JSON.stringify({salt:s2,iter:150000,hash:h2}));access={salt:s2,iter:150000,hash:h2};accessLoaded=true;lastCode=ep.slice(0,4)+'-'+ep.slice(4)}if(setG)await cloud.put(CFG,'createpass',payload);orgInfo={salt,iter,hash};orgLoaded=true;markOrganiser();await registerGroup(gid,groupName);render()}catch(e){toast('Could not save admin password — set it on the Backups tab')}}
     else render();queueMicrotask(persist)})();return}
   if(inflight)return;reconcile(S)},e=>{cloudErr=((e&&e.code)||'error')+': '+((e&&e.message)||'');cs='error';synced=synced&&false;render()})}
-function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};bills=[];billSettle=null;billDraft={desc:'',amt:'',paid:'',shared:{}};appMode='';billTab='list';access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
+function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};bills=[];billSettle=null;billDraft={desc:'',amt:'',paid:'',shared:{}};appMode='';billTab='list';xgrp={busy:false,err:'',list:[],picked:{},data:{},combined:null};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
 function setGroup(code,name,opts){const nm=(name!=null?String(name):'').trim().slice(0,40);const doReg=opts&&opts.register;gid=code;saveRecent(code,nm||code.slice(0,8));try{localStorage.setItem('ptc_group',code);history.replaceState(null,'','#g='+code)}catch(e){}clearLocal();groupName=nm;cs='connecting';startCloud();render();if(doReg)queueMicrotask(()=>registerGroup(code,nm).catch(()=>{}))}
 function refreshGroup(){if(!gid){location.reload();return}if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;synced=false;cs='connecting';accessLoaded=false;viewLoaded=false;orgLoaded=false;base=null;lastSent='';inflight=0;startCloud();render();toast('Refreshing…')}
 function leaveGroup(){adminOpen=false;adminPw=null;if(gid){saveRecent(gid,groupName||gid.slice(0,8));try{localStorage.removeItem(viewKey());localStorage.removeItem(editKey())}catch(e){}}if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;gid='';try{localStorage.removeItem('ptc_group');history.replaceState(null,'',location.pathname)}catch(e){}clearLocal();render()}
@@ -1139,6 +1334,7 @@ window.cloud={
  watch(g,n,cb){if(un[n])un[n]();un[n]=onSnapshot(doc(db,'groups',g,'backup',n),x=>cb(x.exists()?x.data().json:null),()=>cb(undefined))},
  put(g,n,json){return setDoc(doc(db,'groups',g,'backup',n),{json,savedAt:Date.now()})},
  async get(g,n){const x=await getDoc(doc(db,'groups',g,'backup',n));return x.exists()?x.data():null},
+ async getState(g){const x=await getDoc(ref(g));return x.exists()?x.data():null},
  async del(g,n){try{await deleteDoc(doc(db,'groups',g,'backup',n))}catch(e){}},
  async deleteGroup(g){const names=['access','viewaccess','organiser','full','standing'];for(const n of names){try{await deleteDoc(doc(db,'groups',g,'backup',n))}catch(e){}}try{await deleteDoc(doc(db,'groups',g,'app','state'))}catch(e){}},
  commit(g,fn){return runTransaction(db,async tx=>{const r=ref(g),s=await tx.get(r),out=fn(s.exists()?s.data().json:null);tx.set(r,{json:out,updatedAt:Date.now()});return out})}
