@@ -244,8 +244,9 @@ function kpis(){const st=stats();let b=null;sessions.forEach((s,i)=>players.forE
 
 function logFeed(text){
  try{
-  if(!Array.isArray(feed))feed=[];
-  feed.unshift({id:uid(),at:Date.now(),text:String(text||'').slice(0,120)});
+  if(typeof feed==='undefined'||!Array.isArray(feed))feed=[];
+  const t=String(text||'').slice(0,120);if(!t)return;
+  feed.unshift({id:uid(),at:Date.now(),text:t});
   if(feed.length>40)feed=feed.slice(0,40);
  }catch(e){}
 }
@@ -955,14 +956,14 @@ document.addEventListener('change',e=>{const t=e.target;
  else if(t.dataset.d!==undefined){if(!canOrganise())return toast('Only the admin can edit History');sessions[+t.dataset.d].date=t.value;sortS();render()}
  else if(t.dataset.s!==undefined){if(!canOrganise())return toast('Only the admin can edit History');const s=sessions[+t.dataset.s],x=t.value.trim()===''?null:Number(t.value);if(x===null)delete s.v[t.dataset.p];else if(isFinite(x))s.v[t.dataset.p]=x;render()}});
 // ---- cloud sync (Firestore) ----
-let gid='',cs='connecting',cloudErr='',synced=false,cloudOn=false,base=null,inflight=0,lastSent='',applying=false,pendingRender=false;
+let gid='',cs='connecting',cloudErr='',synced=false,cloudOn=false,connGen=0,base=null,inflight=0,lastSent='',applying=false,pendingRender=false;
 try{gid=((location.hash||'').match(/g=([A-Za-z0-9_-]{8,40})/)||[])[1]||localStorage.getItem('ptc_group')||''}catch(e){}
 const hashGame=((location.hash||'').match(/game=(\d{4}-\d{2}-\d{2})/)||[])[1]||'';
 const EMPTY=()=>({players:[],sessions:[],loans:[],expenses:[],settle:null,initLoan:500,game:null,readme:null,rules:null,groupName:'',bills:[],billSettle:null,feed:[]});
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
 const canon=x=>JSON.stringify(x,(k,v)=>v&&typeof v=='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(q=>[q,v[q]])):v);
 const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],expenses:S.expenses||[],settle:S.settle||null,initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:null,groupName:typeof S.groupName=='string'?S.groupName:'',bills:(S.bills||[]),billSettle:S.billSettle||null,feed:feed});
-function getState(){sessions.forEach(x=>{if(!x.id)x.id=uid()});loans.forEach(l=>{if(!l.id)l.id=uid()});expenses.forEach(e=>{if(!e.id)e.id=uid()});bills.forEach(e=>{if(!e.id)e.id=uid()});
+function getState(){if(!Array.isArray(sessions))sessions=[];if(!Array.isArray(loans))loans=[];if(!Array.isArray(expenses))expenses=[];if(!Array.isArray(bills))bills=[];if(!Array.isArray(feed))feed=[];if(!Array.isArray(players))players=[];sessions.forEach(x=>{if(!x.id)x.id=uid()});loans.forEach(l=>{if(!l.id)l.id=uid()});expenses.forEach(e=>{if(!e.id)e.id=uid()});
  return{players:[...players],sessions:sessions.map(x=>({id:x.id,date:(x.date||''),label:(x.label||''),v:(x.v&&typeof x.v==='object')?{...x.v}:{}})),loans:loans.map(l=>({id:l.id,date:l.date,who:l.who,amt:l.amt,src:l.src||null,g:l.g||'',done:!!l.done})),initLoan,game:game?{date:game.date,players:Array.isArray(game.players)?[...game.players]:[],exited:(game.exited&&typeof game.exited==='object')?{...game.exited}:{}}:null,readme,rules,groupName,expenses:expenses.map(e=>({id:e.id,date:e.date||'',desc:e.desc||'',paidBy:e.paidBy,amt:e.amt,split:e.split&&e.split.length?[...e.split]:null,g:e.g||'',done:!!e.done})),settle:settle?JSON.parse(JSON.stringify(settle)):null,bills:[],feed:(feed||[]).slice(0,40).map(x=>({id:x.id,at:x.at,text:x.text||''})),billSettle:billSettle?JSON.parse(JSON.stringify(billSettle)):null}}
 function applyState(S){S=norm(S);players=Array.isArray(S.players)?[...S.players]:[];
  sessions=(Array.isArray(S.sessions)?S.sessions:[]).map(x=>{const v=(x&&x.v&&typeof x.v==='object')?{...x.v}:{};return{...(x||{}),v}});
@@ -973,9 +974,9 @@ function applyState(S){S=norm(S);players=Array.isArray(S.players)?[...S.players]
  readme=S.readme;rules=S.rules;groupName=S.groupName||'';
  expenses=(Array.isArray(S.expenses)?S.expenses:[]).map(e=>({...(e||{})}));settle=S.settle||null;
  bills=(Array.isArray(S.bills)?S.bills:[]).map(e=>({...(e||{})}));billSettle=S.billSettle||null;
- // Sync: older independent bills → shared expenses list
- if(bills.length){const ids=new Set(expenses.map(e=>e.id).filter(Boolean));bills.forEach(b=>{if(b&&b.id&&!ids.has(b.id)){expenses.push({...b});ids.add(b.id)}});bills=[]}
- feed=Array.isArray(S.feed)?S.feed.map(x=>({...(x||{})})):[]
+ // One-time migrate old independent bills into expenses
+ if(bills.length){const ids=new Set(expenses.map(e=>e.id).filter(Boolean));bills.forEach(b=>{if(!b)return;const id=b.id||uid();if(!ids.has(id)){expenses.push({...b,id});ids.add(id)}});bills=[]}
+ feed=Array.isArray(S.feed)?S.feed.map(x=>({id:x&&x.id,at:x&&x.at,text:x&&x.text||''})).filter(x=>x.text):[]
 
  if(!game){gc=false;finals={}}sortS();if(gid&&groupName)saveRecent(gid,groupName)}
 function mergeState(b,l,r){const o=norm(JSON.parse(JSON.stringify(r)));b=norm(b);
@@ -1062,7 +1063,7 @@ function render(){try{
  ['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el){el.disabled=!canEdit()||!sessions.length||!players.length;el.style.display=canEdit()?'':'none'}});
  try{syncUploadBtn()}catch(e){}
  queueMicrotask(()=>{try{persist()}catch(e){console.error(e)}})
-}catch(err){console.error(err);try{toast('Display error: '+(err&&err.message||err))}catch(e){}}
+}catch(err){console.error(err);try{const v=$('#v');if(v&&!v.innerHTML)v.innerHTML='<div class="card"><b>Something went wrong</b><p class="mut">'+(err&&err.message||err)+'</p><button class="pri" data-gleave>Leave group</button></div>';toast('Display error: '+(err&&err.message||err))}catch(e){}}
 }
 function renderSafe(){const a=document.activeElement;if(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)){pendingRender=true;return}render()}
 function reconcile(S){base=norm(S);lastSent='';try{if(canon(getState())!==canon(base)){applying=true;try{applyState(base)}catch(e){console.error(e)}applying=false;renderSafe()}}catch(e){console.error('reconcile',e);applying=false;renderSafe()}setSync(navigator.onLine===false?'offline':'live')}
@@ -1342,26 +1343,27 @@ function backupTab(){const when=x=>new Date(x.savedAt).toLocaleString();
  </div>
  ${bk.err?`<p class="neg">Could not load backups (${E(bk.err)}). Tap ↻ Refresh at the top to try again.</p>`:''}`}
 function startCloud(){if(!gid)return;
- if(!window.cloud){window.addEventListener('cloudready',startCloud,{once:true});setTimeout(()=>{if(!window.cloud){cloudErr='Could not load Google services. Check your internet connection and reload.';cs='error';render()}},15000);return}
+ const gen=++connGen;
+ if(!window.cloud){window.addEventListener('cloudready',()=>{if(gen===connGen)startCloud()},{once:true});setTimeout(()=>{if(gen!==connGen)return;if(!window.cloud){cloudErr='Could not load Google services. Check your internet connection and reload.';cs='error';render()}},12000);return}
  cloudOn=true;cs='connecting';cloudErr='';access=null;accessLoaded=false;viewAccess=null;viewLoaded=false;
  if(window._connTimer)clearTimeout(window._connTimer);
- window._connTimer=setTimeout(()=>{if(!synced&&gid&&cs==='connecting'){cloudErr='Taking too long to reach this group. Check internet or try another group.';cs='error';render()}},20000);
- (async()=>{try{const a=await cloud.get(gid,'access');access=(a&&a.json&&a.json!=='null')?JSON.parse(a.json):null}catch(e){access=null}accessLoaded=true;if(synced)renderSafe()})();
- (async()=>{try{const v=await cloud.get(gid,'viewaccess');viewAccess=(v&&v.json&&v.json!=='null')?JSON.parse(v.json):null}catch(e){viewAccess=null}viewLoaded=true;if(synced)renderSafe()})();
- if(cloud.watch)cloud.watch(gid,'access',json=>{if(json===undefined)return;access=(json&&json!=='null')?JSON.parse(json):null;accessLoaded=true;if(synced)renderSafe()});
- if(cloud.watch)cloud.watch(gid,'viewaccess',json=>{if(json===undefined)return;viewAccess=(json&&json!=='null')?JSON.parse(json):null;viewLoaded=true;if(synced)renderSafe()});
- cloud.listen(gid,json=>{let S;
+ window._connTimer=setTimeout(()=>{if(gen!==connGen)return;if(!synced&&gid&&cs==='connecting'){cloudErr='Taking too long to reach this group. Check internet or try another group.';cs='error';render()}},12000);
+ (async()=>{try{const a=await cloud.get(gid,'access');access=(a&&a.json&&a.json!=='null')?JSON.parse(a.json):null}catch(e){access=null}accessLoaded=true;if(gen===connGen&&synced)renderSafe()})();
+ (async()=>{try{const v=await cloud.get(gid,'viewaccess');viewAccess=(v&&v.json&&v.json!=='null')?JSON.parse(v.json):null}catch(e){viewAccess=null}viewLoaded=true;if(gen===connGen&&synced)renderSafe()})();
+ if(cloud.watch)cloud.watch(gid,'access',json=>{if(gen!==connGen||json===undefined)return;access=(json&&json!=='null')?JSON.parse(json):null;accessLoaded=true;if(synced)renderSafe()});
+ if(cloud.watch)cloud.watch(gid,'viewaccess',json=>{if(gen!==connGen||json===undefined)return;viewAccess=(json&&json!=='null')?JSON.parse(json):null;viewLoaded=true;if(synced)renderSafe()});
+ cloud.listen(gid,json=>{if(gen!==connGen)return;let S;
   try{S=json?norm(JSON.parse(json)):EMPTY()}catch(e){console.error('Bad group data',e);cloudErr='Group data could not be read. It may be damaged.';cs='error';synced=false;render();return}
   if(!synced){synced=true;cs='live';if(window._connTimer){clearTimeout(window._connTimer);window._connTimer=null}const keepName=groupName;base=S;lastSent='';applying=true;try{applyState(S);if(keepName&&!groupName){groupName=keepName;if(gid)saveRecent(gid,groupName)}}catch(e){console.error('applyState',e);cloudErr='Could not load this group\'s data.';cs='error';synced=false;applying=false;render();return}applying=false;if(hashGame){if(game&&game.date===hashGame){tab='loans';toast('Opened the game of '+hashGame)}else if(game)toast('A different game is in progress ('+game.date+')')}
    ;(async()=>{try{const del=await cloud.get(gid,'deleted');if(del&&del.json&&del.json!=='null'&&!pendingOrgPass){removeRecent(gid);const gone=gid;leaveGroup();toast('Group '+(gone.slice(0,8))+'… no longer exists (deleted by the admin).');return}}catch(e){}
-    loadOrg().then(()=>render());
-    if(pendingOrgPass){const pw=pendingOrgPass,setG=pendingSetGlobal,ep=pendingEditPw;pendingOrgPass=null;pendingSetGlobal=false;pendingEditPw=null;try{const salt=randHex(16),iter=150000,hash=await hashPass(pw,salt,iter);const payload=JSON.stringify({salt,iter,hash});await cloud.put(gid,'organiser',payload);if(ep){const s2=randHex(16),h2=await hashPass(ep,s2,150000);await cloud.put(gid,'access',JSON.stringify({salt:s2,iter:150000,hash:h2}));access={salt:s2,iter:150000,hash:h2};accessLoaded=true;lastCode=ep.slice(0,4)+'-'+ep.slice(4)}if(setG)await cloud.put(CFG,'createpass',payload);orgInfo={salt,iter,hash};orgLoaded=true;markOrganiser();await registerGroup(gid,groupName);render()}catch(e){toast('Could not save admin password — set it on the Backups tab')}}
-    else render();queueMicrotask(persist)})();return}
-  if(inflight)return;reconcile(S)},e=>{cloudErr=((e&&e.code)||'error')+': '+((e&&e.message)||'');cs='error';synced=synced&&false;render()})}
-function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};bills=[];billSettle=null;billDraft={desc:'',amt:'',paid:'',shared:{}};feed=[];appMode='';billTab='list';xgrp={busy:false,err:'',list:[],picked:{},data:{},combined:null};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
-function setGroup(code,name,opts){const nm=(name!=null?String(name):'').trim().slice(0,40);const doReg=opts&&opts.register;gid=code;saveRecent(code,nm||code.slice(0,8));try{localStorage.setItem('ptc_group',code);history.replaceState(null,'','#g='+code)}catch(e){}clearLocal();groupName=nm;cs='connecting';startCloud();render();if(doReg)queueMicrotask(()=>registerGroup(code,nm).catch(()=>{}))}
+    loadOrg().then(()=>{if(gen===connGen)render()});
+    if(pendingOrgPass){const pw=pendingOrgPass,setG=pendingSetGlobal,ep=pendingEditPw;pendingOrgPass=null;pendingSetGlobal=false;pendingEditPw=null;try{const salt=randHex(16),iter=150000,hash=await hashPass(pw,salt,iter);const payload=JSON.stringify({salt,iter,hash});await cloud.put(gid,'organiser',payload);if(ep){const s2=randHex(16),h2=await hashPass(ep,s2,150000);await cloud.put(gid,'access',JSON.stringify({salt:s2,iter:150000,hash:h2}));access={salt:s2,iter:150000,hash:h2};accessLoaded=true;lastCode=ep.slice(0,4)+'-'+ep.slice(4)}if(setG)await cloud.put(CFG,'createpass',payload);orgInfo={salt,iter,hash};orgLoaded=true;markOrganiser();await registerGroup(gid,groupName);if(gen===connGen)render()}catch(e){toast('Could not save admin password — set it on the Backups tab')}}
+    else if(gen===connGen){render();queueMicrotask(()=>{try{persist()}catch(e){}})} })();return}
+  if(inflight)return;reconcile(S)},e=>{if(gen!==connGen)return;cloudErr=((e&&e.code)||'error')+': '+((e&&e.message)||'');cs='error';synced=false;render()})}
+function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};bills=[];billSettle=null;billDraft={desc:'',amt:'',paid:'',shared:{}};feed=[];appMode='';billTab='list';xgrp={busy:false,err:'',list:[],picked:{},playerPicked:{},data:{},combined:null};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
+function setGroup(code,name,opts){const nm=(name!=null?String(name):'').trim().slice(0,40);const doReg=opts&&opts.register;gid=code;saveRecent(code,nm||code.slice(0,8));try{localStorage.setItem('ptc_group',code);history.replaceState(null,'','#g='+code)}catch(e){}clearLocal();groupName=nm;cs='connecting';synced=false;if(window.cloud&&cloud.stop){try{cloud.stop()}catch(e){}}startCloud();render();if(doReg)queueMicrotask(()=>registerGroup(code,nm).catch(()=>{}))}
 function refreshGroup(){if(!gid){location.reload();return}if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;synced=false;cs='connecting';accessLoaded=false;viewLoaded=false;orgLoaded=false;base=null;lastSent='';inflight=0;startCloud();render();toast('Refreshing…')}
-function leaveGroup(){adminOpen=false;adminPw=null;if(gid){saveRecent(gid,groupName||gid.slice(0,8));try{localStorage.removeItem(viewKey());localStorage.removeItem(editKey())}catch(e){}}if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;gid='';try{localStorage.removeItem('ptc_group');history.replaceState(null,'',location.pathname)}catch(e){}clearLocal();render()}
+function leaveGroup(){connGen++;if(window._connTimer){clearTimeout(window._connTimer);window._connTimer=null}adminOpen=false;adminPw=null;if(gid){saveRecent(gid,groupName||gid.slice(0,8));try{localStorage.removeItem(viewKey());localStorage.removeItem(editKey())}catch(e){}}if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;gid='';try{localStorage.removeItem('ptc_group');history.replaceState(null,'',location.pathname)}catch(e){}clearLocal();render()}
 function switchGroupUI(){tab='hist';leaveGroup()}
 function randCode(){const a='abcdefghjkmnpqrstuvwxyz23456789';let s='';crypto.getRandomValues(new Uint8Array(14)).forEach(x=>{s+=a[x%a.length]});return s}
 function copyLink(){const u=gid;if(navigator.clipboard)navigator.clipboard.writeText(u).then(()=>toast('Group code copied')).catch(()=>prompt('Copy this group code',u));else prompt('Copy this group code',u)}
