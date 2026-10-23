@@ -154,11 +154,12 @@ body.dopen #drawer{transform:none}body.dopen #scrim{opacity:1;pointer-events:aut
   #v,#v.v-out,#v.v-in,#v.v-show{transition:none!important;transform:none!important;opacity:1!important}
 }
 
-/* ===== App hub (Poker / Expenses) ===== */
+/* ===== App hub (Cards / Expenses / Feed) ===== */
 body.mode-hub .tabs,body.mode-hub .intro,body.mode-hub .bar{display:none!important}
 body.mode-bills .tabs,body.mode-bills .intro{display:none!important}
-.hub{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:24px 0 12px;max-width:520px;margin-left:auto;margin-right:auto}
-@media(max-width:420px){.hub{grid-template-columns:1fr}}
+body.mode-feed .tabs,body.mode-feed .intro{display:none!important}
+.hub{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin:24px 0 12px;max-width:720px;margin-left:auto;margin-right:auto}
+@media(max-width:640px){.hub{grid-template-columns:1fr}}
 .hub-card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:28px 16px;min-height:160px;border:2px solid var(--tx);border-radius:24px;background:var(--card);box-shadow:6px 6px 0 var(--s1);cursor:pointer;transition:transform .15s ease,box-shadow .15s ease;text-align:center}
 .hub-card:nth-child(2){box-shadow:6px 6px 0 var(--s2)}
 .hub-card:active{transform:translateY(3px);box-shadow:2px 2px 0 var(--tx)}
@@ -225,7 +226,7 @@ body.mode-bills .topbar .tabs{display:none}
 <script>
 const $=s=>document.querySelector(s),E=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let adminPw=null,adminOpen=false,adminGroups=[],pendingEditPw=null;
-let aiFn,aiTips={},aiKey='',aiBusy=false,aiMsg='',excl={},game=null,gc=false,finals={},plays={},initLoan=500,loans=[],loanDraft={},ld=new Date().toLocaleDateString('en-CA'),hsort='desc',hpl='file',ALLP=[],PERIOD={a:0,b:-1,N:0},rf=0,rt=-1,players=[],sessions=[],draft={},tab='hist',dd=new Date().toLocaleDateString('en-CA'),appMode='',billTab='list',bills=[],billDraft={desc:'',amt:'',paid:'',shared:{}},billSettle=null,xgrp={busy:false,err:'',list:[],picked:{},data:{},combined:null};
+let aiFn,aiTips={},aiKey='',aiBusy=false,aiMsg='',excl={},game=null,gc=false,finals={},plays={},initLoan=500,loans=[],loanDraft={},ld=new Date().toLocaleDateString('en-CA'),hsort='desc',hpl='file',ALLP=[],PERIOD={a:0,b:-1,N:0},rf=0,rt=-1,players=[],sessions=[],draft={},tab='hist',dd=new Date().toLocaleDateString('en-CA'),appMode='',billTab='list',bills=[],billDraft={desc:'',amt:'',paid:'',shared:{}},billSettle=null,feed=[],xgrp={busy:false,err:'',list:[],picked:{},data:{},combined:null};
 const num=v=>typeof v==='number'&&isFinite(v),f=n=>num(n)?n.toLocaleString():'',cls=n=>n>0?'pos':n<0?'neg':'';
 const iso2ser=d=>Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10))/864e5+25569;
 const ser2iso=n=>new Date(Math.round((n-25569)*864e5)).toISOString().slice(0,10);
@@ -240,10 +241,32 @@ function kpis(){const st=stats();let b=null;sessions.forEach((s,i)=>players.forE
  const a=st[0],z=st[st.length-1];return[['Sessions',sessions.length,players.length+' players'],['Leader',a.p,f(a.t)],['Trailing',z.p,f(z.t)],['Best single session',b?b.p:'-',b?'+'+f(b.x)+' · '+b.n:'']]}
 
 
+
+function logFeed(text){
+ try{
+  if(!Array.isArray(feed))feed=[];
+  feed.unshift({id:uid(),at:Date.now(),text:String(text||'').slice(0,120)});
+  if(feed.length>40)feed=feed.slice(0,40);
+ }catch(e){}
+}
+function feedView(){
+ const items=Array.isArray(feed)?feed:[];
+ let h=`<div class="bills-nav"><button type="button" class="back-hub" data-mode="hub">← Home</button></div>
+ <div class="card"><b>Group feed</b><div class="mut" style="margin:4px 0 10px">Recent activity in this group (sessions, expenses, loans). Visible to everyone in the group.</div>`;
+ if(!items.length)h+='<p class="mut">No activity yet. Complete a game, add an expense, or save loans to see updates here.</p>';
+ else h+=items.map(it=>{
+  const when=it.at?new Date(it.at).toLocaleString():'';
+  return`<div style="padding:10px 0;border-bottom:1px solid var(--bd)"><div style="font-weight:700">${E(it.text)}</div><div class="mut" style="font-size:12px;margin-top:2px">${E(when)}</div></div>`;
+ }).join('');
+ h+=`</div>`;
+ return h;
+}
+
 function hubScreen(){
  return`<div class="hub">
-  <button type="button" class="hub-card" data-mode="poker"><div class="hub-ico">🃏</div><b>Poker</b><span>Sessions, loans &amp; game expenses</span></button>
-  <button type="button" class="hub-card" data-mode="bills"><div class="hub-ico">🧾</div><b>Expenses</b><span>Shared bills, independent of games</span></button>
+  <button type="button" class="hub-card" data-mode="poker"><div class="hub-ico">🃏</div><b>Cards</b><span>Sessions, loans &amp; game expenses</span></button>
+  <button type="button" class="hub-card" data-mode="bills"><div class="hub-ico">🧾</div><b>Expenses</b><span>Shared bills · synced with Cards</span></button>
+  <button type="button" class="hub-card" data-mode="feed"><div class="hub-ico">📢</div><b>Feed</b><span>Group activity updates</span></button>
  </div>
  <p class="mut" style="text-align:center;margin-top:8px">Choose a section for this group</p>`;
 }
@@ -255,15 +278,15 @@ function billsNav(){
  </div>`;
 }
 function billsList(){
- if(!players.length)return billsNav()+`<div class="card"><b>Add people first</b><p class="mut">Add player names once under <b>Poker → New session</b>, then come back here.</p><button class="pri" data-mode="poker">Go to Poker</button></div>`;
- const open=bills.filter(e=>!e.done),done=bills.filter(e=>e.done);
+ if(!players.length)return billsNav()+`<div class="card"><b>Add people first</b><p class="mut">Add player names once under <b>Cards → New session</b>, then come back here.</p><button class="pri" data-mode="poker">Go to Cards</button></div>`;
+ const open=expenses.filter(e=>!e.done),done=expenses.filter(e=>e.done);
  const paid=billDraft.paid&&players.includes(billDraft.paid)?billDraft.paid:players[0];
  const names=[...new Set([...players,...open.flatMap(e=>[e.paidBy,...(e.split||[])])])];
  const sp=expenseSplit(players,open);
  const row=e=>`<tr><td>${E(e.date)}</td><td>${E(e.desc)}</td><td>${E(e.paidBy)}</td><td>${fmtA(e.amt)}</td><td>${e.split&&e.split.length?E(e.split.join(', ')):'Everyone'}</td><td>${e.done?'<span class="mut">settled</span>':`<button class="x" data-billdel="${e.id}" title="Delete">✕</button>`}</td></tr>`;
  const tot=k=>names.reduce((a,p)=>a+(sp[k][p]||0),0)/100;
  let h=billsNav();
- h+=`<div class="card"><b>Add an expense</b>
+ h+=`<div class="mut" style="margin:0 0 10px">Same list as <b>Cards → Expenses</b>. Dashboard &amp; settle are extra tools here.</div><div class="card"><b>Add an expense</b>
  <div class="row"><input data-bd placeholder="What for? (e.g. rent, groceries)" style="text-align:left;flex:1;width:auto" value="${E(billDraft.desc||'')}"></div>
  <div class="row"><input data-ba inputmode="decimal" placeholder="Amount" value="${E(billDraft.amt||'')}"></div>
  <div style="margin:10px 0 4px"><b>Who paid?</b></div>
@@ -286,7 +309,7 @@ function billsList(){
  return h;
 }
 function billsDash(){
- const open=bills.filter(e=>!e.done),all=bills;
+ const open=expenses.filter(e=>!e.done),all=expenses;
  const sp=expenseSplit(players,open);
  const names=players.length?players:[...new Set(all.flatMap(e=>[e.paidBy,...(e.split||[])]))];
  const nets=names.map(p=>{const a=(sp.paid[p]||0)/100,b=(sp.share[p]||0)/100;return{p,paid:a,share:b,net:Math.round((a-b)*100)/100}});
@@ -828,16 +851,18 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(g('data-nreset')){const k=g('data-nreset').dataset.nreset;if(confirm('Replace the '+k+' with the original text?')){if(k=='readme'){readme=null;editing.readme=false;delete notesDraft.readme}else{rules=null;editing.rules=false;delete notesDraft.rules}render()}}
  else if(t.id=='exadd'){const cand=game?game.players:players,amt=parseFloat(exDraft.amt),paid=exDraft.paid&&players.includes(exDraft.paid)?exDraft.paid:cand[0],sh=cand.filter(p=>exDraft.shared[p]!==false);
   if(!(amt>0))return toast('Enter an amount greater than 0');if(!sh.length)return toast('Choose who shares it');
-  expenses.push({date:new Date().toLocaleDateString('en-CA'),desc:(exDraft.desc||'').trim()||'Expense',paidBy:paid,amt,split:sh.length==cand.length?null:sh,g:game?game.date:'',done:false});exDraft={desc:'',amt:'',paid:'',shared:{}};render();toast('Expense added')}
+  const _ed=(exDraft.desc||'').trim()||'Expense';expenses.push({id:uid(),date:new Date().toLocaleDateString('en-CA'),desc:_ed,paidBy:paid,amt,split:sh.length==cand.length?null:sh,g:game?game.date:'',done:false});logFeed(_ed+' · paid by '+paid);exDraft={desc:'',amt:'',paid:'',shared:{}};render();toast('Expense added')}
  else if(t.id=='billadd'){const amt=parseFloat(billDraft.amt),paid=billDraft.paid&&players.includes(billDraft.paid)?billDraft.paid:players[0],sh=players.filter(p=>billDraft.shared[p]!==false);
-  if(!players.length)return toast('Add players in Poker first');if(!(amt>0))return toast('Enter an amount greater than 0');if(!sh.length)return toast('Choose who shares it');
-  bills.push({id:uid(),date:new Date().toLocaleDateString('en-CA'),desc:(billDraft.desc||'').trim()||'Expense',paidBy:paid,amt,split:sh.length==players.length?null:sh,done:false});billDraft={desc:'',amt:'',paid:'',shared:{}};render();toast('Saved')}
- else if(g('data-billdel')){const id=g('data-billdel').dataset.billdel;if(confirm('Delete this expense?')){bills=bills.filter(e=>e.id!==id);render()}}
- else if(t.id=='billsettle'){const open=bills.filter(e=>!e.done);if(!open.length)return toast('Nothing to settle');if(!confirm('Settle all open expenses? This calculates who pays whom and marks them settled.'))return;
+  if(!players.length)return toast('Add players in Cards first');if(!(amt>0))return toast('Enter an amount greater than 0');if(!sh.length)return toast('Choose who shares it');
+  const desc=(billDraft.desc||'').trim()||'Expense';
+  expenses.push({id:uid(),date:new Date().toLocaleDateString('en-CA'),desc,paidBy:paid,amt,split:sh.length==players.length?null:sh,g:game?game.date:'',done:false});
+  billDraft={desc:'',amt:'',paid:'',shared:{}};logFeed(desc+' · paid by '+paid);render();toast('Saved')}
+ else if(g('data-billdel')){const id=g('data-billdel').dataset.billdel;if(confirm('Delete this expense?')){expenses=expenses.filter(e=>e.id!==id);render()}}
+ else if(t.id=='billsettle'){const open=expenses.filter(e=>!e.done);if(!open.length)return toast('Nothing to settle');if(!confirm('Settle all open expenses? This calculates who pays whom and marks them settled.'))return;
   const sp=expenseSplit(players,open),names=[...new Set([...players,...open.flatMap(e=>[e.paidBy,...(e.split||[])])])];
   const bal=names.map(p=>{const a=(sp.paid[p]||0)-(sp.share[p]||0);return{p,b:a}});
   billSettle={id:uid(),date:new Date().toLocaleDateString('en-CA'),items:minTransfers(bal).map(x=>({f:x.f,t:x.t,a:x.a/100}))};
-  bills.forEach(e=>{if(!e.done)e.done=true});render();toast('Settled')}
+  expenses.forEach(e=>{if(!e.done)e.done=true});logFeed('Expenses settled');render();toast('Settled')}
  else if(g('data-exdel')){const id=g('data-exdel').dataset.exdel;if(confirm('Delete this expense?')){expenses=expenses.filter(e=>e.id!==id);render()}}
  else if(g('data-sshare')){if(settle){const t0=settleText();if(navigator.share)navigator.share({text:t0}).catch(()=>{});else if(navigator.clipboard)navigator.clipboard.writeText(t0).then(()=>toast('Copied'));else prompt('Copy this',t0)}}
  else if(g('data-shide')){if(settle){try{localStorage.setItem('ptc_hs_'+gid,settle.id)}catch(e){}render()}}
@@ -890,10 +915,10 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   if(game.players.includes(n))return toast(n+' is already in this game');if(!players.includes(n))players.push(n);game.players.push(n);plays[n]=true;render();toast(n+' added to the game')}
  else if(t.id=='gfin-early'){if(!game||!game.exited)return;const res={...game.exited};if(!confirm('Save cashed-out results to History?'))return;
   const n=Math.round(Object.values(res).reduce((a,b)=>a+b,0)*100)/100;if(n&&!confirm('Results net to '+n+', not 0. Save anyway?'))return;
-  sessions.push({date:game.date,label:'',v:res});settle=computeSettle(res,expenses.filter(e=>!e.done),Object.keys(res),game.date);loans.forEach(l=>{if(!l.done){l.done=true;l.g=game.date}});expenses.forEach(e=>{if(!e.done){e.done=true;e.g=game.date}});sortS();game=null;gc=false;finals={};loanDraft={};tab='hist';wantFull=true;render();toast('Game saved. The settlement is at the top of History.')}
+  sessions.push({date:game.date,label:'',v:res});settle=computeSettle(res,expenses.filter(e=>!e.done),Object.keys(res),game.date);loans.forEach(l=>{if(!l.done){l.done=true;l.g=game.date}});expenses.forEach(e=>{if(!e.done){e.done=true;e.g=game.date}});sortS();game=null;gc=false;finals={};loanDraft={};tab='hist';wantFull=true;render();logFeed('Game completed · '+Object.keys(res||{}).length+' players');toast('Game saved. The settlement is at the top of History.')}
  else if(t.id=='gfin'){if(!game)return;const rows=loanRows(game.players),res={...(game.exited||{})};let miss=0;rows.forEach(r=>{const a=parseFloat(finals[r.p]);if(isNaN(a)){miss=1;return}res[r.p]=Math.round((a-r.cur)*100)/100});
   if(miss)return toast("Enter every remaining player's final amount");if(!confirm('Are you sure you want to complete this game and save results to History?'))return;const n=Math.round(Object.values(res).reduce((a,b)=>a+b,0)*100)/100;if(n&&!confirm(`Results net to ${n}, not 0. Save anyway?`))return;
-  sessions.push({date:game.date,label:'',v:res});settle=computeSettle(res,expenses.filter(e=>!e.done),game.players,game.date);loans.forEach(l=>{if(!l.done){l.done=true;l.g=game.date}});expenses.forEach(e=>{if(!e.done){e.done=true;e.g=game.date}});sortS();game=null;gc=false;finals={};loanDraft={};tab='hist';wantFull=true;render();toast('Game saved. The settlement is at the top of History.')}
+  sessions.push({date:game.date,label:'',v:res});settle=computeSettle(res,expenses.filter(e=>!e.done),game.players,game.date);loans.forEach(l=>{if(!l.done){l.done=true;l.g=game.date}});expenses.forEach(e=>{if(!e.done){e.done=true;e.g=game.date}});sortS();game=null;gc=false;finals={};loanDraft={};tab='hist';wantFull=true;render();logFeed('Game completed · '+Object.keys(res||{}).length+' players');toast('Game saved. The settlement is at the top of History.')}
  else if(t.id=='lsave'){const add=[];let bad=0;if(!game)return;game.players.forEach(p=>{const x=loanDraft[p]||{},a=parseFloat(x.amt);if(x.amt===undefined||x.amt==='')return;if(!isFinite(a)||a===0){bad=1;return}add.push({date:ld,who:p,amt:x.src=='__repay'?-Math.abs(a):a,src:x.src=='__repay'?null:(x.src||null),g:game.date,done:false})});
   if(!ld)return toast('Pick the date');if(bad)return toast('Enter a valid amount that is not 0 (use − for a repayment)');if(!add.length)return toast('Enter at least one amount');
   loans.push(...add);loanDraft={};render();toast('Saved')}
@@ -933,12 +958,12 @@ document.addEventListener('change',e=>{const t=e.target;
 let gid='',cs='connecting',cloudErr='',synced=false,cloudOn=false,base=null,inflight=0,lastSent='',applying=false,pendingRender=false;
 try{gid=((location.hash||'').match(/g=([A-Za-z0-9_-]{8,40})/)||[])[1]||localStorage.getItem('ptc_group')||''}catch(e){}
 const hashGame=((location.hash||'').match(/game=(\d{4}-\d{2}-\d{2})/)||[])[1]||'';
-const EMPTY=()=>({players:[],sessions:[],loans:[],expenses:[],settle:null,initLoan:500,game:null,readme:null,rules:null,groupName:'',bills:[],billSettle:null});
+const EMPTY=()=>({players:[],sessions:[],loans:[],expenses:[],settle:null,initLoan:500,game:null,readme:null,rules:null,groupName:'',bills:[],billSettle:null,feed:[]});
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
 const canon=x=>JSON.stringify(x,(k,v)=>v&&typeof v=='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(q=>[q,v[q]])):v);
-const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],expenses:S.expenses||[],settle:S.settle||null,initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:null,groupName:typeof S.groupName=='string'?S.groupName:'',bills:(S.bills||[]),billSettle:S.billSettle||null});
+const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],expenses:S.expenses||[],settle:S.settle||null,initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:null,groupName:typeof S.groupName=='string'?S.groupName:'',bills:(S.bills||[]),billSettle:S.billSettle||null,feed:feed});
 function getState(){sessions.forEach(x=>{if(!x.id)x.id=uid()});loans.forEach(l=>{if(!l.id)l.id=uid()});expenses.forEach(e=>{if(!e.id)e.id=uid()});bills.forEach(e=>{if(!e.id)e.id=uid()});
- return{players:[...players],sessions:sessions.map(x=>({id:x.id,date:(x.date||''),label:(x.label||''),v:(x.v&&typeof x.v==='object')?{...x.v}:{}})),loans:loans.map(l=>({id:l.id,date:l.date,who:l.who,amt:l.amt,src:l.src||null,g:l.g||'',done:!!l.done})),initLoan,game:game?{date:game.date,players:Array.isArray(game.players)?[...game.players]:[],exited:(game.exited&&typeof game.exited==='object')?{...game.exited}:{}}:null,readme,rules,groupName,expenses:expenses.map(e=>({id:e.id,date:e.date||'',desc:e.desc||'',paidBy:e.paidBy,amt:e.amt,split:e.split&&e.split.length?[...e.split]:null,g:e.g||'',done:!!e.done})),settle:settle?JSON.parse(JSON.stringify(settle)):null,bills:bills.map(e=>({id:e.id,date:e.date||'',desc:e.desc||'',paidBy:e.paidBy,amt:e.amt,split:e.split&&e.split.length?[...e.split]:null,done:!!e.done})),billSettle:billSettle?JSON.parse(JSON.stringify(billSettle)):null}}
+ return{players:[...players],sessions:sessions.map(x=>({id:x.id,date:(x.date||''),label:(x.label||''),v:(x.v&&typeof x.v==='object')?{...x.v}:{}})),loans:loans.map(l=>({id:l.id,date:l.date,who:l.who,amt:l.amt,src:l.src||null,g:l.g||'',done:!!l.done})),initLoan,game:game?{date:game.date,players:Array.isArray(game.players)?[...game.players]:[],exited:(game.exited&&typeof game.exited==='object')?{...game.exited}:{}}:null,readme,rules,groupName,expenses:expenses.map(e=>({id:e.id,date:e.date||'',desc:e.desc||'',paidBy:e.paidBy,amt:e.amt,split:e.split&&e.split.length?[...e.split]:null,g:e.g||'',done:!!e.done})),settle:settle?JSON.parse(JSON.stringify(settle)):null,bills:[],feed:(feed||[]).slice(0,40).map(x=>({id:x.id,at:x.at,text:x.text||''})),billSettle:billSettle?JSON.parse(JSON.stringify(billSettle)):null}}
 function applyState(S){S=norm(S);players=Array.isArray(S.players)?[...S.players]:[];
  sessions=(Array.isArray(S.sessions)?S.sessions:[]).map(x=>{const v=(x&&x.v&&typeof x.v==='object')?{...x.v}:{};return{...(x||{}),v}});
  loans=(Array.isArray(S.loans)?S.loans:[]).map(l=>({...(l||{})}));
@@ -948,6 +973,10 @@ function applyState(S){S=norm(S);players=Array.isArray(S.players)?[...S.players]
  readme=S.readme;rules=S.rules;groupName=S.groupName||'';
  expenses=(Array.isArray(S.expenses)?S.expenses:[]).map(e=>({...(e||{})}));settle=S.settle||null;
  bills=(Array.isArray(S.bills)?S.bills:[]).map(e=>({...(e||{})}));billSettle=S.billSettle||null;
+ // Sync: older independent bills → shared expenses list
+ if(bills.length){const ids=new Set(expenses.map(e=>e.id).filter(Boolean));bills.forEach(b=>{if(b&&b.id&&!ids.has(b.id)){expenses.push({...b});ids.add(b.id)}});bills=[]}
+ feed=Array.isArray(S.feed)?S.feed.map(x=>({...(x||{})})):[]
+
  if(!game){gc=false;finals={}}sortS();if(gid&&groupName)saveRecent(gid,groupName)}
 function mergeState(b,l,r){const o=norm(JSON.parse(JSON.stringify(r)));b=norm(b);
  l.players.forEach(p=>{if(!o.players.includes(p))o.players.push(p)});b.players.forEach(p=>{if(!l.players.includes(p))o.players=o.players.filter(x=>x!==p)});
@@ -1006,6 +1035,7 @@ function render(){try{
  document.body.classList.toggle('mode-hub',!appMode);
  document.body.classList.toggle('mode-poker',appMode==='poker');
  document.body.classList.toggle('mode-bills',appMode==='bills');
+ document.body.classList.toggle('mode-feed',appMode==='feed');
  if(!appMode){
   $('#v').innerHTML=hubScreen();
   setSync(cs);
@@ -1016,6 +1046,13 @@ function render(){try{
  if(appMode==='bills'){
   $('#v').innerHTML=billsView();
   setSync(cs);document.body.classList.toggle('viewonly',!canEdit());if(!canEdit())lockUI();
+  ['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el)el.style.display='none'});
+  try{syncUploadBtn()}catch(e){}
+  queueMicrotask(()=>{try{persist()}catch(e){console.error(e)}});return;
+ }
+ if(appMode==='feed'){
+  $('#v').innerHTML=feedView();
+  setSync(cs);
   ['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el)el.style.display='none'});
   try{syncUploadBtn()}catch(e){}
   queueMicrotask(()=>{try{persist()}catch(e){console.error(e)}});return;
@@ -1265,7 +1302,7 @@ function expensesTab(){if(!players.length)return'<p class="mut">Add players firs
  const cand=game?game.players:players,open=expenses.filter(e=>!e.done),done=expenses.filter(e=>e.done),paid=exDraft.paid&&players.includes(exDraft.paid)?exDraft.paid:cand[0];
  const names=[...new Set([...cand,...open.flatMap(e=>[e.paidBy,...(e.split||[])])])],sp=expenseSplit(cand,open),row=e=>`<tr><td>${E(e.date)}</td><td>${E(e.desc)}</td><td>${E(e.paidBy)}</td><td>${fmtA(e.amt)}</td><td>${e.split&&e.split.length?E(e.split.join(', ')):'Everyone'}</td><td>${e.done?'<span class="mut">settled</span>':`<button class="x" data-exdel="${e.id}" title="Delete">✕</button>`}</td></tr>`;
  const tot=k=>names.reduce((a,p)=>a+(sp[k][p]||0),0)/100;
- return`<div class="card"><b>Add an expense</b>
+ return`<div class="mut" style="margin:0 0 10px">Same expenses as <b>Home → Expenses</b>. Changes sync for everyone.</div><div class="card"><b>Add an expense</b>
  <div class="row"><input data-ed placeholder="What for? (e.g. snacks)" style="text-align:left;flex:1;width:auto" value="${E(exDraft.desc)}"></div>
  <div class="row"><input data-ea inputmode="decimal" placeholder="Amount" value="${E(exDraft.amt)}"></div>
  <div style="margin:10px 0 4px"><b>Who paid?</b></div>
@@ -1321,7 +1358,7 @@ function startCloud(){if(!gid)return;
     if(pendingOrgPass){const pw=pendingOrgPass,setG=pendingSetGlobal,ep=pendingEditPw;pendingOrgPass=null;pendingSetGlobal=false;pendingEditPw=null;try{const salt=randHex(16),iter=150000,hash=await hashPass(pw,salt,iter);const payload=JSON.stringify({salt,iter,hash});await cloud.put(gid,'organiser',payload);if(ep){const s2=randHex(16),h2=await hashPass(ep,s2,150000);await cloud.put(gid,'access',JSON.stringify({salt:s2,iter:150000,hash:h2}));access={salt:s2,iter:150000,hash:h2};accessLoaded=true;lastCode=ep.slice(0,4)+'-'+ep.slice(4)}if(setG)await cloud.put(CFG,'createpass',payload);orgInfo={salt,iter,hash};orgLoaded=true;markOrganiser();await registerGroup(gid,groupName);render()}catch(e){toast('Could not save admin password — set it on the Backups tab')}}
     else render();queueMicrotask(persist)})();return}
   if(inflight)return;reconcile(S)},e=>{cloudErr=((e&&e.code)||'error')+': '+((e&&e.message)||'');cs='error';synced=synced&&false;render()})}
-function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};bills=[];billSettle=null;billDraft={desc:'',amt:'',paid:'',shared:{}};appMode='';billTab='list';xgrp={busy:false,err:'',list:[],picked:{},data:{},combined:null};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
+function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};bills=[];billSettle=null;billDraft={desc:'',amt:'',paid:'',shared:{}};feed=[];appMode='';billTab='list';xgrp={busy:false,err:'',list:[],picked:{},data:{},combined:null};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
 function setGroup(code,name,opts){const nm=(name!=null?String(name):'').trim().slice(0,40);const doReg=opts&&opts.register;gid=code;saveRecent(code,nm||code.slice(0,8));try{localStorage.setItem('ptc_group',code);history.replaceState(null,'','#g='+code)}catch(e){}clearLocal();groupName=nm;cs='connecting';startCloud();render();if(doReg)queueMicrotask(()=>registerGroup(code,nm).catch(()=>{}))}
 function refreshGroup(){if(!gid){location.reload();return}if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;synced=false;cs='connecting';accessLoaded=false;viewLoaded=false;orgLoaded=false;base=null;lastSent='';inflight=0;startCloud();render();toast('Refreshing…')}
 function leaveGroup(){adminOpen=false;adminPw=null;if(gid){saveRecent(gid,groupName||gid.slice(0,8));try{localStorage.removeItem(viewKey());localStorage.removeItem(editKey())}catch(e){}}if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;gid='';try{localStorage.removeItem('ptc_group');history.replaceState(null,'',location.pathname)}catch(e){}clearLocal();render()}
