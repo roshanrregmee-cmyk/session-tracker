@@ -123,15 +123,95 @@ input:focus,select:focus{outline:none;border-color:var(--ac);box-shadow:0 0 0 3p
 .ind{font-size:10px;color:var(--mut);white-space:nowrap;border:1px solid var(--bd);border-radius:999px;padding:2px 8px;background:var(--card);font-weight:600}.ind:empty{display:none}
 .rbtn{width:28px;height:28px;padding:0;font-size:15px;line-height:1;border-radius:50%}
 .srt{display:flex;gap:8px;margin:0 0 8px;font-size:12px}.srt label{flex:1;display:flex;align-items:center;gap:5px;min-width:0;margin:0}.srt select{flex:1;min-width:0;font-size:12px;padding:3px 6px}
-/* join screen */
-.nogrp .hd{justify-content:center}
-.nogrp h1{justify-content:center;margin:30px 0 14px}.nogrp h1 .ttl{display:none}
-.nogrp h1 img{height:128px!important;width:128px!important;margin:0!important;box-shadow:0 14px 34px -12px rgba(70,30,130,.55)}
-.jn{max-width:400px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
-.jn input{width:100%;padding:14px 16px;font-size:16px;text-align:left;border-radius:14px;background:var(--card)}
-.jn button{padding:13px;font-size:16px}
-.grow{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:10px 12px;box-shadow:var(--sh)}
+/* join screen — full viewport, no scroll, floating king */
+.nogrp{overflow:hidden!important;height:100dvh;height:100vh}
+.nogrp body,.nogrp{overscroll-behavior:none}
+body.nogrp{overflow:hidden!important;height:100dvh;height:100vh;touch-action:manipulation}
+html.nogrp{overflow:hidden!important;height:100dvh;height:100vh}
+body.nogrp main{padding:0!important;margin:0!important;max-width:none;height:100dvh;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;position:relative}
+body.nogrp .topbar{position:static;margin:0;padding:0;background:transparent;border:0;box-shadow:none;width:100%;display:flex;flex-direction:column;align-items:center}
+body.nogrp .intro,.nogrp .intro{display:none!important}
+.nogrp .hd{justify-content:center;margin:0;padding:0}
+.nogrp h1{justify-content:center;margin:0 0 8px;padding:0;position:relative;z-index:2}
+.nogrp h1 .ttl{display:none}
+.nogrp h1 img{
+  height:min(42vw,168px)!important;width:min(42vw,168px)!important;margin:0!important;
+  border-radius:28%;
+  box-shadow:0 18px 40px -10px rgba(255,61,129,.55),0 8px 20px -8px rgba(255,138,31,.4);
+  animation:kingFloat 3.2s ease-in-out infinite,kingGlow 2.4s ease-in-out infinite alternate;
+  transform-origin:50% 60%;
+}
+@keyframes kingFloat{
+  0%,100%{transform:translateY(0) rotate(-2deg)}
+  40%{transform:translateY(-14px) rotate(3deg)}
+  70%{transform:translateY(-6px) rotate(-1deg)}
+}
+@keyframes kingGlow{
+  from{filter:drop-shadow(0 0 0 rgba(255,61,129,0))}
+  to{filter:drop-shadow(0 0 18px rgba(255,110,165,.55))}
+}
+@media(prefers-reduced-motion:reduce){
+  .nogrp h1 img{animation:none}
+}
+.nogrp #v{width:100%;max-width:420px;padding:0 20px;box-sizing:border-box;position:relative;z-index:2}
+.jn{max-width:400px;margin:0 auto;display:flex;flex-direction:column;gap:14px;align-items:stretch}
+.jn .jn-title{
+  text-align:center;font-size:clamp(22px,6vw,30px);font-weight:800;letter-spacing:-.5px;
+  background:linear-gradient(90deg,var(--g1),var(--g2) 55%,#c026d3);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  margin:4px 0 2px;line-height:1.15
+}
+.jn .jn-sub{text-align:center;color:var(--mut);font-size:14px;margin:0 0 4px;font-weight:500}
+.jn input{
+  width:100%;padding:16px 18px;font-size:17px;text-align:center;letter-spacing:.04em;
+  border-radius:18px;background:var(--card);border:2px solid transparent;
+  box-shadow:var(--sh),0 0 0 1px var(--bd);font-weight:600;
+  transition:box-shadow .15s,border-color .15s,transform .1s
+}
+.jn input:focus{
+  outline:none;border-color:var(--ac);
+  box-shadow:0 0 0 4px var(--ring),var(--sh)
+}
+.jn input::placeholder{font-weight:500;letter-spacing:0;opacity:.7}
+.jn button{padding:15px 18px;font-size:16px;border-radius:999px;font-weight:700}
+.jn .pri{
+  background:linear-gradient(135deg,var(--g1),var(--g2) 60%,#ffb21e);
+  border:0;color:#fff;box-shadow:0 10px 28px -10px rgba(255,61,129,.75);
+  text-shadow:0 1px 1px rgba(0,0,0,.18);letter-spacing:.02em
+}
+.jn .pri:active{transform:scale(.97)}
+.jn #gadminlogin,.jn #gback{
+  background:rgba(255,255,255,.55);backdrop-filter:blur(8px);
+  border:1px solid var(--bd);color:var(--tx)
+}
+:root[data-theme="dark"] .jn #gadminlogin,:root[data-theme="dark"] .jn #gback{background:rgba(32,18,69,.65)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .jn #gadminlogin,:root:not([data-theme="light"]) .jn #gback{background:rgba(32,18,69,.65)}}
+.jn .jn-or{display:flex;align-items:center;gap:10px;color:var(--mut);font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+.jn .jn-or::before,.jn .jn-or::after{content:"";flex:1;height:1px;background:var(--bd)}
+.grow{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:12px 14px;box-shadow:var(--sh)}
 .grow small{display:block}
+/* funky ambient blobs on join only */
+body.nogrp main::before,body.nogrp main::after{
+  content:"";position:fixed;border-radius:50%;pointer-events:none;z-index:0;
+  filter:blur(40px);opacity:.55
+}
+body.nogrp main::before{
+  width:min(70vw,320px);height:min(70vw,320px);
+  top:-8%;right:-12%;
+  background:radial-gradient(circle at 30% 30%,#ff3d81,transparent 70%)
+}
+body.nogrp main::after{
+  width:min(60vw,280px);height:min(60vw,280px);
+  bottom:5%;left:-15%;
+  background:radial-gradient(circle at 70% 40%,#ffb21e,transparent 70%)
+}
+body.nogrp .topbar::after{
+  content:"";position:fixed;width:min(50vw,220px);height:min(50vw,220px);
+  top:42%;left:50%;transform:translate(-50%,-50%);
+  border-radius:50%;pointer-events:none;z-index:0;
+  background:radial-gradient(circle,#8b5cf6 0%,transparent 70%);
+  opacity:.25;filter:blur(30px)
+}
 /* dashboard tools */
 .tools{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px}
 .tool{display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 8px;border:1px solid var(--bd);border-radius:16px;background:var(--card);color:var(--tx);font:inherit;font-weight:600;font-size:14px;box-shadow:var(--sh);cursor:pointer;text-align:center}
@@ -964,8 +1044,8 @@ function gbarHtml(){if(!gid)return'';
  return`${accessLoaded&&!canEdit()?'<button class="pri" id="unlock">🔑 Enter password</button>':''}<button data-mode="hub">🏠 Home</button><button data-gcopy>📋 Copy Group Code</button>${canEdit()?'<button data-grename>✎ Rename group</button>':''}<button data-gleave>🚪 Leave</button>`}
 function setSync(c){cs=c;try{const tb=document.querySelector('.topbar');if(tb)document.documentElement.style.setProperty('--tbh',tb.offsetHeight+'px')}catch(e){}const g=$('#gbar');if(g)g.innerHTML=gbarHtml();const ii=$('#ind');if(ii)ii.innerHTML=indHtml();const t=$('#ttl');if(t)t.textContent=gid?(groupName||gid.slice(0,6)+'…'):'';const dn=$('#dname');if(dn)dn.textContent=gid?(groupName||gid.slice(0,6)+'…'):''}
 function joinScreen(){
- if(adminOpen)return`<div class="jn">${adminGroups.length?adminGroups.map(g=>`<div class="grow"><span><b>${E(g.name||g.code.slice(0,8))}</b><small class="mut">${E(g.code.slice(0,8))}…</small></span><button class="pri" data-gadm="${E(g.code)}">Enter</button></div>`).join(''):'<div class="mut" style="text-align:center">No groups yet</div>'}<button class="pri" id="gnew2">＋ New group</button><button id="gback">Back</button></div>`;
- return`<div class="jn"><input id="gc_in" placeholder="Group Code" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="pri" id="gjoin">Join</button><button id="gadminlogin">🔑 Admin</button></div>`}
+ if(adminOpen)return`<div class="jn"><div class="jn-title">Admin</div><div class="jn-sub">Pick a group or create one</div>${adminGroups.length?adminGroups.map(g=>`<div class="grow"><span><b>${E(g.name||g.code.slice(0,8))}</b><small class="mut">${E(g.code.slice(0,8))}…</small></span><button class="pri" data-gadm="${E(g.code)}">Enter</button></div>`).join(''):'<div class="mut" style="text-align:center">No groups yet</div>'}<button class="pri" id="gnew2">＋ New group</button><button id="gback">Back</button></div>`;
+ return`<div class="jn"><div class="jn-title">Session Tracker</div><div class="jn-sub">Drop your group code &amp; jump in</div><input id="gc_in" placeholder="Group code" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="pri" id="gjoin">Join the table ✨</button><div class="jn-or">or</div><button id="gadminlogin">🔑 Admin</button></div>`}
 async function adminLogin(){
  if(!(await ensureCloud()))return toast('Could not connect. Check your internet and try again.');
  let info=null;try{info=await loadCreatePass()}catch(e){return toast('Could not check admin access')}
@@ -991,7 +1071,7 @@ function syncUploadBtn(){
   }catch(e){console.error('syncUploadBtn',e)}
 }
 function render(){try{
- document.body.classList.toggle('nogrp',!gid);
+ document.body.classList.toggle('nogrp',!gid);document.documentElement.classList.toggle('nogrp',!gid);
  const vEl=$('#v');if(!vEl){console.error('Missing #v');return}
  if(!gid){vEl.innerHTML=joinScreen();return}
  if(!synced){$('#v').innerHTML=connectCard();setSync(cs);return}
