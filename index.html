@@ -526,12 +526,13 @@ function loantable(P){const r=loanRows(P).map(x=>({p:x.p,i:ng(x.init),b:ng(x.ban
 function loglist(){const log=loans.map((l,i)=>({l,i})).sort((a,b)=>a.l.date<b.l.date?1:a.l.date>b.l.date?-1:b.i-a.i);
  return'<p><b>Loan log</b></p>'+(log.length?'<div class="sc"><table><tbody>'+log.map(o=>`<tr><td>${o.l.date}</td><td>${E(o.l.who)}</td><td class="${cls(ng(o.l.amt))}">${o.l.amt>0?'−':'+'}${f(Math.abs(o.l.amt))}</td><td>${o.l.amt<0?'repaid to ':'borrowed from '}${o.l.src?E(o.l.src):'Bank'}</td><td>${o.l.done?'<span class="mut">settled</span>':`<button class="x" data-ldel="${o.i}" title="Delete">✕</button>`}</td></tr>`).join('')+'</tbody></table></div>':'<p class="mut">No fresh loans yet.</p>')}
 function joinCard(){const out=players.filter(p=>!game.players.includes(p));
- return`<div class="card"><b>Add a player to this game</b><div class="row"><input id="jn" list="jl" placeholder="Player name" style="text-align:left;flex:1"><button id="jb">Add to game</button></div><datalist id="jl">${out.map(p=>`<option value="${E(p)}">`).join('')}</datalist></div>
+ return`<div class="card"><b>Add a player to this game</b><div class="mut" style="margin:0 0 6px">Cashed-out players can rejoin — you'll choose to club results or mark the cash-out as settled.</div><div class="row"><input id="jn" list="jl" placeholder="Player name" style="text-align:left;flex:1"><button id="jb">Add to game</button></div><datalist id="jl">${out.map(p=>`<option value="${E(p)}">`).join('')}</datalist></div>
  <div class="card"><b>Remove a player from this game</b>
  ${game.players.map(p=>`<div class="row" style="justify-content:space-between"><span>${E(p)}</span><button class="x" data-prm="${E(p)}" title="Remove from game">Remove</button></div>`).join('')||'<p class="mut">No players in this game.</p>'}</div>`}
 function gcPanel(P,cur){return`<div class="card" id="gcPanel" style="border:3px solid var(--ac);box-shadow:0 8px 28px rgba(0,0,0,.18)"><b>Game completion</b>
  ${P.map(p=>`<div class="row"><span>${E(p)} <small class="mut">(${f(ng(cur[p]))})</small></span><input inputmode="decimal" placeholder="final amount" data-fa="${E(p)}" value="${E(finals[p]===undefined?'':finals[p])}"><b class="res" data-rp="${E(p)}"></b></div>`).join('')}
- ${Object.entries(game.exited||{}).map(([p,r])=>`<div class="row gout"><span>${E(p)} <small class="mut">cashed out</small></span><span class="mut">locked</span><b class="${cls(r)}">${r>0?'+':''}${f(r)}</b></div>`).join('')}
+ ${Object.entries(game.exited||{}).map(([p,r])=>`<div class="row gout"><span>${E(p)} <small class="mut">cashed out</small></span><span class="mut">in settlement</span><b class="${cls(r)}">${r>0?'+':''}${f(r)}</b></div>`).join('')}
+ ${(game.settledPrior&&Object.keys(game.settledPrior).length)?Object.entries(game.settledPrior).map(([p,r])=>`<div class="row"><span>${E(p)} <small class="mut">prior settled</small></span><span class="mut">kept</span><b class="${cls(r)}">${r>0?'+':''}${f(r)}</b></div>`).join(''):''}
   <div class="sum" id="gsum"></div><button class="pri" id="gfin" style="width:100%">Complete game &amp; save to History</button></div>`}
 function loansTab(){
  if(!game)return`<div class="card"><b>No game in progress</b><p class="mut">Start one in “New session”.</p></div>`+loglist();
@@ -551,9 +552,9 @@ function loansTab(){
  <button class="pri" id="lsave" style="width:100%;margin-top:10px">Save fresh loans</button></div>
  <p><b>Current standing</b></p>
  ${loantable(P)}
- <div class="card"><b>Cash out early</b><div class="mut" style="margin:4px 0 8px">If a player leaves before the game ends, settle their result now. They are removed from this game; others continue.</div>
+ <div class="card"><b>Cash out early</b><div class="mut" style="margin:4px 0 8px">If a player leaves before the game ends, lock their result now. They leave the table but stay in the session for settlement — not treated as unbalanced. They can rejoin later (club results or mark the cash-out as already settled).</div>
  ${P.map(p=>`<div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:6px"><span>${E(p)} <small class="mut">(${f(ng(cur[p]))})</small></span><button data-cashout="${E(p)}">Cash out</button></div>`).join('')}
- ${game.exited&&Object.keys(game.exited).length?`<div class="mut" style="margin-top:10px">Already cashed out:</div>`+Object.entries(game.exited).map(([p,r])=>`<div class="row"><span>${E(p)}</span><b class="${cls(r)}">${r>0?'+':''}${f(r)}</b></div>`).join(''):''}
+ ${game.exited&&Object.keys(game.exited).length?`<div class="mut" style="margin-top:10px">Cashed out (still in settlement — use Add player above to rejoin):</div>`+Object.entries(game.exited).map(([p,r])=>`<div class="row"><span>${E(p)}</span><b class="${cls(r)}">${r>0?'+':''}${f(r)}</b></div>`).join(''):''}
  </div>
  ${gc?gcPanel(P,cur):''}
  ${loglist()}
@@ -955,22 +956,54 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   const fa=prompt('Final amount for '+p+' (chips they leave with):');if(fa===null)return;
   const a=parseFloat(fa);if(!isFinite(a))return toast('Enter a valid number');
   const result=Math.round((a-cur[p])*100)/100;
-  if(!confirm(p+' result: '+(result>0?'+':'')+result+'. Remove them from this game?'))return;
+  if(!confirm(p+' result: '+(result>0?'+':'')+result+'. Lock this cash-out? They leave the table but stay in settlement (not unbalanced).'))return;
   if(!game.exited)game.exited={};game.exited[p]=result;
+  if(!game.settledPrior)game.settledPrior={};
   game.players=game.players.filter(x=>x!==p);
   delete finals[p];delete loanDraft[p];
   if(gc&&!game.players.length)gc=false;
-  render();toast(p+' cashed out · '+(result>0?'+':'')+result)}
+  render();toast(p+' cashed out · '+(result>0?'+':'')+result+' · can rejoin later')}
  else if(t.id=='gcb'){gc=!gc;render();if(gc){requestAnimationFrame(()=>{const el=document.getElementById('gcPanel');if(el)el.scrollIntoView({behavior:'smooth',block:'center'})})}}
 
  else if(t.id=='jb'){if(!game)return;let n=($('#jn').value||'').trim();if(!n)return toast('Enter a player name');n=players.find(q=>q.toLowerCase()==n.toLowerCase())||n;
-  if(game.players.includes(n))return toast(n+' is already in this game');if(!players.includes(n))players.push(n);game.players.push(n);plays[n]=true;render();toast(n+' added to the game')}
- else if(t.id=='gfin-early'){if(!game||!game.exited)return;const res={...game.exited};if(!confirm('Save cashed-out results to History?'))return;
+  if(game.players.includes(n))return toast(n+' is already in this game');if(!players.includes(n))players.push(n);
+  if(game.exited&&game.exited[n]!==undefined){
+    const r=game.exited[n],rs=(r>0?'+':'')+r;
+    const club=confirm(n+' cashed out earlier with result '+rs+'.\n\nOK = Club win/loss into this game (continue playing, combine results)\nCancel = already settled (keep cash-out result, start fresh buy-in)');
+    if(club){
+      delete game.exited[n];
+      if(game.settledPrior)delete game.settledPrior[n];
+      game.players.push(n);plays[n]=true;render();toast(n+' rejoined — results will be clubbed');
+    }else{
+      if(!confirm('Keep the cashed-out result ('+rs+') as already settled and start a new buy-in for '+n+'?'))return;
+      if(!game.settledPrior)game.settledPrior={};
+      game.settledPrior[n]=(game.settledPrior[n]||0)+game.exited[n];
+      delete game.exited[n];
+      game.players.push(n);plays[n]=true;render();toast(n+' rejoined — prior cash-out kept as settled');
+    }
+  }else{game.players.push(n);plays[n]=true;render();toast(n+' added to the game')}}
+ else if(t.id=='gfin-early'){if(!game||!(game.exited&&Object.keys(game.exited).length))return;
+  const prior={...(game.settledPrior||{})},res={...game.exited};
+  Object.keys(prior).forEach(p=>{res[p]=Math.round(((res[p]||0)+prior[p])*100)/100});
+  if(!confirm('Save cashed-out results to History?'))return;
   const n=Math.round(Object.values(res).reduce((a,b)=>a+b,0)*100)/100;if(n&&!confirm('Results net to '+n+', not 0. Save anyway?'))return;
-  sessions.push({date:game.date,label:'',v:res});settle=computeSettle(res,expenses.filter(e=>!e.done),Object.keys(res),game.date);loans.forEach(l=>{if(!l.done){l.done=true;l.g=game.date}});expenses.forEach(e=>{if(!e.done){e.done=true;e.g=game.date}});sortS();game=null;gc=false;finals={};loanDraft={};tab='hist';wantFull=true;render();logFeed('Game completed · '+Object.keys(res||{}).length+' players');toast('Game saved. The settlement is at the top of History.')}
- else if(t.id=='gfin'){if(!game)return;const rows=loanRows(game.players),res={...(game.exited||{})};let miss=0;rows.forEach(r=>{const a=parseFloat(finals[r.p]);if(isNaN(a)){miss=1;return}res[r.p]=Math.round((a-r.cur)*100)/100});
-  if(miss)return toast("Enter every remaining player's final amount");if(!confirm('Are you sure you want to complete this game and save results to History?'))return;const n=Math.round(Object.values(res).reduce((a,b)=>a+b,0)*100)/100;if(n&&!confirm(`Results net to ${n}, not 0. Save anyway?`))return;
-  sessions.push({date:game.date,label:'',v:res});settle=computeSettle(res,expenses.filter(e=>!e.done),game.players,game.date);loans.forEach(l=>{if(!l.done){l.done=true;l.g=game.date}});expenses.forEach(e=>{if(!e.done){e.done=true;e.g=game.date}});sortS();game=null;gc=false;finals={};loanDraft={};tab='hist';wantFull=true;render();logFeed('Game completed · '+Object.keys(res||{}).length+' players');toast('Game saved. The settlement is at the top of History.')}
+  const settleRes={...game.exited};
+  sessions.push({date:game.date,label:'',v:res});
+  settle=computeSettle(settleRes,expenses.filter(e=>!e.done),Object.keys(settleRes),game.date);
+  loans.forEach(l=>{if(!l.done){l.done=true;l.g=game.date}});expenses.forEach(e=>{if(!e.done){e.done=true;e.g=game.date}});sortS();game=null;gc=false;finals={};loanDraft={};tab='hist';wantFull=true;render();logFeed('Game completed · '+Object.keys(res||{}).length+' players');toast('Game saved. The settlement is at the top of History.')}
+ else if(t.id=='gfin'){if(!game)return;const rows=loanRows(game.players),prior={...(game.settledPrior||{})},stillOut={...(game.exited||{})},newRes={};let miss=0;
+  rows.forEach(r=>{const a=parseFloat(finals[r.p]);if(isNaN(a)){miss=1;return}newRes[r.p]=Math.round((a-r.cur)*100)/100});
+  if(miss)return toast("Enter every remaining player's final amount");
+  const res={...stillOut};
+  Object.keys(newRes).forEach(p=>{res[p]=Math.round(((prior[p]||0)+(newRes[p]||0))*100)/100});
+  Object.keys(prior).forEach(p=>{if(res[p]===undefined)res[p]=prior[p]});
+  if(!confirm('Are you sure you want to complete this game and save results to History?'))return;
+  const n=Math.round(Object.values(res).reduce((a,b)=>a+b,0)*100)/100;if(n&&!confirm(`Results net to ${n}, not 0. Save anyway?`))return;
+  const settleRes={...stillOut,...newRes};
+  const settlePlayers=[...new Set([...game.players,...Object.keys(settleRes),...Object.keys(prior)])];
+  sessions.push({date:game.date,label:'',v:res});
+  settle=computeSettle(settleRes,expenses.filter(e=>!e.done),settlePlayers,game.date);
+  loans.forEach(l=>{if(!l.done){l.done=true;l.g=game.date}});expenses.forEach(e=>{if(!e.done){e.done=true;e.g=game.date}});sortS();game=null;gc=false;finals={};loanDraft={};tab='hist';wantFull=true;render();logFeed('Game completed · '+Object.keys(res||{}).length+' players');toast('Game saved. The settlement is at the top of History.')}
  else if(t.id=='lsave'){const add=[];let bad=0;if(!game)return;game.players.forEach(p=>{const x=loanDraft[p]||{},a=parseFloat(x.amt);if(x.amt===undefined||x.amt==='')return;if(!isFinite(a)||a===0){bad=1;return}add.push({date:ld,who:p,amt:x.src=='__repay'?-Math.abs(a):a,src:x.src=='__repay'?null:(x.src||null),g:game.date,done:false})});
   if(!ld)return toast('Pick the date');if(bad)return toast('Enter a valid amount that is not 0 (use − for a repayment)');if(!add.length)return toast('Enter at least one amount');
   loans.push(...add);loanDraft={};render();toast('Saved')}
@@ -1015,12 +1048,12 @@ const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).sli
 const canon=x=>JSON.stringify(x,(k,v)=>v&&typeof v=='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(q=>[q,v[q]])):v);
 const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],expenses:S.expenses||[],settle:S.settle||null,initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:null,groupName:typeof S.groupName=='string'?S.groupName:'',bills:(S.bills||[]),billSettle:S.billSettle||null,feed:feed});
 function getState(){if(!Array.isArray(sessions))sessions=[];if(!Array.isArray(loans))loans=[];if(!Array.isArray(expenses))expenses=[];if(!Array.isArray(bills))bills=[];if(!Array.isArray(feed))feed=[];if(!Array.isArray(players))players=[];sessions.forEach(x=>{if(!x.id)x.id=uid()});loans.forEach(l=>{if(!l.id)l.id=uid()});expenses.forEach(e=>{if(!e.id)e.id=uid()});
- return{players:[...players],sessions:sessions.map(x=>({id:x.id,date:(x.date||''),label:(x.label||''),v:(x.v&&typeof x.v==='object')?{...x.v}:{}})),loans:loans.map(l=>({id:l.id,date:l.date,who:l.who,amt:l.amt,src:l.src||null,g:l.g||'',done:!!l.done})),initLoan,game:game?{date:game.date,players:Array.isArray(game.players)?[...game.players]:[],exited:(game.exited&&typeof game.exited==='object')?{...game.exited}:{}}:null,readme,rules,groupName,expenses:expenses.map(e=>({id:e.id,date:e.date||'',desc:e.desc||'',paidBy:e.paidBy,amt:e.amt,split:e.split&&e.split.length?[...e.split]:null,g:e.g||'',done:!!e.done})),settle:settle?JSON.parse(JSON.stringify(settle)):null,bills:[],feed:(feed||[]).slice(0,40).map(x=>({id:x.id,at:x.at,text:x.text||''})),billSettle:billSettle?JSON.parse(JSON.stringify(billSettle)):null}}
+ return{players:[...players],sessions:sessions.map(x=>({id:x.id,date:(x.date||''),label:(x.label||''),v:(x.v&&typeof x.v==='object')?{...x.v}:{}})),loans:loans.map(l=>({id:l.id,date:l.date,who:l.who,amt:l.amt,src:l.src||null,g:l.g||'',done:!!l.done})),initLoan,game:game?{date:game.date,players:Array.isArray(game.players)?[...game.players]:[],exited:(game.exited&&typeof game.exited==='object')?{...game.exited}:{},settledPrior:(game.settledPrior&&typeof game.settledPrior==='object')?{...game.settledPrior}:{}}:null,readme,rules,groupName,expenses:expenses.map(e=>({id:e.id,date:e.date||'',desc:e.desc||'',paidBy:e.paidBy,amt:e.amt,split:e.split&&e.split.length?[...e.split]:null,g:e.g||'',done:!!e.done})),settle:settle?JSON.parse(JSON.stringify(settle)):null,bills:[],feed:(feed||[]).slice(0,40).map(x=>({id:x.id,at:x.at,text:x.text||''})),billSettle:billSettle?JSON.parse(JSON.stringify(billSettle)):null}}
 function applyState(S){S=norm(S);players=Array.isArray(S.players)?[...S.players]:[];
  sessions=(Array.isArray(S.sessions)?S.sessions:[]).map(x=>{const v=(x&&x.v&&typeof x.v==='object')?{...x.v}:{};return{...(x||{}),v}});
  loans=(Array.isArray(S.loans)?S.loans:[]).map(l=>({...(l||{})}));
  initLoan=num(S.initLoan)?S.initLoan:500;
- if(S.game&&typeof S.game==='object'){const gp=Array.isArray(S.game.players)?[...S.game.players]:[];game={date:S.game.date||'',players:gp,exited:(S.game.exited&&typeof S.game.exited==='object')?{...S.game.exited}:{}};}
+ if(S.game&&typeof S.game==='object'){const gp=Array.isArray(S.game.players)?[...S.game.players]:[];game={date:S.game.date||'',players:gp,exited:(S.game.exited&&typeof S.game.exited==='object')?{...S.game.exited}:{},settledPrior:(S.game.settledPrior&&typeof S.game.settledPrior==='object')?{...S.game.settledPrior}:{}};}
  else game=null;
  readme=S.readme;rules=S.rules;groupName=S.groupName||'';
  expenses=(Array.isArray(S.expenses)?S.expenses:[]).map(e=>({...(e||{})}));settle=S.settle||null;
@@ -1340,8 +1373,11 @@ function minTransfers(bal){const items=bal.filter(x=>x.b!==0),n=items.length;if(
  else groups=[items];
  const out=[];groups.forEach(g=>{const cr=g.filter(x=>x.b>0).map(x=>({p:x.p,b:x.b})),db=g.filter(x=>x.b<0).map(x=>({p:x.p,b:-x.b})),srt=()=>{cr.sort((a,b)=>b.b-a.b);db.sort((a,b)=>b.b-a.b)};srt();
   while(cr.length&&db.length){const c=cr[0],d=db[0],a=Math.min(c.b,d.b);out.push({f:d.p,t:c.p,a});c.b-=a;d.b-=a;if(!c.b)cr.shift();if(!d.b)db.shift();srt()}});return out}
-function computeSettle(res,ex,P,date){const c=x=>Math.round(x*100),sp=expenseSplit(P,ex),names=[...new Set([...P,...ex.flatMap(e=>[e.paidBy,...(e.split||[])])])];
- const rows=names.map(p=>{const r=c(res[p]||0),e=(sp.paid[p]||0)-(sp.share[p]||0);return{p,r,e,b:r+e}}),tot=rows.reduce((a,x)=>a+x.b,0),bal=rows.map(x=>({p:x.p,b:x.b}));let note='';
+function computeSettle(res,ex,P,date){const c=x=>Math.round(x*100);
+ const allP=[...new Set([...(P||[]),...Object.keys(res||{}),...((ex||[]).flatMap(e=>[e.paidBy,...(e.split||[])]))].filter(Boolean))];
+ const sp=expenseSplit(allP,ex||[]);
+ const rows=allP.map(p=>{const r=c(res[p]||0),e=(sp.paid[p]||0)-(sp.share[p]||0);return{p,r,e,b:r+e}});
+ const tot=rows.reduce((a,x)=>a+x.b,0),bal=rows.map(x=>({p:x.p,b:x.b}));let note='';
  if(tot!==0){bal.push({p:'(unbalanced)',b:-tot});note='The results did not add up to 0 (difference '+fmtA(tot/100)+'), so payments involving "(unbalanced)" are the unexplained amount.'}
  return{id:uid(),date,items:minTransfers(bal).map(x=>({f:x.f,t:x.t,a:x.a/100})),rows:rows.map(x=>({p:x.p,r:x.r/100,e:x.e/100,b:x.b/100})),note}}
 function settleText(){return'Settlement '+settle.date+'\n'+(settle.items.length?settle.items.map(x=>x.f+' pays '+x.t+' '+fmtA(x.a)).join('\n'):'Everyone is square.')+(settle.note?'\n'+settle.note:'')}
