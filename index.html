@@ -176,7 +176,10 @@ body.mode-feed .tabs,body.mode-feed .intro{display:none!important}
 .topbar{position:sticky;top:0;z-index:200;margin:calc(-1 * env(safe-area-inset-top,0px) - 16px) -16px 12px;padding:calc(env(safe-area-inset-top,0px) + 12px) 16px 8px;background:var(--bar);border-bottom:1px solid var(--bd);box-shadow:0 6px 16px -12px rgba(29,20,64,.35)}
 .topbar .tabs{margin-bottom:0;padding-bottom:2px}
 .topbar .hd{margin-bottom:8px}
-.bills-nav{position:sticky;top:calc(env(safe-area-inset-top,0px) + 108px);z-index:150;margin:0 -4px 12px;padding:8px 4px;background:var(--bar);border-radius:12px}
+.bills-nav{position:sticky;top:calc(var(--tbh,61px) - 1px);z-index:150;margin:0 -16px 14px;padding:8px 16px;background:var(--bar);border-bottom:1px solid var(--bd);box-shadow:0 6px 16px -12px rgba(29,20,64,.35);border-radius:0}
+body.mode-bills .topbar,body.mode-feed .topbar{border-bottom:0;box-shadow:none;margin-bottom:0}
+#ind{cursor:pointer}
+.nogrp .topbar{background:transparent;border-bottom:0;box-shadow:none}
 body.mode-hub .topbar .tabs{display:none}
 body.mode-bills .topbar .tabs{display:none}
 /* welcome */
@@ -794,7 +797,8 @@ async function save(name,data){
 const last=()=>(sessions.map(s=>s.date).filter(Boolean).sort().pop()||dd);
 // ---- events ----
 const closeDrawer=()=>document.body.classList.remove('dopen');
-document.addEventListener('click',e=>{const t=e.target;if(t.closest('#fab')){document.body.classList.toggle('dopen')}else if(t.closest('#scrim')){closeDrawer()}else if(t.closest('#drawer button')){setTimeout(closeDrawer,60)}});
+document.addEventListener('click',e=>{const t=e.target;if(t.closest('#fab')){document.body.classList.toggle('dopen')}else if(t.closest('#ind')&&gid){document.body.classList.add('dopen')}else if(t.closest('#scrim')){closeDrawer()}else if(t.closest('#drawer button')){setTimeout(closeDrawer,60)}});
+window.addEventListener('resize',()=>{try{const tb=document.querySelector('.topbar');if(tb)document.documentElement.style.setProperty('--tbh',tb.offsetHeight+'px')}catch(e){}});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer();if(e.key==='Enter'&&(e.target.id==='gc_in'||e.target.id==='gp_in')){const b=$('#gjoin');if(b)b.click()}});
 document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']');
  
@@ -958,10 +962,10 @@ function indHtml(){if(!gid)return'';const m={live:['#15803d','Live'],saving:['#d
  const mode=!accessLoaded?'':canOrganise()?'✏️ Admin':canEdit()?'✏️ Write':'👁 View';return`<span style="color:${m[0]}">●</span> ${m[1]}${mode?' · '+mode:''}`}
 function gbarHtml(){if(!gid)return'';
  return`${accessLoaded&&!canEdit()?'<button class="pri" id="unlock">🔑 Enter password</button>':''}<button data-mode="hub">🏠 Home</button><button data-gcopy>📋 Copy Group Code</button>${canEdit()?'<button data-grename>✎ Rename group</button>':''}<button data-gleave>🚪 Leave</button>`}
-function setSync(c){cs=c;const g=$('#gbar');if(g)g.innerHTML=gbarHtml();const ii=$('#ind');if(ii)ii.innerHTML=indHtml();const t=$('#ttl');if(t)t.textContent=gid?(groupName||gid.slice(0,6)+'…'):'';const dn=$('#dname');if(dn)dn.textContent=gid?(groupName||gid.slice(0,6)+'…'):''}
+function setSync(c){cs=c;try{const tb=document.querySelector('.topbar');if(tb)document.documentElement.style.setProperty('--tbh',tb.offsetHeight+'px')}catch(e){}const g=$('#gbar');if(g)g.innerHTML=gbarHtml();const ii=$('#ind');if(ii)ii.innerHTML=indHtml();const t=$('#ttl');if(t)t.textContent=gid?(groupName||gid.slice(0,6)+'…'):'';const dn=$('#dname');if(dn)dn.textContent=gid?(groupName||gid.slice(0,6)+'…'):''}
 function joinScreen(){
  if(adminOpen)return`<div class="jn">${adminGroups.length?adminGroups.map(g=>`<div class="grow"><span><b>${E(g.name||g.code.slice(0,8))}</b><small class="mut">${E(g.code.slice(0,8))}…</small></span><button class="pri" data-gadm="${E(g.code)}">Enter</button></div>`).join(''):'<div class="mut" style="text-align:center">No groups yet</div>'}<button class="pri" id="gnew2">＋ New group</button><button id="gback">Back</button></div>`;
- return`<div class="jn"><input id="gc_in" placeholder="Group Code" autocomplete="off" autocapitalize="off" spellcheck="false"><input id="gp_in" type="password" placeholder="Password" autocomplete="off"><button class="pri" id="gjoin">Join</button><button id="gadminlogin">🔑 Admin</button></div>`}
+ return`<div class="jn"><input id="gc_in" placeholder="Group Code" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="pri" id="gjoin">Join</button><button id="gadminlogin">🔑 Admin</button></div>`}
 async function adminLogin(){
  if(!(await ensureCloud()))return toast('Could not connect. Check your internet and try again.');
  let info=null;try{info=await loadCreatePass()}catch(e){return toast('Could not check admin access')}
@@ -1111,10 +1115,10 @@ async function deleteGroupFully(code){
   else{toast('Group deleted');if(tab==='backup')loadGroupAdmin()}
  }catch(e){toast('Could not delete group: '+(e&&e.message||e))}
 }
-async function openExistingGroup(code,pw,asAdmin){
+async function openExistingGroup(code,pw,asAdmin,silent){
  if(!code)return;
  if(!(await ensureCloud()))return toast('Could not connect. Check your internet and try again.');
- try{const del=await window.cloud.get(code,'deleted');if(del&&del.json&&del.json!=='null'){removeRecent(code);return toast('This group no longer exists.')}}catch(e){}
+ try{const del=await window.cloud.get(code,'deleted');if(del&&del.json&&del.json!=='null'){removeRecent(code);try{localStorage.removeItem('ptc_group');history.replaceState(null,'',location.pathname)}catch(e){}if(!silent)toast('This group no longer exists.');return}}catch(e){}
  try{localStorage.removeItem('ptc_view_'+code);localStorage.removeItem('ptc_edit_'+code);localStorage.removeItem('ptc_org_'+code)}catch(e){}
  if(asAdmin){pendingOrgPass=adminPw;pendingSetGlobal=false}
  else if(pw){
@@ -1336,7 +1340,7 @@ function randCode(){const a='abcdefghjkmnpqrstuvwxyz23456789';let s='';crypto.ge
 function copyLink(){const u=gid;if(navigator.clipboard)navigator.clipboard.writeText(u).then(()=>toast('Group code copied')).catch(()=>prompt('Copy this group code',u));else prompt('Copy this group code',u)}
 document.addEventListener('focusout',()=>{if(pendingRender)setTimeout(()=>{const a=document.activeElement;if(!(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName))){pendingRender=false;render()}},60)});
 window.addEventListener('online',()=>{if(cloudOn){setSync('live');persist()}});window.addEventListener('offline',()=>setSync('offline'));
-if(gid){const boot=gid;gid='';(async()=>{try{await openExistingGroup(boot)}catch(e){console.error(e);toast('Could not open group')}finally{if(!gid)render();else if(!synced)render()}})()}
+if(gid){const boot=gid;gid='';(async()=>{try{await openExistingGroup(boot,'',false,true)}catch(e){console.error(e)}finally{if(!gid)render();else if(!synced)render()}})()}
 else{try{render()}catch(e){console.error(e);document.body.insertAdjacentHTML('beforeend','<pre style="padding:16px;color:red">Start error: '+e.message+'</pre>')}}
 </script>
 <script type="module">
