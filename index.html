@@ -531,7 +531,7 @@ function joinCard(){const out=players.filter(p=>!game.players.includes(p));
  ${game.players.map(p=>`<div class="row" style="justify-content:space-between"><span>${E(p)}</span><button class="x" data-prm="${E(p)}" title="Remove from game">Remove</button></div>`).join('')||'<p class="mut">No players in this game.</p>'}</div>`}
 function gcPanel(P,cur){return`<div class="card" id="gcPanel" style="border:3px solid var(--ac);box-shadow:0 8px 28px rgba(0,0,0,.18)"><b>Game completion</b>
  ${P.map(p=>`<div class="row"><span>${E(p)} <small class="mut">(${f(ng(cur[p]))})</small></span><input inputmode="decimal" placeholder="final amount" data-fa="${E(p)}" value="${E(finals[p]===undefined?'':finals[p])}"><b class="res" data-rp="${E(p)}"></b></div>`).join('')}
- ${Object.entries(game.exited||{}).map(([p,r])=>`<div class="row gout"><span>${E(p)} <small class="mut">cashed out</small></span><span class="mut">in settlement</span><b class="${cls(r)}">${r>0?'+':''}${f(r)}</b></div>`).join('')}
+ ${Object.entries(game.exited||{}).filter(([p])=>!game.players.some(q=>q.toLowerCase()===p.toLowerCase())).map(([p,r])=>`<div class="row gout"><span>${E(p)} <small class="mut">cashed out</small></span><span class="mut">in settlement</span><b class="${cls(r)}">${r>0?'+':''}${f(r)}</b></div>`).join('')}
  ${(game.settledPrior&&Object.keys(game.settledPrior).length)?Object.entries(game.settledPrior).map(([p,r])=>`<div class="row"><span>${E(p)} <small class="mut">prior settled</small></span><span class="mut">kept</span><b class="${cls(r)}">${r>0?'+':''}${f(r)}</b></div>`).join(''):''}
   <div class="sum" id="gsum"></div><button class="pri" id="gfin" style="width:100%">Complete game &amp; save to History</button></div>`}
 function loansTab(){
@@ -554,7 +554,7 @@ function loansTab(){
  ${loantable(P)}
  <div class="card"><b>Cash out early</b><div class="mut" style="margin:4px 0 8px">If a player leaves before the game ends, lock their result now. They leave the table but stay in the session for settlement — not treated as unbalanced. They can rejoin later (club results or mark the cash-out as already settled).</div>
  ${P.map(p=>`<div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:6px"><span>${E(p)} <small class="mut">(${f(ng(cur[p]))})</small></span><button data-cashout="${E(p)}">Cash out</button></div>`).join('')}
- ${game.exited&&Object.keys(game.exited).length?`<div class="mut" style="margin-top:10px">Cashed out (still in settlement — use Add player above to rejoin):</div>`+Object.entries(game.exited).map(([p,r])=>`<div class="row"><span>${E(p)}</span><b class="${cls(r)}">${r>0?'+':''}${f(r)}</b></div>`).join(''):''}
+ ${(()=>{const ex=Object.entries(game.exited||{}).filter(([p])=>!game.players.some(q=>q.toLowerCase()===p.toLowerCase()));return ex.length?`<div class="mut" style="margin-top:10px">Cashed out (still in settlement — use Add player above to rejoin):</div>`+ex.map(([p,r])=>`<div class="row"><span>${E(p)}</span><b class="${cls(r)}">${r>0?'+':''}${f(r)}</b></div>`).join(''):''})()}
  </div>
  ${gc?gcPanel(P,cur):''}
  ${loglist()}
@@ -962,26 +962,27 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   game.players=game.players.filter(x=>x!==p);
   delete finals[p];delete loanDraft[p];
   if(gc&&!game.players.length)gc=false;
-  render();toast(p+' cashed out · '+(result>0?'+':'')+result+' · can rejoin later')}
+  persist();render();toast(p+' cashed out · '+(result>0?'+':'')+result+' · can rejoin later')}
  else if(t.id=='gcb'){gc=!gc;render();if(gc){requestAnimationFrame(()=>{const el=document.getElementById('gcPanel');if(el)el.scrollIntoView({behavior:'smooth',block:'center'})})}}
 
  else if(t.id=='jb'){if(!game)return;let n=($('#jn').value||'').trim();if(!n)return toast('Enter a player name');n=players.find(q=>q.toLowerCase()==n.toLowerCase())||n;
   if(game.players.includes(n))return toast(n+' is already in this game');if(!players.includes(n))players.push(n);
-  if(game.exited&&game.exited[n]!==undefined){
-    const r=game.exited[n],rs=(r>0?'+':'')+r;
+  const exitedKey=game.exited?Object.keys(game.exited).find(k=>k.toLowerCase()===n.toLowerCase()):null;
+  if(exitedKey!==undefined&&exitedKey!==null){
+    const r=game.exited[exitedKey],rs=(r>0?'+':'')+r;
     const club=confirm(n+' cashed out earlier with result '+rs+'.\n\nOK = Club win/loss into this game (continue playing, combine results)\nCancel = already settled (keep cash-out result, start fresh buy-in)');
     if(club){
-      delete game.exited[n];
-      if(game.settledPrior)delete game.settledPrior[n];
-      game.players.push(n);plays[n]=true;render();toast(n+' rejoined — results will be clubbed');
+      delete game.exited[exitedKey];
+      if(game.settledPrior){const pk=Object.keys(game.settledPrior).find(k=>k.toLowerCase()===n.toLowerCase());if(pk!==undefined)delete game.settledPrior[pk]}
+      game.players.push(n);plays[n]=true;persist();render();toast(n+' rejoined — results will be clubbed');
     }else{
       if(!confirm('Keep the cashed-out result ('+rs+') as already settled and start a new buy-in for '+n+'?'))return;
       if(!game.settledPrior)game.settledPrior={};
-      game.settledPrior[n]=(game.settledPrior[n]||0)+game.exited[n];
-      delete game.exited[n];
-      game.players.push(n);plays[n]=true;render();toast(n+' rejoined — prior cash-out kept as settled');
+      game.settledPrior[n]=(game.settledPrior[n]||0)+r;
+      delete game.exited[exitedKey];
+      game.players.push(n);plays[n]=true;persist();render();toast(n+' rejoined — prior cash-out kept as settled');
     }
-  }else{game.players.push(n);plays[n]=true;render();toast(n+' added to the game')}}
+  }else{game.players.push(n);plays[n]=true;persist();render();toast(n+' added to the game')}}}
  else if(t.id=='gfin-early'){if(!game||!(game.exited&&Object.keys(game.exited).length))return;
   const prior={...(game.settledPrior||{})},res={...game.exited};
   Object.keys(prior).forEach(p=>{res[p]=Math.round(((res[p]||0)+prior[p])*100)/100});
