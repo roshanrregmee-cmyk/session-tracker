@@ -99,7 +99,6 @@ button:active,.btn:active{transform:scale(.97)}
 .tabs .on{background:linear-gradient(135deg,var(--g1),var(--g2));color:#fff;border-color:transparent;font-weight:700;box-shadow:0 6px 14px -8px rgba(255,61,129,.7)}
 /* surfaces */
 .card,.sc{border:1px solid var(--bd);border-radius:18px;box-shadow:var(--sh)}
-.card{content-visibility:auto;contain-intrinsic-size:auto 140px}
 .sc{-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
 .kp div{border:1px solid var(--bd);border-left:4px solid var(--s1);border-radius:14px;box-shadow:var(--sh)}
 .kp div:nth-child(4n+2){border-left-color:var(--s2)}.kp div:nth-child(4n+3){border-left-color:var(--s3)}.kp div:nth-child(4n){border-left-color:var(--s4)}
@@ -1312,10 +1311,10 @@ function backupTab(){const when=x=>new Date(x.savedAt).toLocaleString();
  ${bk.err?`<p class="neg">Could not load backups (${E(bk.err)}). Tap ↻ Refresh at the top to try again.</p>`:''}`}
 function startCloud(){if(!gid)return;
  const gen=++connGen;
- if(!window.cloud){window.addEventListener('cloudready',()=>{if(gen===connGen)startCloud()},{once:true});setTimeout(()=>{if(gen!==connGen)return;if(!window.cloud){cloudErr='Could not load Google services. Check your internet connection and reload.';cs='error';render()}},12000);return}
+ if(!window.cloud){window.addEventListener('cloudready',()=>{if(gen===connGen)startCloud()},{once:true});setTimeout(()=>{if(gen!==connGen)return;if(!window.cloud){cloudErr='Could not load Google services. Check your internet connection and reload.';cs='error';render()}},8000);return}
  cloudOn=true;cs='connecting';cloudErr='';access=null;accessLoaded=false;viewAccess=null;viewLoaded=false;
  if(window._connTimer)clearTimeout(window._connTimer);
- window._connTimer=setTimeout(()=>{if(gen!==connGen)return;if(!synced&&gid&&cs==='connecting'){cloudErr='Taking too long to reach this group. Check internet or try another group.';cs='error';render()}},12000);
+ window._connTimer=setTimeout(()=>{if(gen!==connGen)return;if(!synced&&gid&&cs==='connecting'){cloudErr='Taking too long to reach this group. Check internet or try another group.';cs='error';render()}},8000);
  (async()=>{try{const a=await cloud.get(gid,'access');access=(a&&a.json&&a.json!=='null')?JSON.parse(a.json):null}catch(e){access=null}accessLoaded=true;if(gen===connGen&&synced)renderSafe()})();
  (async()=>{try{const v=await cloud.get(gid,'viewaccess');viewAccess=(v&&v.json&&v.json!=='null')?JSON.parse(v.json):null}catch(e){viewAccess=null}viewLoaded=true;if(gen===connGen&&synced)renderSafe()})();
  if(cloud.watch)cloud.watch(gid,'access',json=>{if(gen!==connGen||json===undefined)return;access=(json&&json!=='null')?JSON.parse(json):null;accessLoaded=true;if(synced)renderSafe()});
