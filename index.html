@@ -188,6 +188,9 @@ body.nogrp .intro,.nogrp .intro{display:none!important}
 :root[data-theme="dark"] .jn #gadminlogin,:root[data-theme="dark"] .jn #gback{background:rgba(32,18,69,.65)}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .jn #gadminlogin,:root:not([data-theme="light"]) .jn #gback{background:rgba(32,18,69,.65)}}
 .jn .jn-or{display:flex;align-items:center;gap:10px;color:var(--mut);font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+.jn .jn-refresh{margin-top:4px;background:var(--card);border:1px dashed var(--bd);color:var(--tx);font-weight:600;box-shadow:none}
+.jn .jn-refresh:active{transform:scale(.97)}
+body.nogrp .rbtn{display:none!important}
 .jn .jn-or::before,.jn .jn-or::after{content:"";flex:1;height:1px;background:var(--bd)}
 .grow{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:12px 14px;box-shadow:var(--sh)}
 .grow small{display:block}
@@ -527,23 +530,17 @@ function loantable(P){const r=loanRows(P).map(x=>({p:x.p,i:ng(x.init),b:ng(x.ban
 function loglist(){const log=loans.map((l,i)=>({l,i})).sort((a,b)=>a.l.date<b.l.date?1:a.l.date>b.l.date?-1:b.i-a.i);
  return'<p><b>Loan log</b></p>'+(log.length?'<div class="sc"><table><tbody>'+log.map(o=>`<tr><td>${o.l.date}</td><td>${E(o.l.who)}</td><td class="${cls(ng(o.l.amt))}">${o.l.amt>0?'−':'+'}${f(Math.abs(o.l.amt))}</td><td>${o.l.amt<0?'repaid to ':'borrowed from '}${o.l.src?E(o.l.src):'Bank'}</td><td>${o.l.done?'<span class="mut">settled</span>':`<button class="x" data-ldel="${o.i}" title="Delete">✕</button>`}</td></tr>`).join('')+'</tbody></table></div>':'<p class="mut">No fresh loans yet.</p>')}
 function joinCard(){const out=players.filter(p=>!game.players.includes(p));
- return`<div class="card"><b>Add a player to this game</b><div class="mut" style="margin:0 0 6px">Cashed-out players can rejoin — you'll choose to club results or mark the cash-out as settled.</div><div class="row"><input id="jn" list="jl" placeholder="Player name" style="text-align:left;flex:1"><button id="jb">Add to game</button></div><datalist id="jl">${out.map(p=>`<option value="${E(p)}">`).join('')}</datalist></div>
+ return`<div class="card"><b>Add a player to this game</b><div class="row"><input id="jn" list="jl" placeholder="Player name" style="text-align:left;flex:1"><button id="jb">Add to game</button></div><datalist id="jl">${out.map(p=>`<option value="${E(p)}">`).join('')}</datalist></div>
  <div class="card"><b>Remove a player from this game</b>
  ${game.players.map(p=>`<div class="row" style="justify-content:space-between"><span>${E(p)}</span><button class="x" data-prm="${E(p)}" title="Remove from game">Remove</button></div>`).join('')||'<p class="mut">No players in this game.</p>'}</div>`}
 function gcPanel(P,cur){return`<div class="card" id="gcPanel" style="border:3px solid var(--ac);box-shadow:0 8px 28px rgba(0,0,0,.18)"><b>Game completion</b>
  ${P.map(p=>`<div class="row"><span>${E(p)} <small class="mut">(${f(ng(cur[p]))})</small></span><input inputmode="decimal" placeholder="final amount" data-fa="${E(p)}" value="${E(finals[p]===undefined?'':finals[p])}"><b class="res" data-rp="${E(p)}"></b></div>`).join('')}
- ${Object.entries(game.exited||{}).filter(([p])=>!game.players.some(q=>q.toLowerCase()===p.toLowerCase())).map(([p,r])=>`<div class="row gout"><span>${E(p)} <small class="mut">cashed out</small></span><span class="mut">in settlement</span><b class="${cls(r)}">${r>0?'+':''}${f(r)}</b></div>`).join('')}
- ${(game.settledPrior&&Object.keys(game.settledPrior).length)?Object.entries(game.settledPrior).map(([p,r])=>`<div class="row"><span>${E(p)} <small class="mut">prior settled</small></span><span class="mut">kept</span><b class="${cls(r)}">${r>0?'+':''}${f(r)}</b></div>`).join(''):''}
   <div class="sum" id="gsum"></div><button class="pri" id="gfin" style="width:100%">Complete game &amp; save to History</button></div>`}
 function loansTab(){
  if(!game)return`<div class="card"><b>No game in progress</b><p class="mut">Start one in “New session”.</p></div>`+loglist();
- if(!game.players.length&&game.exited&&Object.keys(game.exited).length){
-  const res=game.exited;const n=Math.round(Object.values(res).reduce((a,b)=>a+b,0)*100)/100;
-  return`<div class="card"><b>Everyone has cashed out</b><div class="mut" style="margin:6px 0 10px">Save these early results to History to finish the game.</div>
-  ${Object.entries(res).map(([p,r])=>`<div class="row"><span>${E(p)}</span><b class="${cls(r)}">${r>0?'+':''}${f(r)}</b></div>`).join('')}
-  <div class="sum ${n?'warn':'ok'}">Net ${n>0?'+':''}${f(n)}</div>
-  <button class="pri" id="gfin-early" style="width:100%">Save to History</button>
-  <button id="gdisc" style="width:100%;margin-top:8px">Discard game</button></div>`+loglist();
+ if(!game.players.length){
+  return`<div class="card"><b>No players in this game</b><div class="mut" style="margin:6px 0 10px">Add players below, or discard this game.</div>
+  <button id="gdisc" style="width:100%">Discard game</button></div>`+joinCard()+loglist();
  }
  const P=game.players,cur=Object.fromEntries(loanRows(P).map(r=>[r.p,r.cur])),opts=p=>'<option value="">Bank (borrow)</option><option value="__repay" '+((loanDraft[p]||{}).src=='__repay'?'selected':'')+'>Repay bank</option>'+P.filter(q=>q!=p).map(q=>`<option value="${E(q)}" ${(loanDraft[p]||{}).src==q?'selected':''}>${E(q)}</option>`).join('');
  return`<div class="card"><label><b>Initial loan per player</b> <input type="number" data-il value="${initLoan}" style="width:110px;text-align:right"></label></div>
@@ -553,10 +550,6 @@ function loansTab(){
  <button class="pri" id="lsave" style="width:100%;margin-top:10px">Save fresh loans</button></div>
  <p><b>Current standing</b></p>
  ${loantable(P)}
- <div class="card"><b>Cash out early</b><div class="mut" style="margin:4px 0 8px">If a player leaves before the game ends, lock their result now. They leave the table but stay in the session for settlement — not treated as unbalanced. They can rejoin later (club results or mark the cash-out as already settled).</div>
- ${P.map(p=>`<div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:6px"><span>${E(p)} <small class="mut">(${f(ng(cur[p]))})</small></span><button data-cashout="${E(p)}">Cash out</button></div>`).join('')}
- ${(()=>{const ex=Object.entries(game.exited||{}).filter(([p])=>!game.players.some(q=>q.toLowerCase()===p.toLowerCase()));return ex.length?`<div class="mut" style="margin-top:10px">Cashed out (still in settlement — use Add player above to rejoin):</div>`+ex.map(([p,r])=>`<div class="row"><span>${E(p)}</span><b class="${cls(r)}">${r>0?'+':''}${f(r)}</b></div>`).join(''):''})()}
- </div>
  ${gc?gcPanel(P,cur):''}
  ${loglist()}
  <div id="gcFab" style="position:sticky;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:20;margin-top:16px"><button class="pri" id="gcb" style="width:100%;padding:14px;font-size:16px;box-shadow:0 6px 20px rgba(0,0,0,.25)">${gc?'Hide game completion':'Game completion'}</button></div>`}
@@ -569,7 +562,7 @@ function entry(){
  </div>
  <button class="pri" id="save" style="width:100%">Start game</button>
  <div class="card" style="margin-top:14px"><b>Resume a saved session</b><label class="btn" for="lg">📂 Load existing session</label><input id="lg" type="file" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"></div>`}
-function upd(){const el=$('#gsum');if(!el||!game)return;const cur=Object.fromEntries(loanRows(game.players).map(r=>[r.p,r.cur]));let t=Object.values(game.exited||{}).reduce((a,b)=>a+b,0),all=1;
+function upd(){const el=$('#gsum');if(!el||!game)return;const cur=Object.fromEntries(loanRows(game.players).map(r=>[r.p,r.cur]));let t=0,all=1;
  document.querySelectorAll('[data-rp]').forEach(c=>{const p=c.dataset.rp,a=parseFloat(finals[p]);if(isNaN(a)){all=0;c.textContent='';return}const r=a-cur[p];t+=r;c.textContent=(r>0?'+':'')+f(Math.round(r*100)/100);c.className='res '+cls(r)});
  t=Math.round(t*100)/100;el.className='sum '+(all&&t?'warn':'ok');el.textContent=all?(t?`Results net to ${t.toLocaleString()} (should be 0)`:'Results net to 0 ✓'):"Enter every player's final amount"}
 function hbar(items,o={}){const neg=items.some(i=>i.v<0),rh=30,cx=neg?350:120,mx=Math.max(1,...items.map(i=>Math.abs(i.v))),sc=(neg?170:420)/mx,H=items.length*rh+10,fm=o.fm||f;
@@ -945,67 +938,29 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(g('data-gdel')){deleteGroupFully(g('data-gdel').dataset.gdel)}
  else if(t.id=='gadmin'){guard('manage all groups',()=>{loadGroupAdmin()})}
  else if(g('data-gcopy')){copyLink()}
- else if(t.id=='gref'||t.id=='gref2'){refreshGroup();if(tab=='backup')setTimeout(loadBackups,1500)}
+ else if(t.id=='gref'||t.id=='gref2'||t.id=='gref-join'){refreshGroup();if(tab=='backup')setTimeout(loadBackups,1500)}
  else if(g('data-gleave')){if(confirm('Leave this group on this device? The shared data stays in the cloud.'))leaveGroup()}
  else if(g('data-gswitch')){if(confirm('Switch to another group? You can return later from Recent groups.'))switchGroupUI()}
  else if(g('data-gsw')){openExistingGroup(g('data-gsw').dataset.gsw)}
  else if(t.id=='sxl'){if(!game)return;if(!canEdit())return toast('View only: export is for editors');save(`Current_Session_${game.date}.xlsx`,sessionBuf())}
  else if(t.id=='ginvite'){if(!game)return;const u=location.origin+location.pathname+'#g='+gid+'&game='+game.date;const msg='Join our session tracker game on '+game.date+': '+u;if(navigator.clipboard)navigator.clipboard.writeText(msg).then(()=>toast('Game invite copied — includes group + date')).catch(()=>prompt('Copy this game invite',msg));else prompt('Copy this game invite',msg)}
- else if(g('data-cashout')){if(!game||!canEdit())return toast('View only');
-  const p=g('data-cashout').dataset.cashout;if(!game.players.includes(p))return;
-  const cur=Object.fromEntries(loanRows(game.players).map(r=>[r.p,r.cur]));
-  const fa=prompt('Final amount for '+p+' (chips they leave with):');if(fa===null)return;
-  const a=parseFloat(fa);if(!isFinite(a))return toast('Enter a valid number');
-  const result=Math.round((a-cur[p])*100)/100;
-  if(!confirm(p+' result: '+(result>0?'+':'')+result+'. Lock this cash-out? They leave the table but stay in settlement (not unbalanced).'))return;
-  if(!game.exited)game.exited={};game.exited[p]=result;
-  if(!game.settledPrior)game.settledPrior={};
-  game.players=game.players.filter(x=>x!==p);
-  delete finals[p];delete loanDraft[p];
-  if(gc&&!game.players.length)gc=false;
-  render();queueMicrotask(()=>{try{persist()}catch(e){}});toast(p+' cashed out · '+(result>0?'+':'')+result+' · can rejoin later')}
+
  else if(t.id=='gcb'){gc=!gc;render();if(gc){requestAnimationFrame(()=>{const el=document.getElementById('gcPanel');if(el)el.scrollIntoView({behavior:'smooth',block:'center'})})}}
 
  else if(t.id=='jb'){if(!game)return;let n=($('#jn').value||'').trim();if(!n)return toast('Enter a player name');n=players.find(q=>q.toLowerCase()==n.toLowerCase())||n;
   if(game.players.includes(n))return toast(n+' is already in this game');if(!players.includes(n))players.push(n);
-  const exitedKey=game.exited?Object.keys(game.exited).find(k=>k.toLowerCase()===n.toLowerCase()):null;
-  if(exitedKey!==undefined&&exitedKey!==null){
-    const r=game.exited[exitedKey],rs=(r>0?'+':'')+r;
-    const club=confirm(n+' cashed out earlier with result '+rs+'.\n\nOK = Club win/loss into this game (continue playing, combine results)\nCancel = already settled (keep cash-out result, start fresh buy-in)');
-    if(club){
-      delete game.exited[exitedKey];
-      if(game.settledPrior){const pk=Object.keys(game.settledPrior).find(k=>k.toLowerCase()===n.toLowerCase());if(pk!==undefined)delete game.settledPrior[pk]}
-      game.players.push(n);plays[n]=true;render();queueMicrotask(()=>{try{persist()}catch(e){}});toast(n+' rejoined — results will be clubbed');
-    }else{
-      if(!confirm('Keep the cashed-out result ('+rs+') as already settled and start a new buy-in for '+n+'?'))return;
-      if(!game.settledPrior)game.settledPrior={};
-      game.settledPrior[n]=(game.settledPrior[n]||0)+r;
-      delete game.exited[exitedKey];
-      game.players.push(n);plays[n]=true;render();queueMicrotask(()=>{try{persist()}catch(e){}});toast(n+' rejoined — prior cash-out kept as settled');
-    }
-  }else{game.players.push(n);plays[n]=true;render();queueMicrotask(()=>{try{persist()}catch(e){}});toast(n+' added to the game')}}
- else if(t.id=='gfin-early'){if(!game||!(game.exited&&Object.keys(game.exited).length))return;
-  const prior={...(game.settledPrior||{})},res={...game.exited};
-  Object.keys(prior).forEach(p=>{res[p]=Math.round(((res[p]||0)+prior[p])*100)/100});
-  if(!confirm('Save cashed-out results to History?'))return;
-  const n=Math.round(Object.values(res).reduce((a,b)=>a+b,0)*100)/100;if(n&&!confirm('Results net to '+n+', not 0. Save anyway?'))return;
-  const settleRes={...game.exited};
-  sessions.push({date:game.date,label:'',v:res});
-  settle=computeSettle(settleRes,expenses.filter(e=>!e.done),Object.keys(settleRes),game.date);
-  loans.forEach(l=>{if(!l.done){l.done=true;l.g=game.date}});expenses.forEach(e=>{if(!e.done){e.done=true;e.g=game.date}});sortS();game=null;gc=false;finals={};loanDraft={};tab='hist';wantFull=true;render();logFeed('Game completed · '+Object.keys(res||{}).length+' players');toast('Game saved. The settlement is at the top of History.')}
- else if(t.id=='gfin'){if(!game)return;const rows=loanRows(game.players),prior={...(game.settledPrior||{})},stillOut={...(game.exited||{})},newRes={};let miss=0;
-  rows.forEach(r=>{const a=parseFloat(finals[r.p]);if(isNaN(a)){miss=1;return}newRes[r.p]=Math.round((a-r.cur)*100)/100});
-  if(miss)return toast("Enter every remaining player's final amount");
-  const res={...stillOut};
-  Object.keys(newRes).forEach(p=>{res[p]=Math.round(((prior[p]||0)+(newRes[p]||0))*100)/100});
-  Object.keys(prior).forEach(p=>{if(res[p]===undefined)res[p]=prior[p]});
+  game.players.push(n);plays[n]=true;render();queueMicrotask(()=>{try{persist()}catch(e){}});toast(n+' added to the game')}}
+ 
+ else if(t.id=='gfin'){if(!game)return;const rows=loanRows(game.players),res={};let miss=0;
+  rows.forEach(r=>{const a=parseFloat(finals[r.p]);if(isNaN(a)){miss=1;return}res[r.p]=Math.round((a-r.cur)*100)/100});
+  if(miss)return toast("Enter every player's final amount");
   if(!confirm('Are you sure you want to complete this game and save results to History?'))return;
   const n=Math.round(Object.values(res).reduce((a,b)=>a+b,0)*100)/100;if(n&&!confirm(`Results net to ${n}, not 0. Save anyway?`))return;
-  const settleRes={...stillOut,...newRes};
-  const settlePlayers=[...new Set([...game.players,...Object.keys(settleRes),...Object.keys(prior)])];
   sessions.push({date:game.date,label:'',v:res});
-  settle=computeSettle(settleRes,expenses.filter(e=>!e.done),settlePlayers,game.date);
-  loans.forEach(l=>{if(!l.done){l.done=true;l.g=game.date}});expenses.forEach(e=>{if(!e.done){e.done=true;e.g=game.date}});sortS();game=null;gc=false;finals={};loanDraft={};tab='hist';wantFull=true;render();logFeed('Game completed · '+Object.keys(res||{}).length+' players');toast('Game saved. The settlement is at the top of History.')}
+  settle=computeSettle(res,expenses.filter(e=>!e.done),game.players,game.date);
+  loans.forEach(l=>{if(!l.done){l.done=true;l.g=game.date}});expenses.forEach(e=>{if(!e.done){e.done=true;e.g=game.date}});
+  sortS();game=null;gc=false;finals={};loanDraft={};tab='hist';wantFull=true;render();
+  logFeed('Game completed · '+Object.keys(res||{}).length+' players');toast('Game saved. The settlement is at the top of History.')}
  else if(t.id=='lsave'){const add=[];let bad=0;if(!game)return;game.players.forEach(p=>{const x=loanDraft[p]||{},a=parseFloat(x.amt);if(x.amt===undefined||x.amt==='')return;if(!isFinite(a)||a===0){bad=1;return}add.push({date:ld,who:p,amt:x.src=='__repay'?-Math.abs(a):a,src:x.src=='__repay'?null:(x.src||null),g:game.date,done:false})});
   if(!ld)return toast('Pick the date');if(bad)return toast('Enter a valid amount that is not 0 (use − for a repayment)');if(!add.length)return toast('Enter at least one amount');
   loans.push(...add);loanDraft={};render();toast('Saved')}
@@ -1079,8 +1034,8 @@ function gbarHtml(){if(!gid)return'';
  return`${accessLoaded&&!canEdit()?'<button class="pri" id="unlock">🔑 Enter password</button>':''}<button data-mode="hub">🏠 Home</button><button data-gcopy>📋 Copy Group Code</button>${canEdit()?'<button data-grename>✎ Rename group</button>':''}<button data-gleave>🚪 Leave</button>`}
 function setSync(c){cs=c;try{const tb=document.querySelector('.topbar');if(tb)document.documentElement.style.setProperty('--tbh',tb.offsetHeight+'px')}catch(e){}const g=$('#gbar');if(g)g.innerHTML=gbarHtml();const ii=$('#ind');if(ii)ii.innerHTML=indHtml();const t=$('#ttl');if(t)t.textContent=gid?(groupName||gid.slice(0,6)+'…'):'';const dn=$('#dname');if(dn)dn.textContent=gid?(groupName||gid.slice(0,6)+'…'):''}
 function joinScreen(){
- if(adminOpen)return`<div class="jn"><div class="jn-title">Admin</div><div class="jn-sub">Pick a group or create one</div>${adminGroups.length?adminGroups.map(g=>`<div class="grow"><span><b>${E(g.name||g.code.slice(0,8))}</b><small class="mut">${E(g.code.slice(0,8))}…</small></span><button class="pri" data-gadm="${E(g.code)}">Enter</button></div>`).join(''):'<div class="mut" style="text-align:center">No groups yet</div>'}<button class="pri" id="gnew2">＋ New group</button><button id="gback">Back</button></div>`;
- return`<div class="jn"><div class="jn-title">Session Tracker</div><div class="jn-sub">Drop your group code &amp; jump in</div><input id="gc_in" placeholder="Group code" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="pri" id="gjoin">Join the table ✨</button><div class="jn-or">or</div><button id="gadminlogin">🔑 Admin</button></div>`}
+ if(adminOpen)return`<div class="jn"><div class="jn-title">Admin</div><div class="jn-sub">Pick a group or create one</div>${adminGroups.length?adminGroups.map(g=>`<div class="grow"><span><b>${E(g.name||g.code.slice(0,8))}</b><small class="mut">${E(g.code.slice(0,8))}…</small></span><button class="pri" data-gadm="${E(g.code)}">Enter</button></div>`).join(''):'<div class="mut" style="text-align:center">No groups yet</div>'}<button class="pri" id="gnew2">＋ New group</button><button id="gback">Back</button><button type="button" id="gref-join" class="jn-refresh">↻ Refresh app</button></div>`;
+ return`<div class="jn"><div class="jn-title">Session Tracker</div><div class="jn-sub">Drop your group code &amp; jump in</div><input id="gc_in" placeholder="Group code" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="pri" id="gjoin">Join the table ✨</button><div class="jn-or">or</div><button id="gadminlogin">🔑 Admin</button><button type="button" id="gref-join" class="jn-refresh">↻ Refresh app</button><div class="jn-sub" style="margin-top:4px;font-size:12px">Refresh updates the app before you join</div></div>`}
 async function adminLogin(){
  if(!(await ensureCloud()))return toast('Could not connect. Check your internet and try again.');
  let info=null;try{info=await loadCreatePass()}catch(e){return toast('Could not check admin access')}
@@ -1485,7 +1440,7 @@ async function checkAppUpdate(){
     return{updated:false,reason:hadWaiting?'activated':'latest'};
   }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
 }
-const CACHE_HINT='session-tracker-v49';
+const CACHE_HINT='session-tracker-v50';
 async function refreshGroup(){
   toast('Checking for app update…');
   let upd={updated:false};
