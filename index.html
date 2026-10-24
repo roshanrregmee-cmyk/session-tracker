@@ -348,63 +348,29 @@ function logFeed(text){
   if(feed.length>40)feed=feed.slice(0,40);
  }catch(e){}
 }
-function rsvpView(){
- const list=Array.isArray(events)?[...events]:[];
- list.sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.timeFrom||'').localeCompare(b.timeFrom||'')||((b.at||0)-(a.at||0)));
- const today=new Date().toLocaleDateString('en-CA');
- let h=`${sectionNav()}
- <div class="card"><b>📅 Group events</b><div class="mut" style="margin:4px 0 12px">Anyone in the group — <b>including view-only</b> — can create events and RSVP. No password needed.</div>
- <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Message</label>
- <input id="ev_msg" type="text" placeholder="Party at my house / brunch / trip…" maxlength="120" style="width:100%;margin-bottom:10px">
- <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Date</label>
- <input id="ev_date" type="date" value="${today}" style="width:100%;margin-bottom:10px">
- <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-  <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Time from</label>
-   <input id="ev_tfrom" type="time" style="width:100%"></div>
-  <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Time to</label>
-   <input id="ev_tto" type="time" style="width:100%"></div>
- </div>
- <label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;margin-bottom:12px;cursor:pointer">
-  <input id="ev_food" type="checkbox" style="width:18px;height:18px"> Food will be served (ask veg / non-veg)
- </label>
- <button type="button" class="pri" id="ev_add" style="width:100%">Create event</button>
- <button type="button" id="ev_share" style="width:100%;margin-top:10px">📤 Share RSVP link</button>
- <div class="mut" style="margin-top:6px;font-size:12px;text-align:center">Opens this group directly on the RSVP page</div>
- </div>`;
- if(!list.length){
-  h+=`<div class="card"><p class="mut" style="margin:0">No events yet. Create one above.</p></div>`;
-  return h;
+function rsvpEventCard(ev, opts){
+ opts=opts||{};
+ const rsvps=Array.isArray(ev.rsvps)?ev.rsvps:[];
+ const yes=rsvps.filter(r=>r.status==='yes'), no=rsvps.filter(r=>r.status==='no'), maybe=rsvps.filter(r=>r.status==='maybe');
+ const foodOn=!!ev.food;
+ const namesList=arr=>arr.length?arr.map(r=>E(r.name)+(r.foodPref?(' ('+(r.foodPref==='veg'?'veg':'non-veg')+')'):'')).join(', '):'<span class="mut">—</span>';
+ let foodSummary='';
+ if(foodOn){
+  const veg=rsvps.filter(r=>r.foodPref==='veg').length, nv=rsvps.filter(r=>r.foodPref==='nonveg').length;
+  foodSummary=`<div class="mut" style="font-size:13px;margin:4px 0 8px">Food · Veg ${veg} · Non-veg ${nv}</div>`;
  }
- list.forEach(ev=>{
-  const rsvps=Array.isArray(ev.rsvps)?ev.rsvps:[];
-  const yes=rsvps.filter(r=>r.status==='yes'), no=rsvps.filter(r=>r.status==='no'), maybe=rsvps.filter(r=>r.status==='maybe');
-  const when=ev.date?ev.date:(ev.at?new Date(ev.at).toLocaleDateString():'');
-  let timeStr='';
-  if(ev.timeFrom||ev.timeTo){
-    timeStr=' · 🕒 '+(ev.timeFrom||'?')+(ev.timeTo?' – '+ev.timeTo:'');
-  }
-  const foodOn=!!ev.food;
-  const fmtName=r=>{
-    let s=E(r.name||'');
-    if(foodOn&&r.foodPref)s+=' <span class="mut">('+(r.foodPref==='veg'?'veg':'non-veg')+')</span>';
-    return s;
-  };
-  const namesList=(arr)=>arr.length?arr.map(fmtName).join(', '):'<span class="mut">—</span>';
-  let foodSummary='';
-  if(foodOn){
-    const veg=rsvps.filter(r=>r.status==='yes'&&r.foodPref==='veg').length;
-    const nv=rsvps.filter(r=>r.status==='yes'&&r.foodPref==='nonveg').length;
-    const unk=rsvps.filter(r=>r.status==='yes'&&!r.foodPref).length;
-    foodSummary=`<div style="margin:8px 0;font-size:13px;background:#f0fdf4;border-radius:10px;padding:8px 10px">🍽 Food · Yes: <b>${veg}</b> veg · <b>${nv}</b> non-veg${unk?` · <b>${unk}</b> unspecified`:''}</div>`;
-  }
-  h+=`<div class="card" data-evid="${E(ev.id)}">
-   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-    <div><b style="font-size:17px">${E(ev.msg||'Event')}</b>
-     <div class="mut" style="margin-top:4px">📆 ${E(when)}${E(timeStr)}${foodOn?' · 🍽 food':''}${ev.by?' · by '+E(ev.by):''}</div></div>
-    <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+ const timeStr=[ev.timeFrom,ev.timeTo].filter(Boolean).join(' – ');
+ const hideAdmin=!!opts.focus;
+ return`<div class="card" data-evid="${E(ev.id)}">
+   <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap">
+    <div>
+     <b style="font-size:16px">${E(ev.msg||'Event')}</b>
+     <div class="mut" style="margin-top:4px">${E(ev.date||'')}${timeStr?(' · '+E(timeStr)):''}${foodOn?' · 🍽 food':''}</div>
+    </div>
+    ${hideAdmin?'':`<div style="display:flex;gap:6px;flex-wrap:wrap">
      <button type="button" data-evshare="${E(ev.id)}" style="padding:6px 10px;font-size:12px">Share</button>
      ${canEdit()?`<button type="button" data-evdel="${E(ev.id)}" style="padding:6px 10px;font-size:12px">Delete</button>`:''}
-    </div>
+    </div>`}
    </div>
    <div style="display:flex;gap:10px;flex-wrap:wrap;margin:12px 0 8px;font-size:13px">
     <span style="background:#dcfce7;color:#166534;padding:4px 10px;border-radius:999px;font-weight:700">Yes ${yes.length}</span>
@@ -433,12 +399,63 @@ function rsvpView(){
     </div>
    </div>
   </div>`;
- });
+}
+function rsvpView(){
+ readRsvpFocusFromHash();
+ const focusId=String(rsvpFocusId||'');
+ const list=Array.isArray(events)?[...events]:[];
+ list.sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.timeFrom||'').localeCompare(b.timeFrom||'')||((b.at||0)-(a.at||0)));
+ const today=new Date().toLocaleDateString('en-CA');
+ if(focusId){
+  const ev=list.find(e=>String(e.id)===focusId);
+  // Focus mode: ONLY this event's RSVP UI — no create form, no other events, minimal chrome
+  let h=`<div class="card" style="text-align:center;padding:14px">
+    <b style="font-size:18px">📩 You’re invited</b>
+    <div class="mut" style="margin-top:6px;font-size:13px">Respond below — you don’t need the full group page</div>
+   </div>`;
+  if(!list.length){
+   h+=`<div class="card"><p class="mut" style="margin:0">Loading event…</p></div>`;
+   return h;
+  }
+  if(!ev){
+   h+=`<div class="card"><p class="mut" style="margin:0">This event was removed or the link is outdated.</p>
+    <button type="button" id="rsvp_show_all" class="pri" style="width:100%;margin-top:10px">Open full RSVP list</button></div>`;
+   return h;
+  }
+  h+=rsvpEventCard(ev,{focus:true});
+  if(players.length)h+=`<datalist id="ev_players">${players.map(p=>`<option value="${E(p)}">`).join('')}</datalist>`;
+  return h;
+ }
+ let h=`${sectionNav()}
+ <div class="card"><b>📅 Group events</b><div class="mut" style="margin:4px 0 12px">Anyone in the group — <b>including view-only</b> — can create events and RSVP. No password needed.</div>
+ <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Message</label>
+ <input id="ev_msg" type="text" placeholder="Party at my house / brunch / trip…" maxlength="120" style="width:100%;margin-bottom:10px">
+ <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Date</label>
+ <input id="ev_date" type="date" value="${today}" style="width:100%;margin-bottom:10px">
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+  <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Time from</label>
+   <input id="ev_tfrom" type="time" style="width:100%"></div>
+  <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Time to</label>
+   <input id="ev_tto" type="time" style="width:100%"></div>
+ </div>
+ <label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;margin-bottom:12px;cursor:pointer">
+  <input id="ev_food" type="checkbox" style="width:18px;height:18px"> Food will be served (ask veg / non-veg)
+ </label>
+ <button type="button" class="pri" id="ev_add" style="width:100%">Create event</button>
+ <button type="button" id="ev_share" style="width:100%;margin-top:10px">📤 Share RSVP page</button>
+ <div class="mut" style="margin-top:6px;font-size:12px;text-align:center">Opens RSVP for this group. Use <b>Share</b> on an event for a single-event invite link.</div>
+ </div>`;
+ if(!list.length){
+  h+=`<div class="card"><p class="mut" style="margin:0">No events yet. Create one above.</p></div>`;
+  return h;
+ }
+ list.forEach(ev=>{h+=rsvpEventCard(ev,{focus:false})});
  if(players.length){
   h+=`<datalist id="ev_players">${players.map(p=>`<option value="${E(p)}">`).join('')}</datalist>`;
  }
  return h;
 }
+
 
 function chipsOverlap(aFrom,aTo,bFrom,bTo){
   if(!aFrom||!aTo||!bFrom||!bTo)return false;
@@ -1294,17 +1311,24 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   if(!Array.isArray(events))events=[];
   events.push({id:uid(),msg,date,timeFrom,timeTo,food,at:Date.now(),by:'',rsvps:[]});
   render();toast('Event created');queueMicrotask(()=>{try{persistEvents()}catch(e){console.error(e)}});return}
+ if(t.id=='rsvp_show_all'){rsvpFocusId='';try{sessionStorage.removeItem('ptc_rsvp_focus')}catch(e){}try{history.replaceState(null,'',hashWithMode(gid,'rsvp',''))}catch(e){}render();return}
  if(t.id=='ev_share'||g('data-evshare')){
   if(!gid)return toast('Join a group first');
-  const evId=g('data-evshare')?g('data-evshare').dataset.evshare:'';
-  let u=location.origin+location.pathname.replace(/\/[^/]*$/,'/')+'#g='+gid+'&mode=rsvp';
-  // Prefer clean path: same folder index
-  try{u=location.origin+(location.pathname.endsWith('/')?location.pathname:location.pathname.replace(/\/[^/]+$/, '/'))+'#g='+gid+'&mode=rsvp'}catch(e){u=location.origin+location.pathname+'#g='+gid+'&mode=rsvp'}
-  if(evId)u+='&ev='+evId;
-  const msg='RSVP for our group: '+u;
+  const el=g('data-evshare');
+  const evId=el?String(el.dataset.evshare||''):(rsvpFocusId||'');
+  // Build absolute link that always includes mode=rsvp and event id when sharing an event
+  const base=location.href.split('#')[0];
+  let u=base+hashWithMode(gid,'rsvp',evId||'');
+  if(!evId){
+   toast('Tip: use Share on a specific event for a single-event invite');
+  }
+  const msg=evId?'You’re invited — open this link to RSVP: '+u:'RSVP page: '+u;
   const share=()=>{
-   if(navigator.share){navigator.share({title:'Group RSVP',text:msg,url:u}).catch(()=>{})}
-   else if(navigator.clipboard)navigator.clipboard.writeText(u).then(()=>toast('RSVP link copied')).catch(()=>prompt('Copy this RSVP link',u));
+   if(navigator.share){navigator.share({title:'Event RSVP',text:msg,url:u}).catch(()=>{
+     if(navigator.clipboard)navigator.clipboard.writeText(u).then(()=>toast('RSVP link copied')).catch(()=>prompt('Copy this RSVP link',u));
+     else prompt('Copy this RSVP link',u);
+   })}
+   else if(navigator.clipboard)navigator.clipboard.writeText(u).then(()=>toast('RSVP link copied — open it on another phone to test')).catch(()=>prompt('Copy this RSVP link',u));
    else prompt('Copy this RSVP link',u);
   };
   share();return}
@@ -1643,10 +1667,28 @@ try{loadEmailSession()}catch(e){}
 const hashGame=((location.hash||'').match(/game=(\d{4}-\d{2}-\d{2})/)||[])[1]||'';
 const hashMode=((location.hash||'').match(/mode=(rsvp|news|poker|hub)/)||[])[1]||'';
 const hashEv=((location.hash||'').match(/ev=([A-Za-z0-9_-]+)/)||[])[1]||'';
+let rsvpFocusId=hashEv||(function(){try{return sessionStorage.getItem('ptc_rsvp_focus')||''}catch(e){return ''}})();
 let pendingMode=hashMode||'';
 let pendingEv=hashEv||'';
+// rsvpFocusId set above from hash
 const EMPTY=()=>({players:[],sessions:[],loans:[],expenses:[],settle:null,initLoan:500,game:null,readme:null,rules:null,groupName:'',bills:[],billSettle:null,feed:[],events:[],chipsBookings:[]});
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
+
+function readRsvpFocusFromHash(){
+  try{
+    const h=location.hash||'';
+    const m=(h.match(/[?&#]ev=([A-Za-z0-9_-]+)/)||h.match(/ev=([A-Za-z0-9_-]+)/)||[])[1]||'';
+    if(m){rsvpFocusId=m;try{sessionStorage.setItem('ptc_rsvp_focus',m)}catch(e){}return m}
+  }catch(e){}
+  return rsvpFocusId||'';
+}
+function hashWithMode(code,mode,ev){
+  let h='#g='+code;
+  if(mode)h+='&mode='+mode;
+  if(ev)h+='&ev='+ev;
+  return h;
+}
+
 const canon=x=>JSON.stringify(x,(k,v)=>v&&typeof v=='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(q=>[q,v[q]])):v);
 const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],expenses:S.expenses||[],settle:S.settle||null,initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:null,groupName:typeof S.groupName=='string'?S.groupName:'',bills:(S.bills||[]),billSettle:S.billSettle||null,feed:Array.isArray(S.feed)?S.feed:[],events:Array.isArray(S.events)?S.events:[],chipsBookings:Array.isArray(S.chipsBookings)?S.chipsBookings:[]});
 function getState(){if(!Array.isArray(sessions))sessions=[];if(!Array.isArray(loans))loans=[];if(!Array.isArray(expenses))expenses=[];if(!Array.isArray(bills))bills=[];if(!Array.isArray(feed))feed=[];if(!Array.isArray(events))events=[];if(!Array.isArray(chipsBookings))chipsBookings=[];if(!Array.isArray(players))players=[];sessions.forEach(x=>{if(!x.id)x.id=uid()});loans.forEach(l=>{if(!l.id)l.id=uid()});expenses.forEach(e=>{if(!e.id)e.id=uid()});
@@ -2570,15 +2612,39 @@ function startCloud(){if(!gid)return;
  cloud.listen(gid,json=>{if(gen!==connGen)return;let S;
   try{S=json?norm(JSON.parse(json)):EMPTY()}catch(e){console.error('Bad group data',e);cloudErr='Group data could not be read. It may be damaged.';cs='error';synced=false;render();return}
   if(!synced){synced=true;cs='live';if(window._connTimer){clearTimeout(window._connTimer);window._connTimer=null}const keepName=groupName;base=S;lastSent='';applying=true;try{applyState(S);if(keepName&&!groupName){groupName=keepName;if(gid)saveRecent(gid,groupName)}}catch(e){console.error('applyState',e);cloudErr='Could not load this group\'s data.';cs='error';synced=false;applying=false;render();return}applying=false;if(hashGame){if(game&&game.date===hashGame){tab='loans';appMode='poker';toast('Opened the game of '+hashGame)}else if(game)toast('A different game is in progress ('+game.date+')')}
-  if(pendingMode||hashMode){const m=pendingMode||hashMode;pendingMode='';if(m==='rsvp'||m==='news'||m==='poker'){appMode=m;if(m==='poker')tab='hist';try{history.replaceState(null,'','#g='+gid+'&mode='+m)}catch(e){}if(m==='rsvp')toast('Opened RSVP');else if(m==='news')toast('Opened Newsletter');else toast('Opened Cards')}}
-  if(pendingEv){pendingEv=''}
+  if(pendingMode||hashMode){const m=pendingMode||hashMode;pendingMode='';
+  if(m==='rsvp'||m==='news'||m==='poker'){
+   appMode=m;if(m==='poker')tab='hist';
+   if(m==='rsvp'){
+    if(pendingEv)rsvpFocusId=pendingEv;
+    readRsvpFocusFromHash();
+    try{if(rsvpFocusId)sessionStorage.setItem('ptc_rsvp_focus',rsvpFocusId)}catch(e){}
+   }else{rsvpFocusId='';try{sessionStorage.removeItem('ptc_rsvp_focus')}catch(e){}}
+   try{history.replaceState(null,'',hashWithMode(gid,m,m==='rsvp'?rsvpFocusId:''))}catch(e){}
+   if(m==='rsvp')toast(rsvpFocusId?'Opened event RSVP':'Opened RSVP');
+   else if(m==='news')toast('Opened Newsletter');
+   else toast('Opened Cards');
+  }
+  pendingEv='';
+ }
    ;(async()=>{try{const del=await cloud.get(gid,'deleted');if(del&&del.json&&del.json!=='null'&&!pendingOrgPass){removeRecent(gid);const gone=gid;leaveGroup();toast('Group '+(gone.slice(0,8))+'… no longer exists (deleted by the admin).');return}}catch(e){}
     loadOrg().then(()=>{if(gen===connGen)render()});
     if(pendingOrgPass){const pw=pendingOrgPass,setG=pendingSetGlobal,ep=pendingEditPw;pendingOrgPass=null;pendingSetGlobal=false;pendingEditPw=null;try{const salt=randHex(16),iter=150000,hash=await hashPass(pw,salt,iter);const payload=JSON.stringify({salt,iter,hash});await cloud.put(gid,'organiser',payload);if(ep){const s2=randHex(16),h2=await hashPass(ep,s2,150000);await cloud.put(gid,'access',JSON.stringify({salt:s2,iter:150000,hash:h2}));access={salt:s2,iter:150000,hash:h2};accessLoaded=true;lastCode=ep.slice(0,4)+'-'+ep.slice(4)}if(setG)await cloud.put(CFG,'createpass',payload);orgInfo={salt,iter,hash};orgLoaded=true;markOrganiser();await registerGroup(gid,groupName);if(gen===connGen)render()}catch(e){toast('Could not save admin password — set it on the Backups tab')}}
     else if(gen===connGen){render();queueMicrotask(()=>{try{persist()}catch(e){}})} })();return}
   if(inflight)return;reconcile(S)},e=>{if(gen!==connGen)return;cloudErr=((e&&e.code)||'error')+': '+((e&&e.message)||'');cs='error';synced=false;render()})}
 function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};bills=[];billSettle=null;billDraft={desc:'',amt:'',paid:'',shared:{}};feed=[];events=[];chipsBookings=[];appMode='';billTab='list';xgrp={busy:false,err:'',list:[],picked:{},playerPicked:{},data:{},combined:null};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;ownerEmail='';players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
-function setGroup(code,name,opts){const nm=(name!=null?String(name):'').trim().slice(0,40);const doReg=opts&&opts.register;gid=code;saveRecent(code,nm||code.slice(0,8));try{localStorage.setItem('ptc_group',code);const modeBit=pendingMode?('&mode='+pendingMode):(hashMode?('&mode='+hashMode):'');history.replaceState(null,'','#g='+code+modeBit)}catch(e){}clearLocal();groupName=nm;cs='connecting';synced=false;if(pendingMode==='rsvp'||hashMode==='rsvp'){appMode='rsvp'}else if(pendingMode==='news'||hashMode==='news'){appMode='news'}else if(pendingMode==='poker'||hashMode==='poker'){appMode='poker';tab='hist'};if(window.cloud&&cloud.stop){try{cloud.stop()}catch(e){}}startCloud();render();loadOwner(code);if(doReg)queueMicrotask(()=>registerGroup(code,nm).catch(()=>{}))}
+function setGroup(code,name,opts){const nm=(name!=null?String(name):'').trim().slice(0,40);const doReg=opts&&opts.register;gid=code;saveRecent(code,nm||code.slice(0,8));
+ const mode=pendingMode||hashMode||'';
+ const evKeep=pendingEv||hashEv||rsvpFocusId||'';
+ try{localStorage.setItem('ptc_group',code);history.replaceState(null,'',hashWithMode(code,mode,mode==='rsvp'?evKeep:''))}catch(e){}
+ clearLocal();groupName=nm;cs='connecting';synced=false;
+ if(mode==='rsvp'||pendingMode==='rsvp'||hashMode==='rsvp'){
+  appMode='rsvp';
+  rsvpFocusId=evKeep||readRsvpFocusFromHash()||'';
+  try{if(rsvpFocusId)sessionStorage.setItem('ptc_rsvp_focus',rsvpFocusId)}catch(e){}
+ }else if(mode==='news'||pendingMode==='news'||hashMode==='news'){appMode='news';rsvpFocusId=''}
+ else if(mode==='poker'||pendingMode==='poker'||hashMode==='poker'){appMode='poker';tab='hist';rsvpFocusId=''}
+ if(window.cloud&&cloud.stop){try{cloud.stop()}catch(e){}}startCloud();render();loadOwner(code);if(doReg)queueMicrotask(()=>registerGroup(code,nm).catch(()=>{}))}
 async function checkAppUpdate(){
   if(!('serviceWorker' in navigator))return{updated:false,reason:'no-sw'};
   try{
@@ -2613,7 +2679,7 @@ async function checkAppUpdate(){
     return{updated:false,reason:hadWaiting?'activated':'latest'};
   }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
 }
-const CACHE_HINT='session-tracker-v70';
+const CACHE_HINT='session-tracker-v72';
 async function hardReloadApp(){
   try{
     if('caches' in window){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}
@@ -2682,7 +2748,7 @@ async function refreshGroup(forceHard){
   cloudOn=false;synced=false;cs='connecting';base=null;lastSent='';inflight=0;
   startCloud();render();toast('Live data refreshed · Shift+click top ↻ for full app reload')
 }
-function leaveGroup(){window._glLoaded=false;connGen++;if(window._connTimer){clearTimeout(window._connTimer);window._connTimer=null}const keepAdmin=(()=>{try{return sessionStorage.getItem('ptc_admin_open')==='1'}catch(e){return false}})();if(keepAdmin){adminOpen=true;adminPw=adminPw||'session';adminSection=adminSection||'groups';loadGroupList().then(l=>{adminGroups=l;render()}).catch(()=>{})}else{adminOpen=false;adminPw=null}if(gid){saveRecent(gid,groupName||gid.slice(0,8));try{localStorage.removeItem(viewKey());localStorage.removeItem(editKey())}catch(e){}}if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;gid='';try{localStorage.removeItem('ptc_group');history.replaceState(null,'',location.pathname)}catch(e){}clearLocal();render()}
+function leaveGroup(){rsvpFocusId='';try{sessionStorage.removeItem('ptc_rsvp_focus')}catch(e){}window._glLoaded=false;connGen++;if(window._connTimer){clearTimeout(window._connTimer);window._connTimer=null}const keepAdmin=(()=>{try{return sessionStorage.getItem('ptc_admin_open')==='1'}catch(e){return false}})();if(keepAdmin){adminOpen=true;adminPw=adminPw||'session';adminSection=adminSection||'groups';loadGroupList().then(l=>{adminGroups=l;render()}).catch(()=>{})}else{adminOpen=false;adminPw=null}if(gid){saveRecent(gid,groupName||gid.slice(0,8));try{localStorage.removeItem(viewKey());localStorage.removeItem(editKey())}catch(e){}}if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;gid='';try{localStorage.removeItem('ptc_group');history.replaceState(null,'',location.pathname)}catch(e){}clearLocal();render()}
 function switchGroupUI(){tab='hist';leaveGroup()}
 function randCode(){const a='abcdefghjkmnpqrstuvwxyz23456789';let s='';crypto.getRandomValues(new Uint8Array(14)).forEach(x=>{s+=a[x%a.length]});return s}
 function copyLink(){const u=gid;if(navigator.clipboard)navigator.clipboard.writeText(u).then(()=>toast('Group code copied')).catch(()=>prompt('Copy this group code',u));else prompt('Copy this group code',u)}
@@ -2692,8 +2758,9 @@ window.addEventListener('hashchange',()=>{
     const h=location.hash||'';
     const m=(h.match(/mode=(rsvp|news|poker|hub)/)||[])[1]||'';
     const gcode=(h.match(/g=([A-Za-z0-9_-]{8,40})/)||[])[1]||'';
-    if(gcode&&gcode!==gid){pendingMode=m||'rsvp';if(m==='rsvp')appMode='rsvp';openExistingGroup(gcode);return}
-    if(m&&gid){appMode=m==='hub'?'':m;if(m==='poker')tab='hist';render()}
+    const ev=(h.match(/ev=([A-Za-z0-9_-]+)/)||[])[1]||'';
+    if(gcode&&gcode!==gid){pendingMode=m||'rsvp';pendingEv=ev;if(m==='rsvp'){appMode='rsvp';rsvpFocusId=ev||''}openExistingGroup(gcode);return}
+    if(m&&gid){appMode=m==='hub'?'':m;if(m==='poker')tab='hist';if(m==='rsvp')rsvpFocusId=ev||rsvpFocusId;else if(m!=='rsvp')rsvpFocusId='';render()}
   }catch(e){console.error(e)}
 });
 window.addEventListener('online',()=>{if(cloudOn){setSync('live');persist()}});window.addEventListener('offline',()=>setSync('offline'));
