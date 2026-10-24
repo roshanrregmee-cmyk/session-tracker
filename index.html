@@ -275,6 +275,13 @@ body.mode-bills .topbar .tabs{display:none}
 /* welcome */
 #welcome{background:linear-gradient(135deg,#ff3d81,#ff8a1f 58%,#ffc633)}
 #enterBtn{color:#e9366f;border:0;box-shadow:0 12px 26px -10px rgba(0,0,0,.45)}
+
+.admin-ico-row{display:flex;gap:12px;justify-content:center;margin:0 0 16px;flex-wrap:wrap}
+.admin-ico{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:96px;min-height:88px;padding:12px 8px;border-radius:18px;border:1px solid var(--bd);background:var(--card);box-shadow:var(--sh);cursor:pointer;font-weight:700}
+.admin-ico.on{border-color:transparent;background:linear-gradient(135deg,var(--g1),var(--g2));color:#fff}
+.admin-ico-emoji{font-size:28px;line-height:1}
+.admin-ico-label{font-size:12px;text-align:center}
+.admin-ico:active{transform:scale(.96)}
 </style></head><body><div id="welcome"><img src="icon-512.png" alt=""><h2>Welcome Folks! 👑</h2><button id="enterBtn" type="button">Enter</button></div><main>
 <div class="topbar">
 <div class="hd"><h1><img src="icon-192.png" alt="" style="height:1.15em;width:1.15em;border-radius:22%;vertical-align:-0.2em;margin-right:.3em"><span class="ttl" id="ttl"></span></h1><span id="ind" class="ind"></span><button id="gref" class="rbtn" title="Refresh live data · Shift+click for full app reload" aria-label="Refresh">↻</button></div>
@@ -1209,7 +1216,24 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(t.id=='gnew'){createNewGroup()}
  else if(t.id=='gadminlogin'){adminLogin()}
  else if(t.id=='gnew2'){adminCreate()}
- else if(g('data-asec')){adminSection=g('data-asec').dataset.asec||'groups';render();return}
+ else if(g('data-asec')){adminSection=g('data-asec').dataset.asec||'groups';persistAdminSession(true);render();return}
+ else if(t.id=='admin_chg_pass'){(async()=>{
+  if(!(await ensureCloud()))return toast('Could not connect');
+  let info=null;try{info=await loadCreatePass()}catch(e){return toast('Could not load admin password')}
+  if(!info)return toast('No admin password set yet');
+  const cur=prompt('Current admin password:');if(cur===null)return;
+  if(await hashPass(cur,info.salt,info.iter)!==info.hash)return toast('Wrong current password');
+  const n1=prompt('New admin password (at least 4 characters):');if(n1===null)return;
+  if(n1.length<4)return toast('Use at least 4 characters');
+  const n2=prompt('Confirm new admin password:');if(n2===null)return;
+  if(n1!==n2)return toast('New passwords do not match');
+  const salt=randHex(16),iter=150000,hash=await hashPass(n1,salt,iter);
+  try{
+    await window.cloud.put(CFG,'createpass',JSON.stringify({salt,iter,hash}));
+    adminPw=n1;
+    toast('Admin password updated');
+  }catch(e){toast('Could not save new password')}
+ })();return}
  else if(t.id=='em_add'){(async()=>{
   if(!(await ensureCloud()))return toast('Could not connect');
   const email=normEmail(($('#em_email')&&$('#em_email').value)||'');
@@ -1233,8 +1257,35 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  })();return}
  else if(g('data-emdel')){(async()=>{
   const i=+g('data-emdel').dataset.emdel;
-  if(!confirm('Delete this email registration?'))return;
-  await loadEmailUsers();emailUsers.splice(i,1);await saveEmailUsers(emailUsers);render();toast('Deleted');
+  await loadEmailUsers();
+  const u=emailUsers[i];
+  if(!u)return;
+  const email=normEmail(u.email);
+  let glist=[];
+  try{glist=await loadGroupList()}catch(e){glist=adminGroups||[]}
+  const created=glist.filter(g=>g.by==='user'&&normEmail(g.byEmail||'')===email);
+  const msg=created.length
+    ?('Delete '+email+' and permanently delete '+created.length+' group(s) they created?\n\n'+created.map(g=>(g.name||g.code.slice(0,8))).join(', ')+'\n\nThis cannot be undone.')
+    :('Delete email registration for '+email+'?');
+  if(!confirm(msg))return;
+  if(created.length&&!confirm('Confirm: delete those group(s) and all their data forever?'))return;
+  toast(created.length?'Deleting registration and groups…':'Deleting registration…');
+  for(const g of created){
+    try{await deleteGroupDataSilent(g.code)}catch(e){console.error('delete group',g.code,e)}
+  }
+  // Remove this email and strip deleted codes from other users' group lists
+  const dead=new Set(created.map(g=>g.code));
+  await loadEmailUsers();
+  emailUsers=(emailUsers||[]).filter(x=>normEmail(x.email)!==email).map(x=>{
+    if(Array.isArray(x.groups)&&dead.size)x.groups=x.groups.filter(c=>!dead.has(c));
+    return x;
+  });
+  await saveEmailUsers(emailUsers);
+  try{adminGroups=await loadGroupList()}catch(e){}
+  // If admin is currently inside a deleted group, leave it
+  if(gid&&dead.has(gid)){try{leaveGroup()}catch(e){}}
+  render();
+  toast(created.length?('Deleted user and '+created.length+' group(s)'):'Email registration deleted');
  })();return}
  else if(g('data-emedit')){(async()=>{
   const i=+g('data-emedit').dataset.emedit;
@@ -1505,16 +1556,29 @@ function adminEmailsSection(){
   </div>
   <div style="max-width:420px;margin:0 auto">${rows}</div>`;
 }
+function adminPasswordSection(){
+  return`<div class="card" style="text-align:left;max-width:420px;margin:0 auto 14px">
+   <b>🔑 Admin password</b>
+   <div class="mut" style="margin:4px 0 12px">Used to open this Admin area and to unlock organiser actions in a group. Not the same as a player group password (those are removed).</div>
+   <button type="button" class="pri" id="admin_chg_pass" style="width:100%">Change admin password</button>
+   <div class="mut" style="margin-top:10px;font-size:12px">You will need the current password, then choose a new one.</div>
+  </div>`;
+}
 function joinScreen(){
  if(adminOpen){
+  const iconBtn=(id,emoji,label,on)=>`<button type="button" data-asec="${id}" class="admin-ico ${on?'on':''}" title="${label}">
+    <span class="admin-ico-emoji">${emoji}</span>
+    <span class="admin-ico-label">${label}</span>
+   </button>`;
   return`<div class="jn" style="max-width:480px"><div class="jn-title">Admin</div>
-   <div class="jn-sub" style="margin-bottom:12px">Manage groups &amp; email registrations</div>
-   <div style="display:flex;gap:8px;justify-content:center;margin-bottom:14px;flex-wrap:wrap">
-    <button type="button" data-asec="groups" class="${adminSection==='groups'?'pri':''}">Groups</button>
-    <button type="button" data-asec="emails" class="${adminSection==='emails'?'pri':''}">Email registrations</button>
+   <div class="jn-sub" style="margin-bottom:14px">Manage groups, emails &amp; password</div>
+   <div class="admin-ico-row">
+    ${iconBtn('groups','🃏','Groups',adminSection==='groups')}
+    ${iconBtn('emails','✉️','Emails',adminSection==='emails')}
+    ${iconBtn('password','🔑','Password',adminSection==='password')}
    </div>
-   ${adminSection==='emails'?adminEmailsSection():adminGroupsSection()}
-   <button id="gback" style="margin-top:8px">Back</button></div>`;
+   ${adminSection==='emails'?adminEmailsSection():adminSection==='password'?adminPasswordSection():adminGroupsSection()}
+   <button id="gback" style="margin-top:12px">Back</button></div>`;
  }
  // Email user signed in — show their groups + organise
  if(emailUser&&emailUser.email&&!gid){
@@ -1600,12 +1664,12 @@ async function adminCreate(){
  const nameEl=$('#admin_gname');
  const n=nameEl?nameEl.value.trim():prompt('Group name:');
  if(n===null)return;if(nameEl&&!n)return toast('Enter a group name');
- let ep=null;if(confirm('Generate a Password for players now? You can also do it later from Backups.')){const a='ABCDEFGHJKMNPQRSTUVWXYZ23456789';ep='';crypto.getRandomValues(new Uint8Array(8)).forEach(x=>{ep+=a[x%a.length]})}
- pendingOrgPass=adminPw;pendingSetGlobal=false;pendingEditPw=ep;
+ pendingOrgPass=adminPw;pendingSetGlobal=false;pendingEditPw=null;
  pendingGroupMeta={by:'admin',byName:'Admin',byEmail:''};
  persistAdminSession(true);
  adminOpen=false;adminPw=null;
- setGroup(randCode(),(n||'').trim(),{register:true});toast(ep?'Group created. Open Backups to copy the Password.':'Group created.')}
+ setGroup(randCode(),(n||'').trim(),{register:true});toast('Group created');
+}
 async function issueEmailOtp(email){
  const e=normEmail(email);
  await loadEmailUsers();
@@ -1943,16 +2007,20 @@ async function registerGroup(code,name){
 }
 async function unregisterGroup(code){const list=(await loadGroupList()).filter(x=>x.code!==code);await saveGroupList(list)}
 function removeRecent(code){try{const r=getRecent().filter(x=>x.code!==code);localStorage.setItem('ptc_recent',JSON.stringify(r))}catch(e){}}
+async function deleteGroupDataSilent(code){
+ if(!code||!window.cloud)return;
+ try{await window.cloud.deleteGroup(code)}catch(e){console.error(e)}
+ try{await window.cloud.put(code,'deleted',JSON.stringify({at:Date.now(),reason:'email-user-removed'}))}catch(e){}
+ try{await unregisterGroup(code)}catch(e){}
+ removeRecent(code);
+ try{localStorage.removeItem('ptc_view_'+code);localStorage.removeItem('ptc_edit_'+code);localStorage.removeItem('ptc_org_'+code)}catch(e){}
+}
 async function deleteGroupFully(code){
  if(!(await checkPass('delete a group and all its data')))return;
  if(!confirm('Permanently delete group '+(code.slice(0,8))+'… including all sessions, loans, expenses and backups?\nThis cannot be undone.'))return;
  if(!confirm('Type-confirm: really delete this group forever?'))return;
  try{
-  await window.cloud.deleteGroup(code);
-  try{await window.cloud.put(code,'deleted',JSON.stringify({at:Date.now()}))}catch(e){}
-  await unregisterGroup(code);
-  removeRecent(code);
-  try{localStorage.removeItem('ptc_view_'+code);localStorage.removeItem('ptc_edit_'+code);localStorage.removeItem('ptc_org_'+code)}catch(e){}
+  await deleteGroupDataSilent(code);
   if(gid===code){leaveGroup();toast('Group deleted')}
   else{toast('Group deleted');if(tab==='backup')loadGroupAdmin()}
  }catch(e){toast('Could not delete group: '+(e&&e.message||e))}
@@ -2160,15 +2228,11 @@ function backupTab(){const when=x=>new Date(x.savedAt).toLocaleString();
  else a='<div class="mut">No backup yet.</div>';
  if(bk.standing){const d=JSON.parse(bk.standing.json);b=`<div class="mut">Saved ${E(when(bk.standing))} · game of ${E(d.game.date)} · ${d.game.players.length} players · ${d.loans.length} loan entries</div><button class="pri" id="bkstd" style="margin-top:8px">Restore this standing</button>`}
  else b='<div class="mut">No standing saved yet.</div>';
- return`${canOrganise()?`<div class="card"><b>Upload Excel</b><div class="mut" style="margin:4px 0 10px">Replace all shared poker history for everyone in this group.</div><label class="btn pri" id="uplbl" for="up" style="display:inline-flex;cursor:pointer">📤 Upload Excel</label><input id="up" type="file" accept=".xlsx,.xls" style="position:absolute;width:1px;height:1px;opacity:0"></div>`:''}<div class="card"><b>Last completed game backup</b>${a}</div>
+ return`<div class="card"><b>Upload Excel</b><div class="mut" style="margin:4px 0 10px">Replace all shared poker history for everyone in this group.</div>
+  <label class="btn pri" id="uplbl" for="up" style="display:inline-flex;cursor:pointer">📤 Upload Excel</label>
+  <input id="up" type="file" accept=".xlsx,.xls" style="position:absolute;width:1px;height:1px;opacity:0"></div>
+ <div class="card"><b>Last completed game backup</b>${a}</div>
  <div class="card"><b>Current standing backup</b>${b}</div>
- ${canOrganise()?'':`<div class="card"><b>Admin</b><div class="mut" style="margin:4px 0 8px">Unlock History editing, uploads and restores.</div><button class="pri" id="unlockorg">Enter admin password</button></div>`}
- <div class="card"><b>Password</b><div class="mut" style="margin:4px 0 8px">${access?'Only people with the password can make changes. Everyone else can view and export.':'Everyone can edit. Create a password so only people who have it can change data.'} Needs the admin password.</div><button class="pri" id="gencode">${access?'Generate a new password':'Create a password'}</button>${access?' <button id="allowall">Allow everyone to edit</button>':''}${lastCode?`<div style="margin-top:10px">Share this password (shown once):<div style="font-size:24px;font-weight:700;letter-spacing:2px;margin:4px 0">${lastCode}</div><button id="copycode">Copy password</button></div>`:''}</div>
- <div class="card"><b>Admin password</b><div class="mut" style="margin:4px 0 8px">${orgInfo?'Needed to restore backups, delete data and manage groups.':'Not set.'}</div><button class="pri" id="orgset">${orgInfo?'Change':'Set'}</button>${orgInfo?' <button id="orgrm">Remove</button>':''}</div>
- <div class="card"><b>All groups (admin)</b><div class="mut" style="margin:4px 0 8px">After entering the admin password you can open any registered group or permanently delete one (history, loans, expenses and backups).</div>
- <button class="pri" id="gadmin" ${adminGroupsBusy?'disabled':''}>${adminGroupsBusy?'Loading…':'Load / refresh group list'}</button>${adminGroupsErr?`<p class="neg" style="margin-top:8px">Could not load the group list (${E(adminGroupsErr)}). Tap the button to try again.</p>`:''}
- ${adminGroupsLoaded?(adminGroups.length?adminGroups.map(g=>`<div class="row" style="justify-content:space-between;flex-wrap:wrap;margin-top:8px;gap:6px"><span><b>${E(g.name||g.code.slice(0,8))}</b> <span class="mut">${E(g.code.slice(0,8))}…</span>${g.code===gid?' <span class="pos">· current</span>':''}</span><span style="display:flex;gap:6px">${g.code!==gid?`<button data-gopen="${E(g.code)}">Open</button>`:''}<button class="x" data-gdel="${E(g.code)}">Delete</button></span></div>`).join(''):'<p class="mut" style="margin-top:8px">No groups registered yet. Create or open groups while organiser is set — they appear here.</p>'):''}
- </div>
  ${bk.err?`<p class="neg">Could not load backups (${E(bk.err)}). Tap ↻ Refresh at the top to try again.</p>`:''}`}
 function startCloud(){if(!gid)return;
  const gen=++connGen;
@@ -2226,7 +2290,7 @@ async function checkAppUpdate(){
     return{updated:false,reason:hadWaiting?'activated':'latest'};
   }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
 }
-const CACHE_HINT='session-tracker-v61';
+const CACHE_HINT='session-tracker-v63';
 async function hardReloadApp(){
   try{
     if('caches' in window){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}
