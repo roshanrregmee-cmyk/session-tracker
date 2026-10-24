@@ -297,6 +297,23 @@ body.mode-bills .topbar .tabs{display:none}
 .nogrp #v{padding-bottom:100px}
 .gbtns{display:flex;gap:6px;flex-shrink:0;align-items:center}
 .rm{color:var(--neg);border-color:rgba(224,52,79,.4);padding:8px 12px;font-size:13px}
+
+body.mode-news .tabs,body.mode-news .intro{display:none!important}
+body.mode-news .topbar{border-bottom:0;box-shadow:none;margin-bottom:0}
+body.mode-news .topbar .tabs{display:none}
+.hub{grid-template-columns:1fr 1fr 1fr}
+@media(max-width:640px){.hub{grid-template-columns:1fr}}
+.news-mast{text-align:center;padding:18px 12px 14px;margin:0 0 14px;border-radius:18px;color:#fff;background:linear-gradient(135deg,#2b1263,#7c2bd9 55%,#e9366f);box-shadow:var(--sh)}
+.news-kicker{font-size:12px;letter-spacing:.28em;font-weight:700;opacity:.85}
+.news-group{font:800 26px Georgia,'Times New Roman',serif;margin:6px 0 2px;word-break:break-word}
+.news-date{font-size:13px;opacity:.85}
+.news-sec{padding:18px 18px 8px}
+.news-k{font-size:11px;letter-spacing:.2em;text-transform:uppercase;font-weight:800;color:var(--ac);margin-bottom:6px}
+.news-h{margin:0 0 2px;font:800 24px/1.2 Georgia,'Times New Roman',serif}
+.news-sub{font-size:13px;color:var(--mut);margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--bd)}
+.news-p{font:16px/1.7 Georgia,'Times New Roman',serif;margin:0 0 12px}
+.news-p:first-of-type::first-letter{float:left;font-size:46px;line-height:.9;font-weight:800;padding:4px 8px 0 0;color:var(--ac)}
+.pw button.on{background:linear-gradient(135deg,var(--g1),var(--g2));color:#fff;border-color:transparent}
 </style></head><body><div id="welcome"><img src="icon-512.png" alt=""><h2>Welcome Folks! 👑</h2><button id="enterBtn" type="button">Enter</button></div><main>
 <div class="topbar">
 <div class="hd"><h1><img src="icon-192.png" alt="" style="height:1.15em;width:1.15em;border-radius:22%;vertical-align:-0.2em;margin-right:.3em"><span class="ttl" id="ttl"></span></h1><span id="ind" class="ind"></span><button id="gref" class="rbtn" title="Refresh live data · Shift+click for full app reload" aria-label="Refresh">↻</button></div>
@@ -527,12 +544,152 @@ function chipsView(){
   return h;
 }
 
+/* ===== Newsletter ===== */
+let newsMode='latest',newsN=3,newsRf=0,newsRt=-1;
+const nvN=x=>{const n=parseFloat(x);return isFinite(n)?n:null};
+const nfmt=n=>Math.abs(Math.round(n*100)/100).toLocaleString(undefined,{maximumFractionDigits:2});
+const nsgn=n=>(n<0?'−':'+')+nfmt(n);
+function nHash(s){let h=2166136261;s=String(s);for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
+function nRng(seed){let a=nHash(seed)||1;return()=>{a=(a+0x6D2B79F5)|0;let t=Math.imul(a^(a>>>15),1|a);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296}}
+const nPick=(r,arr)=>arr[Math.floor(r()*arr.length)];
+function nDate(d){try{const x=new Date(d+'T00:00');return isNaN(x)?(d||''):x.toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long'})}catch(e){return d||''}}
+function nDay(d){try{const x=new Date(d+'T00:00');return isNaN(x)?(d||''):x.toLocaleDateString(undefined,{day:'numeric',month:'short'})}catch(e){return d||''}}
+function nList(a){a=a.filter(Boolean);return a.length<=1?(a[0]||''):a.slice(0,-1).join(', ')+' and '+a[a.length-1]}
+function newsSelect(S){
+ const N=S.length,all=[...S.keys()],k=Math.max(1,newsN|0);
+ if(!N)return{idx:[],txt:'no games yet'};
+ if(newsMode==='latest')return{idx:[N-1],txt:'the latest game'};
+ if(newsMode==='sess')return{idx:all.slice(-k),txt:k>1?`the last ${k} games`:'the latest game'};
+ if(newsMode==='mon'){const ds=S.map(x=>x.date).filter(Boolean).sort();if(!ds.length)return{idx:[],txt:'no dated games'};const end=ds[ds.length-1],e=new Date(end+'T00:00');e.setMonth(e.getMonth()-k);const from=e.toLocaleDateString('en-CA');return{idx:all.filter(i=>S[i].date&&S[i].date>from&&S[i].date<=end),txt:k>1?`the last ${k} months`:'the last month'}}
+ if(newsMode==='custom'){let a=Math.min(newsRf,N-1),b=newsRt<0?N-1:Math.min(newsRt,N-1);if(a>b)[a,b]=[b,a];a=Math.max(a,0);return{idx:all.slice(a,b+1),txt:`games ${a+1} to ${b+1}`}}
+ return{idx:all,txt:'all time'}}
+function newsStats(list){
+ const P={};
+ list.forEach((s,si)=>{Object.keys(s.v||{}).forEach(p=>{const n=nvN(s.v[p]);if(n===null)return;(P[p]=P[p]||{p,g:[]}).g.push({si,date:s.date||'',a:n})})});
+ return Object.values(P).map(o=>{const g=o.g,n=g.length,tot=g.reduce((a,x)=>a+x.a,0),avg=tot/n,wins=g.filter(x=>x.a>0).length,losses=g.filter(x=>x.a<0).length;
+  const best=g.reduce((m,x)=>x.a>m.a?x:m,g[0]),worst=g.reduce((m,x)=>x.a<m.a?x:m,g[0]),sd=Math.sqrt(g.reduce((a,x)=>a+(x.a-avg)**2,0)/n);
+  let st=0,sg=0;for(let i=g.length-1;i>=0;i--){const q=g[i].a>0?1:g[i].a<0?-1:0;if(i===g.length-1){sg=q;if(!q)break;st=1}else if(q===sg)st++;else break}
+  const r3=g.slice(-3),e3=g.slice(0,-3),ra=r3.reduce((a,x)=>a+x.a,0)/r3.length,ea=e3.length?e3.reduce((a,x)=>a+x.a,0)/e3.length:null;
+  return{p:o.p,n,tot,avg,wins,losses,best,worst,sd,st,sg,ra,ea}})}
+function newsLatest(S,r){
+ if(!S.length)return null;
+ const ls=S[S.length-1],prev=S.slice(0,-1);
+ const rows=Object.keys(ls.v||{}).map(p=>({p,a:nvN(ls.v[p])})).filter(x=>x.a!==null).sort((a,b)=>b.a-a.a);
+ if(!rows.length)return null;
+ const win=rows.filter(x=>x.a>0),los=rows.filter(x=>x.a<0).sort((a,b)=>a.a-b.a),even=rows.filter(x=>x.a===0);
+ const moved=win.reduce((a,x)=>a+x.a,0),pst=newsStats(prev),prevTot=Object.fromEntries(pst.map(o=>[o.p,o.tot])),all=newsStats(S);
+ const lead=[...all].sort((a,b)=>b.tot-a.tot),prevLead=[...pst].sort((a,b)=>b.tot-a.tot)[0];
+ const W=win[0],L=los[0],pl=prev.length?prev[prev.length-1]:null;
+ const plWin=pl?Object.keys(pl.v||{}).map(p=>({p,a:nvN(pl.v[p])})).filter(x=>x.a!==null).sort((a,b)=>b.a-a.a)[0]:null;
+ let head,sub=(ls.date?nDate(ls.date)+' · ':'')+rows.length+' player'+(rows.length>1?'s':'')+' at the table';
+ if(!W&&!L)head='A Night of Perfect Balance';
+ else if(W&&prevTot[W.p]!==undefined&&prevTot[W.p]<0)head=nPick(r,[`${W.p} Turns the Tables`,`${W.p} Climbs Out of the Red`,`Comeback Kid: ${W.p} Strikes`]);
+ else if(W&&plWin&&plWin.p===W.p&&plWin.a>0)head=nPick(r,[`${W.p} Does It Again`,`Back-to-Back for ${W.p}`,`${W.p} Keeps the Streak Alive`]);
+ else if(W&&win.length>1&&W.a>=moved*.6)head=`${W.p} Takes the Lion’s Share`;
+ else if(W)head=nPick(r,[`${W.p} Wins the Night`,`${W.p} Rules the Table`,`The Pot Goes to ${W.p}`]);
+ else head=`${L.p} Pays the Price`;
+ const P=[];
+ P.push(`${ls.date?nDate(ls.date):'The most recent game'} saw ${rows.length} players ${nPick(r,['pull up a chair and shuffle up','settle in and cut the deck','sit down with their best poker faces on','gather round for another round of cards'])}. By the final hand, ${nfmt(moved)} had changed hands${win.length&&los.length?`, flowing from ${los.length} player${los.length>1?'s':''} in the red to ${win.length} in the black`:''}.`);
+ if(W){let s=`${W.p} was the story of the night, finishing ${nsgn(W.a)}.`;
+  if(prevTot[W.p]!==undefined&&prevTot[W.p]<0)s+=` It was quite a turnaround for someone who walked in ${nfmt(prevTot[W.p])} down overall.`;
+  else if(plWin&&plWin.p===W.p&&plWin.a>0)s+=` That makes it back-to-back wins.`;
+  if(win.length===1&&los.length)s+=` The only player to finish in the black — everyone else paid the toll.`;
+  else if(win.length>1)s+=` Also finishing ahead: ${nList(win.slice(1).map(x=>`${x.p} (${nsgn(x.a)})`))}.`;
+  P.push(s)}
+ if(L){const st=all.find(x=>x.p===L.p);let s=nPick(r,[`The night was far less kind to ${L.p}, who dropped ${nfmt(L.a)}.`,`${L.p} had a night to forget, dropping ${nfmt(L.a)}.`,`The cards turned their back on ${L.p}, who dropped ${nfmt(L.a)}.`,`${L.p} left ${nfmt(L.a)} lighter, wondering where it all went wrong.`]);
+  if(st&&st.sg===-1&&st.st>=2)s+=` That is ${st.st} losing games in a row — maybe it is time to change seats.`;
+  else if(st&&st.tot>0&&st.n>1)s+=` A bruising night, though still ${nfmt(st.tot)} up overall.`;
+  if(los.length>1)s+=` ${nList(los.slice(1).map(x=>`${x.p} (${nsgn(x.a)})`))} also felt the pinch.`;
+  P.push(s)}
+ if(even.length)P.push(`${nList(even.map(x=>x.p))} ${even.length>1?'both ':''}broke even — ${nPick(r,['a quiet night, and a perfectly respectable one','the diplomatic result','not a chip lost, not a chip won'])}.`);
+ if(all.length>1&&S.length>1){const a=lead[0],z=lead[lead.length-1];let s='';
+  if(prevLead&&prevLead.p!==a.p)s+=`In the overall standings, ${a.p} grabbed the lead from ${prevLead.p}, now ${nsgn(a.tot)} across ${a.n} games.`;
+  else s+=`${a.p} stays on top of the overall standings at ${nsgn(a.tot)} across ${a.n} games.`;
+  if(z.p!==a.p)s+=` Bringing up the rear is ${z.p} at ${nsgn(z.tot)}.`;
+  P.push(s)}
+ else if(S.length===1)P.push(`That is the first game on the books — the season starts here, and the story is only beginning.`);
+ return{head,sub,kicker:'The Latest Game',p:P}}
+function newsTimeline(list,sel,r){
+ const st=newsStats(list);if(st.length<1||list.length<2)return null;
+ const moved=list.reduce((a,s)=>a+Object.values(s.v||{}).reduce((q,x)=>{const n=nvN(x);return q+(n>0?n:0)},0),0);
+ const byTot=[...st].sort((a,b)=>b.tot-a.tot),A=byTot[0],B=byTot[1],Z=byTot[byTot.length-1];
+ const dates=list.map(s=>s.date).filter(Boolean).sort(),P=[];
+ P.push(`Zooming out to ${sel.txt==='all time'?'the full record':sel.txt}: ${list.length} games${dates.length>1?` between ${nDay(dates[0])} and ${nDay(dates[dates.length-1])}`:''}, ${st.length} different player${st.length>1?'s':''} and ${nfmt(moved)} chips changing hands — roughly ${nfmt(Math.round(moved/list.length))} a night.`);
+ if(st.length>1){let s=`${A.p} sits at the top of the table at ${nsgn(A.tot)}, with ${A.wins} win${A.wins===1?'':'s'} in ${A.n} games.`;
+  if(B&&B.p!==Z.p)s+=` ${B.p} is the closest challenger at ${nsgn(B.tot)}.`;
+  if(Z.p!==A.p)s+=` At the other end, ${Z.p} is ${nsgn(Z.tot)} — ${nPick(r,['hoping for a change of fortune','still waiting for the cards to turn','proof that the comeback story is yet to be written'])}.`;
+  P.push(s)}
+ else P.push(`${A.p} has the table to themselves at ${nsgn(A.tot)} over ${A.n} games.`);
+ const bn=st.reduce((m,x)=>x.best.a>m.best.a?x:m,st[0]),wn=st.reduce((m,x)=>x.worst.a<m.worst.a?x:m,st[0]);
+ let s='';
+ if(bn.best.a>0)s+=`The night of the period belongs to ${bn.p}, who pocketed ${nfmt(bn.best.a)} on ${nDate(bn.best.date)||'one memorable evening'}. `;
+ if(wn.worst.a<0)s+=`The roughest evening was ${wn.p}’s ${nfmt(wn.worst.a)} loss${wn.worst.date?` on ${nDate(wn.worst.date)}`:''} — ${nPick(r,['the kind of night you tell stories about later','a lesson in humility, delivered in chips'])}.`;
+ if(s)P.push(s.trim());
+ const bits=[];
+ const hot=st.filter(x=>x.sg===1&&x.st>=2).sort((a,b)=>b.st-a.st)[0],cold=st.filter(x=>x.sg===-1&&x.st>=2).sort((a,b)=>b.st-a.st)[0];
+ if(hot)bits.push(`${hot.p} is riding a ${hot.st}-game winning streak`);
+ if(cold)bits.push(`${cold.p} has dropped ${cold.st} games in a row`);
+ const tr=st.filter(x=>x.ea!==null&&x.n>=4).map(x=>({x,d:x.ra-x.ea}));
+ const up=tr.filter(t=>t.d>0).sort((a,b)=>b.d-a.d)[0],dn=tr.filter(t=>t.d<0).sort((a,b)=>a.d-b.d)[0];
+ if(up&&(!hot||up.x.p!==hot.p))bits.push(`${up.x.p} is heating up, averaging ${nsgn(up.x.ra)} lately against ${nsgn(up.x.ea)} before`);
+ if(dn&&(!cold||dn.x.p!==cold.p))bits.push(`${dn.x.p} has cooled off, averaging ${nsgn(dn.x.ra)} lately against ${nsgn(dn.x.ea)} before`);
+ if(bits.length)P.push(`On form: ${nList(bits)}.`);
+ const cons=st.filter(x=>x.n>=3&&st.length>2).sort((a,b)=>a.sd-b.sd)[0],wr=st.filter(x=>x.n>=3).sort((a,b)=>b.wins/b.n-a.wins/a.n||b.tot-a.tot)[0],most=[...st].sort((a,b)=>b.n-a.n)[0];
+ const t2=[];
+ if(wr)t2.push(`${wr.p} wins ${Math.round(wr.wins/wr.n*100)}% of the games they play`);
+ if(cons&&(!wr||cons.p!==wr.p))t2.push(`${cons.p} is the steadiest hand, with swings of only about ${nfmt(Math.round(cons.sd))} either way`);
+ const ranked=[...st].sort((a,b)=>b.n-a.n);
+ if(most&&most.n>1&&(ranked.length<2||ranked[1].n<most.n))t2.push(`${most.p} has been the most loyal regular with ${most.n} games`);
+ if(t2.length)P.push(`Around the table: ${nList(t2)}.`);
+ P.push(nPick(r,['The next chapter is already in the cards.','Same table, new stories — see you at the next deal.','Will the standings hold? Only the next shuffle knows.']));
+ return{head:newsMode==='all'?'The Full Story So Far':`The Big Picture: ${sel.txt.replace(/^the /,'').replace(/\b\w/g,c=>c.toUpperCase())}`,sub:'Timeline recap',kicker:'The Bigger Story',p:P}}
+function newsEvents(r){
+ const today=new Date().toLocaleDateString('en-CA');
+ const up=(Array.isArray(events)?events:[]).filter(e=>e&&e.date&&e.date>=today).sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.timeFrom||'').localeCompare(b.timeFrom||''));
+ if(!up.length)return null;
+ const P=[];
+ up.slice(0,3).forEach((ev,ix)=>{
+  const rs=Array.isArray(ev.rsvps)?ev.rsvps:[],yes=rs.filter(x=>x.status==='yes'),maybe=rs.filter(x=>x.status==='maybe'),no=rs.filter(x=>x.status==='no');
+  const days=Math.round((new Date(ev.date+'T00:00')-new Date(today+'T00:00'))/864e5);
+  const when=days===0?'That is today!':days===1?'That is tomorrow.':days<8?`That is just ${days} days away.`:`That is ${days} days from now.`;
+  const tm=(ev.timeFrom||ev.timeTo)?`, ${ev.timeFrom||'?'}${ev.timeTo?' to '+ev.timeTo:''}`:'';
+  let s=`${ix===0?nPick(r,['Mark your calendars: ','Next on the schedule: ','Save the date: ']):ix===1?'After that: ':'And later: '}“${ev.msg||'Group event'}” — ${nDate(ev.date)}${tm}. ${when}`;
+  if(yes.length)s+=` ${yes.length} ${yes.length===1?'person has':'people have'} said yes (${nList(yes.map(x=>x.name).slice(0,6))}${yes.length>6?' and more':''})`;
+  else s+=` Nobody has replied yet — be the first to RSVP`;
+  if(maybe.length)s+=`, ${maybe.length} ${maybe.length===1?'is':'are'} thinking about it (${nList(maybe.map(x=>x.name).slice(0,4))})`;
+  if(no.length)s+=`, and ${no.length} can’t make it`;
+  s+='.';
+  if(ev.food&&yes.length){const v=yes.filter(x=>x.foodPref==='veg').length,nv=yes.filter(x=>x.foodPref==='nonveg'||x.foodPref==='non-veg').length;s+=` Food will be served${(v||nv)?` — ${v} veg and ${nv} non-veg so far`:''}.`}
+  else if(ev.food)s+=' Food will be served.';
+  P.push(s)});
+ return{head:'Coming Up',sub:'From the group calendar',kicker:'On the Horizon',p:P}}
+function newsPlain(secs){const d=new Date().toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+ return 'THE TABLE TIMES'+(groupName?' — '+groupName:'')+'\n'+d+'\n\n'+secs.map(s=>s.head.toUpperCase()+'\n'+s.sub+'\n\n'+s.p.join('\n\n')).join('\n\n———\n\n')}
+function newsView(){
+ const S=Array.isArray(sessions)?sessions:[],N=S.length,sel=newsSelect(S),list=sel.idx.map(i=>S[i]);
+ const seed=(gid||'')+'|'+(N&&S[N-1].date||'')+'|'+N+'|'+newsMode+newsN+newsRf+newsRt;
+ const secs=[],L=newsLatest(S,nRng(seed+'L'));if(L)secs.push(L);
+ if(newsMode!=='latest'&&list.length>=2){const T=newsTimeline(list,sel,nRng(seed+'T'));if(T)secs.push(T)}
+ const EV=newsEvents(nRng(seed+'E'));if(EV)secs.push(EV);
+ window._newsText=newsPlain(secs);
+ const opt=x=>S.map((s,i)=>`<option value="${i}" ${i==x?'selected':''}>${i+1}. ${E(s.date||'game')}</option>`).join('');
+ let a=Math.min(newsRf,Math.max(N-1,0)),b=newsRt<0?N-1:Math.min(newsRt,N-1);if(a>b)[a,b]=[b,a];
+ const Q=[['latest',1,'Latest game'],['sess',3,'Last 3 games'],['sess',6,'Last 6'],['sess',10,'Last 10'],['mon',1,'Last month'],['mon',3,'Last 3 months'],['all',0,'All time']],
+  M=[['latest','Latest game'],['sess','Last N games'],['mon','Last N months'],['all','All time'],['custom','Custom range']];
+ const ctl=N?`<div class="card"><b>Newsletter timeline</b> <span class="mut">${list.length} of ${N} games</span>
+  <div class="pw">${Q.map(q=>`<button data-nq="${q[0]}:${q[1]}" class="${newsMode===q[0]&&(!q[1]||newsN===q[1])?'on':''}">${q[2]}</button>`).join('')}</div>
+  <div class="pw"><label>Show <select data-nmode>${M.map(o=>`<option value="${o[0]}" ${newsMode===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select></label>
+  ${newsMode==='sess'||newsMode==='mon'?`<label>N <input type="number" min="1" max="99" value="${newsN}" data-nn style="width:70px"></label>`:''}
+  ${newsMode==='custom'?`<label>From <select data-nfr>${opt(a)}</select></label><label>To <select data-nto>${opt(b)}</select></label>`:''}</div></div>`:'';
+ const mast=`<div class="news-mast"><div class="news-kicker">✦ THE TABLE TIMES ✦</div><div class="news-group">${E(groupName||'Your group')}</div><div class="news-date">${E(new Date().toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long',year:'numeric'}))}</div></div>`;
+ const body=secs.length?secs.map(s=>`<div class="card news-sec"><div class="news-k">${E(s.kicker)}</div><h3 class="news-h">${E(s.head)}</h3><div class="news-sub">${E(s.sub)}</div>${s.p.map(t=>`<p class="news-p">${E(t)}</p>`).join('')}</div>`).join(''):`<div class="card news-sec"><h3 class="news-h">The presses are idle</h3><p class="news-p">No games have been recorded yet. Once a game is completed and saved to History, its story will be written here.</p></div>`;
+ return sectionNav('<button type="button" data-ncopy>📤 Share</button>')+mast+ctl+body}
+
 function hubScreen(){
  return`<div class="hub">
   <button type="button" class="hub-card" data-mode="poker"><div class="hub-ico">🃏</div><b>Cards</b><span>Sessions, loans &amp; game expenses</span></button>
-  <button type="button" class="hub-card" data-mode="bills"><div class="hub-ico">🧾</div><b>Expenses</b><span>Shared bills · synced with Cards</span></button>
   <button type="button" class="hub-card" data-mode="rsvp"><div class="hub-ico">📅</div><b>RSVP</b><span>Events · dates · responses</span></button>
-  <button type="button" class="hub-card" data-mode="chips"><div class="hub-ico">🪙</div><b>Chips</b><span>Who has the set · book dates</span></button>
+  <button type="button" class="hub-card" data-mode="news"><div class="hub-ico">📰</div><b>Newsletter</b><span>The story of your games</span></button>
  </div>
  <p class="mut" style="text-align:center;margin-top:8px">Choose a section for this group</p>`;
 }
@@ -1109,7 +1266,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  if(t.id=='xgrp-load'){xgrpLoadList();return}
  if(t.id=='xgrp-fetch'){xgrpFetch();return}
  if(t.id=='xgrp-import'){xgrpImport();return}
- if(g('data-mode')){appMode=g('data-mode').dataset.mode==='hub'?'':g('data-mode').dataset.mode;if(appMode==='poker')tab='hist';if(appMode==='bills')billTab='list';try{if(gid){const m=appMode?('&mode='+appMode):'';history.replaceState(null,'','#g='+gid+m)}}catch(e){}render();return}
+ if(g('data-mode')&&g('data-mode').tagName!=='SELECT'&&['hub','poker','rsvp','news'].includes(g('data-mode').dataset.mode)){appMode=g('data-mode').dataset.mode==='hub'?'':g('data-mode').dataset.mode;if(appMode==='poker')tab='hist';if(appMode==='bills')billTab='list';try{if(gid){const m=appMode?('&mode='+appMode):'';history.replaceState(null,'','#g='+gid+m)}}catch(e){}render();return}
  if(t.id=='ev_add'){
   const msg=(($('#ev_msg')&&$('#ev_msg').value)||'').trim().slice(0,120);
   const date=(($('#ev_date')&&$('#ev_date').value)||'').trim();
@@ -1198,6 +1355,8 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  if(g('data-btab')){billTab=g('data-btab').dataset.btab;render();return}
  if(g('data-t')){const nt=g('data-t').dataset.t;if(nt===tab)return;tab=nt;swapView(()=>{render0();upd();syncUploadBtn();if(tab=='backup')loadBackups()});document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t==tab))}
  else if(g('data-all')){const v=+g('data-all').dataset.all;OPTS.forEach(o=>sel[o[0]]=v);render()}
+ else if(g('data-nq')){const q=g('data-nq').dataset.nq.split(':');newsMode=q[0];if(+q[1])newsN=+q[1];render();return}
+ else if(g('data-ncopy')){const tx=window._newsText||'';if(navigator.share){navigator.share({title:'The Table Times',text:tx}).catch(()=>{})}else if(navigator.clipboard){navigator.clipboard.writeText(tx).then(()=>toast('Newsletter copied')).catch(()=>prompt('Copy the newsletter',tx))}else prompt('Copy the newsletter',tx);return}
  else if(g('data-q')){const q=g('data-q').dataset.q.split(':');mode=q[0];if(+q[1])pn=+q[1];render()}
  else if(g('data-xall')){excl={};render()}
  else if(g('data-del')){const i=+g('data-del').dataset.del;guard('delete a session',()=>{if(confirm('Delete session '+nm(sessions[i],i)+'? This cannot be undone.')){sessions.splice(i,1);render();toast('Session deleted')}})}
@@ -1424,6 +1583,10 @@ document.addEventListener('change',e=>{const t=e.target;
  else if(t.dataset.hp!==undefined){hpl=t.value;render()}
  else if(t.dataset.mode!==undefined){mode=t.value;render()}
  else if(t.dataset.pn!==undefined){pn=Math.max(1,Math.min(99,Math.round(+t.value)||1));render()}
+ else if(t.dataset.nmode!==undefined){newsMode=t.value;render()}
+ else if(t.dataset.nn!==undefined){newsN=Math.max(1,Math.min(99,Math.round(+t.value)||1));render()}
+ else if(t.dataset.nfr!==undefined){newsRf=+t.value;render()}
+ else if(t.dataset.nto!==undefined){newsRt=+t.value;render()}
  else if(t.dataset.rf!==undefined){rf=+t.value;render()}
  else if(t.dataset.rt!==undefined){rt=+t.value;render()}
  else if(t.dataset.x!==undefined){if(t.checked)delete excl[t.dataset.x];else excl[t.dataset.x]=1;render()}
@@ -1437,7 +1600,7 @@ try{loadEmailSession()}catch(e){}
 // Restore admin panel after page refresh (session only)
 ;(async()=>{try{if(await restoreAdminSession()){render()}}catch(e){}})();
 const hashGame=((location.hash||'').match(/game=(\d{4}-\d{2}-\d{2})/)||[])[1]||'';
-const hashMode=((location.hash||'').match(/mode=(rsvp|chips|bills|poker|hub)/)||[])[1]||'';
+const hashMode=((location.hash||'').match(/mode=(rsvp|news|poker|hub)/)||[])[1]||'';
 const hashEv=((location.hash||'').match(/ev=([A-Za-z0-9_-]+)/)||[])[1]||'';
 let pendingMode=hashMode||'';
 let pendingEv=hashEv||'';
@@ -1861,6 +2024,8 @@ function render(){try{
  <button id="unlockorg" style="width:100%">Enter admin password</button>
  <div class="mut" style="margin-top:12px">${viewAccess?'A view code is set for this group.':'No view code yet — only the admin can open this group until they create one on the Backups tab.'}</div>
  </div>`;setSync(cs);['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el)el.disabled=true});return}
+ if(appMode==='bills'||appMode==='chips')appMode='';
+ document.body.classList.toggle('mode-news',appMode==='news');
  document.body.classList.toggle('mode-hub',!appMode);
  document.body.classList.toggle('mode-poker',appMode==='poker');
  document.body.classList.toggle('mode-bills',appMode==='bills');
@@ -1872,6 +2037,14 @@ function render(){try{
   ['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el)el.style.display='none'});
   try{syncUploadBtn()}catch(e){}
   queueMicrotask(()=>{try{persist()}catch(e){console.error(e)}});return;
+ }
+ if(appMode==='news'){
+  document.body.classList.remove('viewonly');
+  $('#v').innerHTML=newsView();
+  setSync(cs);
+  ['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el)el.style.display='none'});
+  try{syncUploadBtn()}catch(e){}
+  return;
  }
  if(appMode==='bills'){
   $('#v').innerHTML=billsView();
@@ -2356,7 +2529,7 @@ function startCloud(){if(!gid)return;
  cloud.listen(gid,json=>{if(gen!==connGen)return;let S;
   try{S=json?norm(JSON.parse(json)):EMPTY()}catch(e){console.error('Bad group data',e);cloudErr='Group data could not be read. It may be damaged.';cs='error';synced=false;render();return}
   if(!synced){synced=true;cs='live';if(window._connTimer){clearTimeout(window._connTimer);window._connTimer=null}const keepName=groupName;base=S;lastSent='';applying=true;try{applyState(S);if(keepName&&!groupName){groupName=keepName;if(gid)saveRecent(gid,groupName)}}catch(e){console.error('applyState',e);cloudErr='Could not load this group\'s data.';cs='error';synced=false;applying=false;render();return}applying=false;if(hashGame){if(game&&game.date===hashGame){tab='loans';appMode='poker';toast('Opened the game of '+hashGame)}else if(game)toast('A different game is in progress ('+game.date+')')}
-  if(pendingMode){const m=pendingMode;pendingMode='';if(m==='rsvp'||m==='chips'||m==='bills'||m==='poker'){appMode=m;if(m==='poker')tab='hist';if(m==='bills')billTab='list';toast(m==='rsvp'?'Opened RSVP':m==='chips'?'Opened Chips':m==='bills'?'Opened Expenses':'Opened Cards')}}
+  if(pendingMode){const m=pendingMode;pendingMode='';if(m==='rsvp'||m==='news'||m==='poker'){appMode=m;if(m==='poker')tab='hist';toast(m==='rsvp'?'Opened RSVP':m==='news'?'Opened Newsletter':'Opened Cards')}}
   if(pendingEv){pendingEv=''}
    ;(async()=>{try{const del=await cloud.get(gid,'deleted');if(del&&del.json&&del.json!=='null'&&!pendingOrgPass){removeRecent(gid);const gone=gid;leaveGroup();toast('Group '+(gone.slice(0,8))+'… no longer exists (deleted by the admin).');return}}catch(e){}
     loadOrg().then(()=>{if(gen===connGen)render()});
