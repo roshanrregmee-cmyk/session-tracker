@@ -277,7 +277,7 @@ body.mode-bills .topbar .tabs{display:none}
 #enterBtn{color:#e9366f;border:0;box-shadow:0 12px 26px -10px rgba(0,0,0,.45)}
 </style></head><body><div id="welcome"><img src="icon-512.png" alt=""><h2>Welcome Folks! 👑</h2><button id="enterBtn" type="button">Enter</button></div><main>
 <div class="topbar">
-<div class="hd"><h1><img src="icon-192.png" alt="" style="height:1.15em;width:1.15em;border-radius:22%;vertical-align:-0.2em;margin-right:.3em"><span class="ttl" id="ttl"></span></h1><span id="ind" class="ind"></span><button id="gref" class="rbtn" title="Refresh live data · check for app update" aria-label="Refresh">↻</button></div>
+<div class="hd"><h1><img src="icon-192.png" alt="" style="height:1.15em;width:1.15em;border-radius:22%;vertical-align:-0.2em;margin-right:.3em"><span class="ttl" id="ttl"></span></h1><span id="ind" class="ind"></span><button id="gref" class="rbtn" title="Refresh live data · Shift+click for full app reload" aria-label="Refresh">↻</button></div>
 <div class="intro mut">Add sessions, track loans and expenses.</div>
 <div class="tabs"><button data-t="hist">History</button><button data-t="add">New session</button><button data-t="loans">Loans</button><button data-t="expenses">Expenses</button><button data-t="dash">Dashboard</button><button data-t="backup">Backups</button><button data-t="rules">Rules</button></div>
 </div>
@@ -512,18 +512,13 @@ function hubScreen(){
   <button type="button" class="hub-card" data-mode="rsvp"><div class="hub-ico">📅</div><b>RSVP</b><span>Events · dates · responses</span></button>
   <button type="button" class="hub-card" data-mode="chips"><div class="hub-ico">🪙</div><b>Chips</b><span>Who has the set · book dates</span></button>
  </div>
- <p class="mut" style="text-align:center;margin-top:8px">Choose a section for this group</p>
- <div style="max-width:720px;margin:16px auto 0;text-align:center">
-  <button type="button" id="gref-page" style="padding:12px 20px;font-weight:700">↻ Refresh app</button>
-  <div class="mut" style="margin-top:6px;font-size:12px">Updates the app and reloads live group data</div>
- </div>`;
+ <p class="mut" style="text-align:center;margin-top:8px">Choose a section for this group</p>`;
 }
 function sectionNav(extra){
  return`<div class="bills-nav">
   <button type="button" class="back-hub" data-mode="hub">← Home</button>
   ${extra||''}
-  <button type="button" id="gref-page" title="Reload app + live data" style="margin-left:auto;padding:8px 12px;font-weight:700">↻ Refresh</button>
- </div>`;
+  </div>`;
 }
 function billsNav(){
  return sectionNav(`<button type="button" data-btab="list" class="${billTab=='list'?'on':''}">Expenses</button>
@@ -1219,7 +1214,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(g('data-gdel')){deleteGroupFully(g('data-gdel').dataset.gdel)}
  else if(t.id=='gadmin'){guard('manage all groups',()=>{loadGroupAdmin()})}
  else if(g('data-gcopy')){copyLink()}
- else if(t.id=='gref'||t.id=='gref2'||t.id=='gref-join'||t.id=='gref-page'){refreshGroup(t.id==='gref-join'||t.id==='gref-page'||e.shiftKey);if(tab=='backup')setTimeout(loadBackups,1500)}
+ else if(t.id=='gref'||t.id=='gref2'||t.id=='gref-join'||t.id=='gref-page'){refreshGroup(!!e.shiftKey||t.id==='gref2');if(tab=='backup')setTimeout(loadBackups,1500)}
  else if(g('data-gleave')){if(confirm('Leave this group on this device? The shared data stays in the cloud.'))leaveGroup()}
  else if(g('data-gswitch')){if(confirm('Switch to another group? You can return later from Recent groups.'))switchGroupUI()}
  else if(g('data-gsw')){openExistingGroup(g('data-gsw').dataset.gsw)}
@@ -1318,11 +1313,11 @@ function saveRecent(code,label){let r=getRecent().filter(x=>x.code!==code);r.uns
 function indHtml(){if(!gid)return'';const m={live:['#15803d','Live'],saving:['#d97706','Saving'],connecting:['#d97706','Connecting'],offline:['#dc2626','Offline'],error:['#dc2626','Error']}[cs]||['#6b7686',''];
  const mode=!accessLoaded?'':canOrganise()?'✏️ Admin':canEdit()?'✏️ Write':'👁 View';return`<span style="color:${m[0]}">●</span> ${m[1]}${mode?' · '+mode:''}`}
 function gbarHtml(){if(!gid)return'';
- return`${accessLoaded&&!canEdit()?'<button class="pri" id="unlock">🔑 Enter password</button>':''}<button data-mode="hub">🏠 Home</button><button id="gref-page">↻ Refresh app</button><button data-gcopy>📋 Copy Group Code</button>${canEdit()?'<button data-grename>✎ Rename group</button>':''}<button data-gleave>🚪 Leave</button>`}
+ return`${accessLoaded&&!canEdit()?'<button class="pri" id="unlock">🔑 Enter password</button>':''}<button data-mode="hub">🏠 Home</button><button data-gcopy>📋 Copy Group Code</button>${canEdit()?'<button data-grename>✎ Rename group</button>':''}<button data-gleave>🚪 Leave</button>`}
 function setSync(c){cs=c;try{const tb=document.querySelector('.topbar');if(tb)document.documentElement.style.setProperty('--tbh',tb.offsetHeight+'px')}catch(e){}const g=$('#gbar');if(g)g.innerHTML=gbarHtml();const ii=$('#ind');if(ii)ii.innerHTML=indHtml();const t=$('#ttl');if(t)t.textContent=gid?(groupName||gid.slice(0,6)+'…'):'';const dn=$('#dname');if(dn)dn.textContent=gid?(groupName||gid.slice(0,6)+'…'):''}
 function joinScreen(){
- if(adminOpen)return`<div class="jn"><div class="jn-title">Admin</div><div class="jn-sub">Pick a group or create one</div>${adminGroups.length?adminGroups.map(g=>`<div class="grow"><span><b>${E(g.name||g.code.slice(0,8))}</b><small class="mut">${E(g.code.slice(0,8))}…</small></span><button class="pri" data-gadm="${E(g.code)}">Enter</button></div>`).join(''):'<div class="mut" style="text-align:center">No groups yet</div>'}<button class="pri" id="gnew2">＋ New group</button><button id="gback">Back</button><button type="button" id="gref-join" class="jn-refresh">↻ Refresh app</button></div>`;
- return`<div class="jn"><div class="jn-title">Session Tracker</div><div class="jn-sub">Drop your group code &amp; jump in</div><input id="gc_in" placeholder="Group code" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="pri" id="gjoin">Join the table ✨</button><div class="jn-or">or</div><button id="gadminlogin">🔑 Admin</button><button type="button" id="gref-join" class="jn-refresh">↻ Refresh app</button><div class="jn-sub" style="margin-top:4px;font-size:12px">Refresh updates the app before you join</div></div>`}
+ if(adminOpen)return`<div class="jn"><div class="jn-title">Admin</div><div class="jn-sub">Pick a group or create one</div>${adminGroups.length?adminGroups.map(g=>`<div class="grow"><span><b>${E(g.name||g.code.slice(0,8))}</b><small class="mut">${E(g.code.slice(0,8))}…</small></span><button class="pri" data-gadm="${E(g.code)}">Enter</button></div>`).join(''):'<div class="mut" style="text-align:center">No groups yet</div>'}<button class="pri" id="gnew2">＋ New group</button><button id="gback">Back</button></div>`;
+ return`<div class="jn"><div class="jn-title">Session Tracker</div><div class="jn-sub">Drop your group code &amp; jump in</div><input id="gc_in" placeholder="Group code" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="pri" id="gjoin">Join the table ✨</button><div class="jn-or">or</div><button id="gadminlogin">🔑 Admin</button></div>`}
 async function adminLogin(){
  if(!(await ensureCloud()))return toast('Could not connect. Check your internet and try again.');
  let info=null;try{info=await loadCreatePass()}catch(e){return toast('Could not check admin access')}
@@ -1381,18 +1376,20 @@ function render(){try{
   queueMicrotask(()=>{try{persist()}catch(e){console.error(e)}});return;
  }
  if(appMode==='rsvp'){
+  document.body.classList.remove('viewonly');
   $('#v').innerHTML=rsvpView();
   setSync(cs);
   ['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el)el.style.display='none'});
   try{syncUploadBtn()}catch(e){}
-  queueMicrotask(()=>{try{persist()}catch(e){console.error(e)}});return;
+  return;
  }
  if(appMode==='chips'){
+  document.body.classList.remove('viewonly');
   $('#v').innerHTML=chipsView();
   setSync(cs);
   ['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el)el.style.display='none'});
   try{syncUploadBtn()}catch(e){}
-  queueMicrotask(()=>{try{persist()}catch(e){console.error(e)}});return;
+  return;
  }
  // poker mode — existing app
  render0();setSync(cs);document.body.classList.toggle('viewonly',!canEdit());if(!canEdit())lockUI();
@@ -1478,15 +1475,31 @@ async function persistChips(){
  }catch(e){console.error('persistChips',e);cs='error';setSync(cs);toast('Could not save chips booking — check connection')}
  finally{inflight=Math.max(0,inflight-1);if(!inflight&&cs==='saving')setSync(navigator.onLine===false?'offline':'live')}
 }
+function stateWithoutSocial(S){
+  const o={...(S||{})};
+  o.events=[];o.chipsBookings=[];
+  return o;
+}
 async function persist(){if(!cloudOn||!synced||applying||!window.cloud)return;let L,c;try{L=getState();c=canon(L)}catch(e){console.error('getState',e);return}if(c===canon(base||EMPTY())||c===lastSent)return;
- if(!canEdit()){applying=true;applyState(base||EMPTY());applying=false;toast('View only: enter the password to make changes');renderSafe();return}
+ if(!canEdit()){
+  const B=base||EMPTY();
+  if(canon(stateWithoutSocial(L))!==canon(stateWithoutSocial(B))){
+   applying=true;try{applyState(B)}catch(e){}applying=false;
+   toast('View only: enter the password to make changes');renderSafe();return;
+  }
+  try{
+   if(canon(L.events||[])!==canon(B.events||[]))await persistEvents();
+   if(canon(L.chipsBookings||[])!==canon(B.chipsBookings||[]))await persistChips();
+  }catch(e){console.error(e)}
+  return;
+ }
  lastSent=c;inflight++;setSync('saving');
  try{const out=await cloud.commit(gid,rj=>JSON.stringify(mergeState(base||EMPTY(),L,rj?JSON.parse(rj):EMPTY())));base=norm(JSON.parse(out));cs=navigator.onLine===false?'offline':'live';saveBackups()}
  catch(e){lastSent='';cs='offline';toast('Could not save: '+((e&&e.code)||'offline')+'. It will retry on your next change.')}
  inflight--;if(!inflight&&cs!='offline')reconcile(base);else setSync(cs)}
 let access=null,accessLoaded=false,lastCode='',viewAccess=null,viewLoaded=false,lastViewCode='';
 const editKey=()=>'ptc_edit_'+gid,viewKey=()=>'ptc_view_'+gid,orgKey=()=>'ptc_org_'+gid;
-function canEdit(){if(!accessLoaded)return false;if(canOrganise())return true;if(!access)return true;try{return localStorage.getItem(editKey())===access.hash}catch(e){return false}}
+function canEdit(){if(canOrganise())return true;if(!accessLoaded){try{if(localStorage.getItem(editKey()))return true}catch(e){}return true}if(!access)return true;try{return localStorage.getItem(editKey())===access.hash}catch(e){return false}}
 function canView(){return true}
 function canOrganise(){if(Date.now()<unlockUntil)return true;if(!orgInfo)return false;try{return localStorage.getItem(orgKey())===orgInfo.hash}catch(e){return false}}
 function markOrganiser(){if(orgInfo)try{localStorage.setItem(orgKey(),orgInfo.hash)}catch(e){}unlockUntil=Date.now()+36e5}
@@ -1812,7 +1825,7 @@ async function checkAppUpdate(){
     return{updated:false,reason:hadWaiting?'activated':'latest'};
   }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
 }
-const CACHE_HINT='session-tracker-v56';
+const CACHE_HINT='session-tracker-v57';
 async function hardReloadApp(){
   try{
     if('caches' in window){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}
@@ -1853,8 +1866,8 @@ async function refreshGroup(forceHard){
   }catch(e){}
   if(!gid){toast('App is up to date');try{await hardReloadApp()}catch(e){location.reload()};return}
   if(window.cloud&&cloud.stop)try{cloud.stop()}catch(e){}
-  cloudOn=false;synced=false;cs='connecting';accessLoaded=false;viewLoaded=false;orgLoaded=false;base=null;lastSent='';inflight=0;
-  startCloud();render();toast('Synced · tap Refresh again (or Shift+↻) for a full app reload')
+  cloudOn=false;synced=false;cs='connecting';base=null;lastSent='';inflight=0;
+  startCloud();render();toast('Live data refreshed · Shift+click top ↻ for full app reload')
 }
 function leaveGroup(){connGen++;if(window._connTimer){clearTimeout(window._connTimer);window._connTimer=null}adminOpen=false;adminPw=null;if(gid){saveRecent(gid,groupName||gid.slice(0,8));try{localStorage.removeItem(viewKey());localStorage.removeItem(editKey())}catch(e){}}if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;gid='';try{localStorage.removeItem('ptc_group');history.replaceState(null,'',location.pathname)}catch(e){}clearLocal();render()}
 function switchGroupUI(){tab='hist';leaveGroup()}
