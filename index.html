@@ -121,7 +121,8 @@ input:focus,select:focus{outline:none;border-color:var(--ac);box-shadow:0 0 0 3p
 .hd{display:flex;align-items:center;gap:8px;min-width:0}.hd h1{margin:0}
 .hd .ind,.hd .rbtn{flex-shrink:0}
 .ind{font-size:10px;color:var(--mut);white-space:nowrap;border:1px solid var(--bd);border-radius:999px;padding:2px 8px;background:var(--card);font-weight:600}.ind:empty{display:none}
-.rbtn{width:28px;height:28px;padding:0;font-size:15px;line-height:1;border-radius:50%}
+.rbtn{width:36px;height:36px;padding:0;font-size:18px;line-height:1;border-radius:50%;font-weight:700;background:var(--card);border:1px solid var(--bd)}
+.rbtn:active{transform:scale(.94)}
 .srt{display:flex;gap:8px;margin:0 0 8px;font-size:12px}.srt label{flex:1;display:flex;align-items:center;gap:5px;min-width:0;margin:0}.srt select{flex:1;min-width:0;font-size:12px;padding:3px 6px}
 /* join screen — centered, floating king, scroll only if needed (e.g. keyboard) */
 .nogrp{overscroll-behavior:none}
@@ -193,7 +194,7 @@ body.nogrp .intro,.nogrp .intro{display:none!important}
 .jn .jn-or{display:flex;align-items:center;gap:10px;color:var(--mut);font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 .jn .jn-refresh{margin-top:4px;background:var(--card);border:1px dashed var(--bd);color:var(--tx);font-weight:600;box-shadow:none}
 .jn .jn-refresh:active{transform:scale(.97)}
-body.nogrp .rbtn{display:none!important}
+/* refresh stays visible on join */
 .jn .jn-or::before,.jn .jn-or::after{content:"";flex:1;height:1px;background:var(--bd)}
 .grow{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:12px 14px;box-shadow:var(--sh)}
 .grow small{display:block}
@@ -237,7 +238,7 @@ body.dopen #scrim{opacity:1;pointer-events:auto}
 #gbar{gap:6px;font-size:13px}
 #drawer #gbar{display:flex;flex-direction:column;gap:10px;font-size:15px}
 #drawer #gbar button{width:100%;font-size:15px;padding:12px 16px;text-align:left}
-.nogrp #fab,.nogrp #drawer,.nogrp #scrim,.nogrp .rbtn,.nogrp .ind{display:none}
+.nogrp #fab,.nogrp #drawer,.nogrp #scrim,.nogrp .ind{display:none}
 @media(prefers-reduced-motion:reduce){#drawer,#scrim,main{transition:none;animation:none}}
 #v{/* transitions disabled for stability */}
 #v.v-show{opacity:1;transform:none}
@@ -245,12 +246,14 @@ body.dopen #scrim{opacity:1;pointer-events:auto}
 body.mode-hub .tabs,body.mode-hub .intro,body.mode-hub .bar{display:none!important}
 body.mode-bills .tabs,body.mode-bills .intro{display:none!important}
 body.mode-rsvp .tabs,body.mode-rsvp .intro{display:none!important}
-.hub{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin:24px 0 12px;max-width:720px;margin-left:auto;margin-right:auto}
-@media(max-width:640px){.hub{grid-template-columns:1fr}}
+body.mode-chips .tabs,body.mode-chips .intro{display:none!important}
+.hub{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:24px 0 12px;max-width:720px;margin-left:auto;margin-right:auto}
+@media(max-width:480px){.hub{grid-template-columns:1fr}}
 .hub-card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:26px 16px;min-height:150px;border:1px solid var(--bd);border-radius:22px;background:var(--card);box-shadow:var(--sh);cursor:pointer;transition:transform .12s ease;text-align:center;position:relative;overflow:hidden}
 .hub-card::before{content:"";position:absolute;left:0;right:0;top:0;height:4px;background:linear-gradient(90deg,var(--s1),var(--g2))}
 .hub-card:nth-child(2)::before{background:linear-gradient(90deg,var(--s2),var(--s4))}
 .hub-card:nth-child(3)::before{background:linear-gradient(90deg,var(--s3),var(--g1))}
+.hub-card:nth-child(4)::before{background:linear-gradient(90deg,var(--g2),var(--s1))}
 .hub-card:active{transform:scale(.98)}
 .hub-card .hub-ico{font-size:44px;line-height:1}
 .hub-card b{font-size:19px;font-weight:800}
@@ -264,7 +267,7 @@ body.mode-rsvp .tabs,body.mode-rsvp .intro{display:none!important}
 .topbar .tabs{margin-bottom:0;padding-bottom:2px}
 .topbar .hd{margin-bottom:8px}
 .bills-nav{position:sticky;top:calc(var(--tbh,61px) - 1px);z-index:150;margin:0 -16px 14px;padding:8px 16px;background:var(--bar);border-bottom:1px solid var(--bd);box-shadow:0 6px 16px -12px rgba(29,20,64,.35);border-radius:0}
-body.mode-bills .topbar,body.mode-rsvp .topbar{border-bottom:0;box-shadow:none;margin-bottom:0}
+body.mode-bills .topbar,body.mode-rsvp .topbar,body.mode-chips .topbar{border-bottom:0;box-shadow:none;margin-bottom:0}
 #ind{cursor:pointer}
 .nogrp .topbar{background:transparent;border-bottom:0;box-shadow:none}
 body.mode-hub .topbar .tabs{display:none}
@@ -282,7 +285,7 @@ body.mode-bills .topbar .tabs{display:none}
 <script>
 const $=s=>document.querySelector(s),E=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let adminPw=null,adminOpen=false,adminGroups=[],pendingEditPw=null;
-let aiFn,aiTips={},aiKey='',aiBusy=false,aiMsg='',excl={},game=null,gc=false,finals={},plays={},initLoan=500,loans=[],loanDraft={},ld=new Date().toLocaleDateString('en-CA'),hsort='desc',hpl='file',ALLP=[],PERIOD={a:0,b:-1,N:0},rf=0,rt=-1,players=[],sessions=[],draft={},tab='hist',dd=new Date().toLocaleDateString('en-CA'),appMode='',billTab='list',bills=[],billDraft={desc:'',amt:'',paid:'',shared:{}},billSettle=null,feed=[],events=[],xgrp={busy:false,err:'',list:[],picked:{},data:{},combined:null};
+let aiFn,aiTips={},aiKey='',aiBusy=false,aiMsg='',excl={},game=null,gc=false,finals={},plays={},initLoan=500,loans=[],loanDraft={},ld=new Date().toLocaleDateString('en-CA'),hsort='desc',hpl='file',ALLP=[],PERIOD={a:0,b:-1,N:0},rf=0,rt=-1,players=[],sessions=[],draft={},tab='hist',dd=new Date().toLocaleDateString('en-CA'),appMode='',billTab='list',bills=[],billDraft={desc:'',amt:'',paid:'',shared:{}},billSettle=null,feed=[],events=[],chipsBookings=[],xgrp={busy:false,err:'',list:[],picked:{},data:{},combined:null};
 const num=v=>typeof v==='number'&&isFinite(v),f=n=>num(n)?n.toLocaleString():'',cls=n=>n>0?'pos':n<0?'neg':'';
 const iso2ser=d=>Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10))/864e5+25569;
 const ser2iso=n=>new Date(Math.round((n-25569)*864e5)).toISOString().slice(0,10);
@@ -308,15 +311,26 @@ function logFeed(text){
 }
 function rsvpView(){
  const list=Array.isArray(events)?[...events]:[];
- list.sort((a,b)=>(a.date||'').localeCompare(b.date||'')||((b.at||0)-(a.at||0)));
+ list.sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.timeFrom||'').localeCompare(b.timeFrom||'')||((b.at||0)-(a.at||0)));
  const today=new Date().toLocaleDateString('en-CA');
- let h=`<div class="bills-nav"><button type="button" class="back-hub" data-mode="hub">← Home</button></div>
- <div class="card"><b>📅 Group events</b><div class="mut" style="margin:4px 0 12px">Create a date + note (e.g. “party at my house”). Anyone in the group — including view-only — can RSVP yes / no / maybe.</div>
+ let h=`${sectionNav()}
+ <div class="card"><b>📅 Group events</b><div class="mut" style="margin:4px 0 12px">Anyone in the group — <b>including view-only</b> — can create events and RSVP. No password needed.</div>
  <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Message</label>
  <input id="ev_msg" type="text" placeholder="Party at my house / brunch / trip…" maxlength="120" style="width:100%;margin-bottom:10px">
  <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Date</label>
- <input id="ev_date" type="date" value="${today}" style="width:100%;margin-bottom:12px">
+ <input id="ev_date" type="date" value="${today}" style="width:100%;margin-bottom:10px">
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+  <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Time from</label>
+   <input id="ev_tfrom" type="time" style="width:100%"></div>
+  <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Time to</label>
+   <input id="ev_tto" type="time" style="width:100%"></div>
+ </div>
+ <label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;margin-bottom:12px;cursor:pointer">
+  <input id="ev_food" type="checkbox" style="width:18px;height:18px"> Food will be served (ask veg / non-veg)
+ </label>
  <button type="button" class="pri" id="ev_add" style="width:100%">Create event</button>
+ <button type="button" id="ev_share" style="width:100%;margin-top:10px">📤 Share RSVP link</button>
+ <div class="mut" style="margin-top:6px;font-size:12px;text-align:center">Opens this group directly on the RSVP page</div>
  </div>`;
  if(!list.length){
   h+=`<div class="card"><p class="mut" style="margin:0">No events yet. Create one above.</p></div>`;
@@ -326,18 +340,39 @@ function rsvpView(){
   const rsvps=Array.isArray(ev.rsvps)?ev.rsvps:[];
   const yes=rsvps.filter(r=>r.status==='yes'), no=rsvps.filter(r=>r.status==='no'), maybe=rsvps.filter(r=>r.status==='maybe');
   const when=ev.date?ev.date:(ev.at?new Date(ev.at).toLocaleDateString():'');
-  const namesList=(arr)=>arr.length?arr.map(r=>E(r.name)).join(', '):'<span class="mut">—</span>';
+  let timeStr='';
+  if(ev.timeFrom||ev.timeTo){
+    timeStr=' · 🕒 '+(ev.timeFrom||'?')+(ev.timeTo?' – '+ev.timeTo:'');
+  }
+  const foodOn=!!ev.food;
+  const fmtName=r=>{
+    let s=E(r.name||'');
+    if(foodOn&&r.foodPref)s+=' <span class="mut">('+(r.foodPref==='veg'?'veg':'non-veg')+')</span>';
+    return s;
+  };
+  const namesList=(arr)=>arr.length?arr.map(fmtName).join(', '):'<span class="mut">—</span>';
+  let foodSummary='';
+  if(foodOn){
+    const veg=rsvps.filter(r=>r.status==='yes'&&r.foodPref==='veg').length;
+    const nv=rsvps.filter(r=>r.status==='yes'&&r.foodPref==='nonveg').length;
+    const unk=rsvps.filter(r=>r.status==='yes'&&!r.foodPref).length;
+    foodSummary=`<div style="margin:8px 0;font-size:13px;background:#f0fdf4;border-radius:10px;padding:8px 10px">🍽 Food · Yes: <b>${veg}</b> veg · <b>${nv}</b> non-veg${unk?` · <b>${unk}</b> unspecified`:''}</div>`;
+  }
   h+=`<div class="card" data-evid="${E(ev.id)}">
    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
     <div><b style="font-size:17px">${E(ev.msg||'Event')}</b>
-     <div class="mut" style="margin-top:4px">📆 ${E(when)}${ev.by?' · by '+E(ev.by):''}</div></div>
-    ${canEdit()?`<button type="button" data-evdel="${E(ev.id)}" style="flex-shrink:0;padding:6px 10px;font-size:12px">Delete</button>`:''}
+     <div class="mut" style="margin-top:4px">📆 ${E(when)}${E(timeStr)}${foodOn?' · 🍽 food':''}${ev.by?' · by '+E(ev.by):''}</div></div>
+    <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+     <button type="button" data-evshare="${E(ev.id)}" style="padding:6px 10px;font-size:12px">Share</button>
+     <button type="button" data-evdel="${E(ev.id)}" style="padding:6px 10px;font-size:12px">Delete</button>
+    </div>
    </div>
    <div style="display:flex;gap:10px;flex-wrap:wrap;margin:12px 0 8px;font-size:13px">
     <span style="background:#dcfce7;color:#166534;padding:4px 10px;border-radius:999px;font-weight:700">Yes ${yes.length}</span>
     <span style="background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:999px;font-weight:700">Maybe ${maybe.length}</span>
     <span style="background:#fee2e2;color:#991b1b;padding:4px 10px;border-radius:999px;font-weight:700">No ${no.length}</span>
    </div>
+   ${foodSummary}
    <div style="font-size:13px;line-height:1.5;margin-bottom:12px">
     <div><b>Yes:</b> ${namesList(yes)}</div>
     <div><b>Maybe:</b> ${namesList(maybe)}</div>
@@ -346,6 +381,12 @@ function rsvpView(){
    <div style="border-top:1px solid var(--bd);padding-top:12px">
     <label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px">Your name</label>
     <input type="text" class="ev-name" data-evid="${E(ev.id)}" placeholder="Name" maxlength="40" list="ev_players" style="width:100%;margin-bottom:8px">
+    ${foodOn?`<label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px">Food preference</label>
+    <select class="ev-foodpref" data-evid="${E(ev.id)}" style="width:100%;margin-bottom:8px;padding:10px;border-radius:10px;border:1px solid var(--bd);background:var(--card)">
+     <option value="">Select…</option>
+     <option value="veg">Veg</option>
+     <option value="nonveg">Non-veg</option>
+    </select>`:''}
     <div style="display:flex;gap:8px;flex-wrap:wrap">
      <button type="button" class="pri" data-evrsvp="${E(ev.id)}" data-status="yes" style="flex:1;min-width:80px">Yes</button>
      <button type="button" data-evrsvp="${E(ev.id)}" data-status="maybe" style="flex:1;min-width:80px">Maybe</button>
@@ -360,20 +401,133 @@ function rsvpView(){
  return h;
 }
 
+function chipsOverlap(aFrom,aTo,bFrom,bTo){
+  if(!aFrom||!aTo||!bFrom||!bTo)return false;
+  return aFrom<=bTo && bFrom<=aTo;
+}
+function chipsCurrent(list, today){
+  const t=today||new Date().toLocaleDateString('en-CA');
+  const active=(list||[]).filter(b=>b.from&&b.to&&b.from<=t&&t<=b.to);
+  if(!active.length)return null;
+  active.sort((a,b)=>(b.at||0)-(a.at||0));
+  return active[0];
+}
+function chipsCalMonth(list, year, month){
+  /* month 0-based; return HTML for month grid */
+  const first=new Date(year,month,1);
+  const startDow=(first.getDay()+6)%7; /* Mon=0 */
+  const daysIn=new Date(year,month+1,0).getDate();
+  const today=new Date().toLocaleDateString('en-CA');
+  const monName=first.toLocaleString('en',{month:'long',year:'numeric'});
+  let h=`<div style="margin-top:8px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <button type="button" data-chcal="-1" style="padding:6px 12px">‹</button>
+    <b>${monName}</b>
+    <button type="button" data-chcal="1" style="padding:6px 12px">›</button>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;font-size:11px;text-align:center">
+   <div class="mut">Mo</div><div class="mut">Tu</div><div class="mut">We</div><div class="mut">Th</div><div class="mut">Fr</div><div class="mut">Sa</div><div class="mut">Su</div>`;
+  for(let i=0;i<startDow;i++)h+=`<div></div>`;
+  for(let d=1;d<=daysIn;d++){
+    const iso=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const hits=(list||[]).filter(b=>b.from&&b.to&&b.from<=iso&&iso<=b.to);
+    const isToday=iso===today;
+    let bg='#f8fafc',fg='#0f172a',title='';
+    if(hits.length){
+      bg='#dbeafe';fg='#1e40af';
+      title=hits.map(b=>b.who+(b.from===b.to?'':` (${b.from}→${b.to})`)).join('; ');
+    }
+    if(isToday){bg=hits.length?'#93c5fd':'#fef3c7';}
+    h+=`<div title="${E(title||iso)}" style="padding:6px 2px;border-radius:8px;background:${bg};color:${fg};font-weight:${isToday||hits.length?700:500};min-height:36px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.15">
+      <span>${d}</span>${hits.length?`<span style="font-size:9px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${E((hits[0].who||'').slice(0,6))}${hits.length>1?'+':''}</span>`:''}
+    </div>`;
+  }
+  h+=`</div></div>`;
+  return h;
+}
+function chipsView(){
+  if(!Array.isArray(chipsBookings))chipsBookings=[];
+  const list=[...chipsBookings];
+  const today=new Date().toLocaleDateString('en-CA');
+  const cur=chipsCurrent(list,today);
+  if(typeof window._chipsCalY!=='number'){const n=new Date();window._chipsCalY=n.getFullYear();window._chipsCalM=n.getMonth()}
+  const y=window._chipsCalY, m=window._chipsCalM;
+  const upcoming=list.filter(b=>b.to&&b.to>=today).sort((a,b)=>(a.from||'').localeCompare(b.from||'')||(a.to||'').localeCompare(b.to||''));
+  const past=list.filter(b=>b.to&&b.to<today).sort((a,b)=>(b.to||'').localeCompare(a.to||''));
+  const nameOpts=players.length?players.map(p=>`<option value="${E(p)}">`).join(''):'';
+  let h=`${sectionNav()}
+  <div class="card" style="border:2px solid ${cur?'#3b82f6':'var(--bd)'}">
+   <b>🪙 Who has the chips now?</b>
+   <div style="margin-top:10px;font-size:18px;font-weight:800">${cur?E(cur.who):'<span class="mut">Nobody booked for today</span>'}</div>
+   ${cur?`<div class="mut" style="margin-top:4px">${E(cur.from)} → ${E(cur.to)}${cur.note?' · '+E(cur.note):''}</div>`:''}
+  </div>
+  <div class="card"><b>Book the chips</b>
+   <div class="mut" style="margin:4px 0 12px">Pick who holds them and the date range. Overlaps are flagged.</div>
+   <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Who</label>
+   <input id="ch_who" type="text" placeholder="Name" maxlength="40" list="ch_players" style="width:100%;margin-bottom:10px">
+   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+    <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">From</label>
+     <input id="ch_from" type="date" value="${today}" style="width:100%"></div>
+    <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">To</label>
+     <input id="ch_to" type="date" value="${today}" style="width:100%"></div>
+   </div>
+   <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Note (optional)</label>
+   <input id="ch_note" type="text" placeholder="e.g. weekend home game" maxlength="80" style="width:100%;margin-bottom:12px">
+   <button type="button" class="pri" id="ch_add" style="width:100%">Book chips</button>
+   ${nameOpts?`<datalist id="ch_players">${nameOpts}</datalist>`:''}
+  </div>
+  <div class="card"><b>Calendar</b>
+   <div class="mut" style="margin:4px 0 8px">Blue days are booked. Today is highlighted.</div>
+   ${chipsCalMonth(list,y,m)}
+  </div>`;
+  const row=(b,pastFlag)=>{
+    const active=b.from&&b.to&&b.from<=today&&today<=b.to;
+    return`<div style="padding:12px 0;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+     <div>
+      <div style="font-weight:800">${E(b.who)}${active?' <span style="background:#dbeafe;color:#1e40af;font-size:11px;padding:2px 8px;border-radius:999px;margin-left:4px">NOW</span>':''}</div>
+      <div class="mut" style="margin-top:2px">${E(b.from)} → ${E(b.to)}${b.note?' · '+E(b.note):''}</div>
+     </div>
+     <button type="button" data-chdel="${E(b.id)}" style="flex-shrink:0;padding:6px 10px;font-size:12px">Remove</button>
+    </div>`;
+  };
+  h+=`<div class="card"><b>Bookings</b>`;
+  if(!upcoming.length&&!past.length)h+=`<p class="mut" style="margin:8px 0 0">No bookings yet.</p>`;
+  else{
+    if(upcoming.length){
+      h+=`<div class="mut" style="margin:8px 0 4px;font-weight:700">Upcoming &amp; current</div>`;
+      upcoming.forEach(b=>{h+=row(b,false)});
+    }
+    if(past.length){
+      h+=`<div class="mut" style="margin:12px 0 4px;font-weight:700">Past</div>`;
+      past.slice(0,20).forEach(b=>{h+=row(b,true)});
+    }
+  }
+  h+=`</div>`;
+  return h;
+}
+
 function hubScreen(){
  return`<div class="hub">
   <button type="button" class="hub-card" data-mode="poker"><div class="hub-ico">🃏</div><b>Cards</b><span>Sessions, loans &amp; game expenses</span></button>
   <button type="button" class="hub-card" data-mode="bills"><div class="hub-ico">🧾</div><b>Expenses</b><span>Shared bills · synced with Cards</span></button>
   <button type="button" class="hub-card" data-mode="rsvp"><div class="hub-ico">📅</div><b>RSVP</b><span>Events · dates · responses</span></button>
+  <button type="button" class="hub-card" data-mode="chips"><div class="hub-ico">🪙</div><b>Chips</b><span>Who has the set · book dates</span></button>
  </div>
- <p class="mut" style="text-align:center;margin-top:8px">Choose a section for this group</p>`;
+ <p class="mut" style="text-align:center;margin-top:8px">Choose a section for this group</p>
+ <div style="max-width:720px;margin:16px auto 0;text-align:center">
+  <button type="button" id="gref-page" style="padding:12px 20px;font-weight:700">↻ Refresh app</button>
+  <div class="mut" style="margin-top:6px;font-size:12px">Updates the app and reloads live group data</div>
+ </div>`;
 }
-function billsNav(){
+function sectionNav(extra){
  return`<div class="bills-nav">
   <button type="button" class="back-hub" data-mode="hub">← Home</button>
-  <button type="button" data-btab="list" class="${billTab=='list'?'on':''}">Expenses</button>
-  <button type="button" data-btab="dash" class="${billTab=='dash'?'on':''}">Dashboard</button>
+  ${extra||''}
+  <button type="button" id="gref-page" title="Reload app + live data" style="margin-left:auto;padding:8px 12px;font-weight:700">↻ Refresh</button>
  </div>`;
+}
+function billsNav(){
+ return sectionNav(`<button type="button" data-btab="list" class="${billTab=='list'?'on':''}">Expenses</button>
+  <button type="button" data-btab="dash" class="${billTab=='dash'?'on':''}">Dashboard</button>`);
 }
 function billsList(){
  if(!players.length)return billsNav()+`<div class="card"><b>Add people first</b><p class="mut">Add player names once under <b>Cards → New session</b>, then come back here.</p><button class="pri" data-mode="poker">Go to Cards</button></div>`;
@@ -924,17 +1078,33 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  if(t.id=='xgrp-load'){xgrpLoadList();return}
  if(t.id=='xgrp-fetch'){xgrpFetch();return}
  if(t.id=='xgrp-import'){xgrpImport();return}
- if(g('data-mode')){appMode=g('data-mode').dataset.mode==='hub'?'':g('data-mode').dataset.mode;if(appMode==='poker')tab='hist';if(appMode==='bills')billTab='list';render();return}
+ if(g('data-mode')){appMode=g('data-mode').dataset.mode==='hub'?'':g('data-mode').dataset.mode;if(appMode==='poker')tab='hist';if(appMode==='bills')billTab='list';try{if(gid){const m=appMode?('&mode='+appMode):'';history.replaceState(null,'','#g='+gid+m)}}catch(e){}render();return}
  if(t.id=='ev_add'){
   const msg=(($('#ev_msg')&&$('#ev_msg').value)||'').trim().slice(0,120);
   const date=(($('#ev_date')&&$('#ev_date').value)||'').trim();
+  const timeFrom=(($('#ev_tfrom')&&$('#ev_tfrom').value)||'').trim();
+  const timeTo=(($('#ev_tto')&&$('#ev_tto').value)||'').trim();
+  const food=!!($('#ev_food')&&$('#ev_food').checked);
   if(!msg)return toast('Write a short message for the event');
   if(!date)return toast('Pick a date');
   if(!Array.isArray(events))events=[];
-  events.push({id:uid(),msg,date,at:Date.now(),by:'',rsvps:[]});
+  events.push({id:uid(),msg,date,timeFrom,timeTo,food,at:Date.now(),by:'',rsvps:[]});
   render();toast('Event created');queueMicrotask(()=>{try{persistEvents()}catch(e){console.error(e)}});return}
+ if(t.id=='ev_share'||g('data-evshare')){
+  if(!gid)return toast('Join a group first');
+  const evId=g('data-evshare')?g('data-evshare').dataset.evshare:'';
+  let u=location.origin+location.pathname.replace(/\/[^/]*$/,'/')+'#g='+gid+'&mode=rsvp';
+  // Prefer clean path: same folder index
+  try{u=location.origin+(location.pathname.endsWith('/')?location.pathname:location.pathname.replace(/\/[^/]+$/, '/'))+'#g='+gid+'&mode=rsvp'}catch(e){u=location.origin+location.pathname+'#g='+gid+'&mode=rsvp'}
+  if(evId)u+='&ev='+evId;
+  const msg='RSVP for our group: '+u;
+  const share=()=>{
+   if(navigator.share){navigator.share({title:'Group RSVP',text:msg,url:u}).catch(()=>{})}
+   else if(navigator.clipboard)navigator.clipboard.writeText(u).then(()=>toast('RSVP link copied')).catch(()=>prompt('Copy this RSVP link',u));
+   else prompt('Copy this RSVP link',u);
+  };
+  share();return}
  if(g('data-evdel')){
-  if(!canEdit())return toast('Only editors can delete events');
   const id=g('data-evdel').dataset.evdel;
   if(!confirm('Delete this event and all RSVPs?'))return;
   events=(events||[]).filter(ev=>ev.id!==id);
@@ -944,6 +1114,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   const status=g('data-evrsvp').dataset.status||'yes';
   const card=g('data-evrsvp').closest('[data-evid]')||g('data-evrsvp').closest('.card');
   const nameInp=card?card.querySelector('.ev-name'):null;
+  const foodSel=card?card.querySelector('.ev-foodpref'):null;
   const name=((nameInp&&nameInp.value)||'').trim().slice(0,40);
   if(!name)return toast('Enter your name to RSVP');
   if(!['yes','no','maybe'].includes(status))return;
@@ -951,11 +1122,46 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   const ev=events.find(x=>x.id===id);
   if(!ev)return toast('Event not found');
   if(!Array.isArray(ev.rsvps))ev.rsvps=[];
+  let foodPref='';
+  if(ev.food&&status==='yes'){
+    foodPref=((foodSel&&foodSel.value)||'').trim();
+    if(foodPref!=='veg'&&foodPref!=='nonveg')return toast('Select food preference: veg or non-veg');
+  }else if(ev.food&&foodSel&&foodSel.value){
+    foodPref=foodSel.value==='veg'||foodSel.value==='nonveg'?foodSel.value:'';
+  }
   const key=name.toLowerCase();
   const existing=ev.rsvps.find(r=>(r.name||'').toLowerCase()===key);
-  if(existing){existing.status=status;existing.at=Date.now()}
-  else ev.rsvps.push({name,status,at:Date.now()});
-  render();toast(name+' · '+status);queueMicrotask(()=>{try{persistEvents()}catch(e){console.error(e)}});return}
+  if(existing){existing.status=status;existing.at=Date.now();existing.foodPref=foodPref||existing.foodPref||''}
+  else ev.rsvps.push({name,status,foodPref,at:Date.now()});
+  render();toast(name+' · '+status+(foodPref?' · '+foodPref:''));queueMicrotask(()=>{try{persistEvents()}catch(e){console.error(e)}});return}
+ if(t.id=='ch_add'){
+  const who=(($('#ch_who')&&$('#ch_who').value)||'').trim().slice(0,40);
+  let fr=(($('#ch_from')&&$('#ch_from').value)||'').trim();
+  let to=(($('#ch_to')&&$('#ch_to').value)||'').trim();
+  const note=(($('#ch_note')&&$('#ch_note').value)||'').trim().slice(0,80);
+  if(!who)return toast('Enter who is taking the chips');
+  if(!fr||!to)return toast('Pick from and to dates');
+  if(to<fr){const tmp=fr;fr=to;to=tmp}
+  if(!Array.isArray(chipsBookings))chipsBookings=[];
+  const clash=chipsBookings.filter(b=>b.id&&chipsOverlap(fr,to,b.from,b.to));
+  if(clash.length){
+    const names=clash.map(b=>b.who+' ('+b.from+'→'+b.to+')').join(', ');
+    if(!confirm('Overlaps with: '+names+'. Book anyway?'))return;
+  }
+  chipsBookings.push({id:uid(),who,from:fr,to,note,at:Date.now()});
+  render();toast('Booked for '+who);queueMicrotask(()=>{try{persistChips()}catch(e){console.error(e)}});return}
+ if(g('data-chdel')){
+  const id=g('data-chdel').dataset.chdel;
+  if(!confirm('Remove this chips booking?'))return;
+  chipsBookings=(chipsBookings||[]).filter(b=>b.id!==id);
+  render();toast('Booking removed');queueMicrotask(()=>{try{persistChips()}catch(e){console.error(e)}});return}
+ if(g('data-chcal')){
+  const d=+g('data-chcal').dataset.chcal;
+  if(typeof window._chipsCalY!=='number'){const n=new Date();window._chipsCalY=n.getFullYear();window._chipsCalM=n.getMonth()}
+  window._chipsCalM+=d;
+  while(window._chipsCalM<0){window._chipsCalM+=12;window._chipsCalY--}
+  while(window._chipsCalM>11){window._chipsCalM-=12;window._chipsCalY++}
+  render();return}
  if(g('data-btab')){billTab=g('data-btab').dataset.btab;render();return}
  if(g('data-t')){const nt=g('data-t').dataset.t;if(nt===tab)return;tab=nt;swapView(()=>{render0();upd();syncUploadBtn();if(tab=='backup')loadBackups()});document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t==tab))}
  else if(g('data-all')){const v=+g('data-all').dataset.all;OPTS.forEach(o=>sel[o[0]]=v);render()}
@@ -1013,7 +1219,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(g('data-gdel')){deleteGroupFully(g('data-gdel').dataset.gdel)}
  else if(t.id=='gadmin'){guard('manage all groups',()=>{loadGroupAdmin()})}
  else if(g('data-gcopy')){copyLink()}
- else if(t.id=='gref'||t.id=='gref2'||t.id=='gref-join'){refreshGroup();if(tab=='backup')setTimeout(loadBackups,1500)}
+ else if(t.id=='gref'||t.id=='gref2'||t.id=='gref-join'||t.id=='gref-page'){refreshGroup(t.id==='gref-join'||t.id==='gref-page'||e.shiftKey);if(tab=='backup')setTimeout(loadBackups,1500)}
  else if(g('data-gleave')){if(confirm('Leave this group on this device? The shared data stays in the cloud.'))leaveGroup()}
  else if(g('data-gswitch')){if(confirm('Switch to another group? You can return later from Recent groups.'))switchGroupUI()}
  else if(g('data-gsw')){openExistingGroup(g('data-gsw').dataset.gsw)}
@@ -1075,12 +1281,16 @@ document.addEventListener('change',e=>{const t=e.target;
 let gid='',cs='connecting',cloudErr='',synced=false,cloudOn=false,connGen=0,base=null,inflight=0,lastSent='',applying=false,pendingRender=false;
 try{gid=((location.hash||'').match(/g=([A-Za-z0-9_-]{8,40})/)||[])[1]||localStorage.getItem('ptc_group')||''}catch(e){}
 const hashGame=((location.hash||'').match(/game=(\d{4}-\d{2}-\d{2})/)||[])[1]||'';
-const EMPTY=()=>({players:[],sessions:[],loans:[],expenses:[],settle:null,initLoan:500,game:null,readme:null,rules:null,groupName:'',bills:[],billSettle:null,feed:[],events:[]});
+const hashMode=((location.hash||'').match(/mode=(rsvp|chips|bills|poker|hub)/)||[])[1]||'';
+const hashEv=((location.hash||'').match(/ev=([A-Za-z0-9_-]+)/)||[])[1]||'';
+let pendingMode=hashMode||'';
+let pendingEv=hashEv||'';
+const EMPTY=()=>({players:[],sessions:[],loans:[],expenses:[],settle:null,initLoan:500,game:null,readme:null,rules:null,groupName:'',bills:[],billSettle:null,feed:[],events:[],chipsBookings:[]});
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
 const canon=x=>JSON.stringify(x,(k,v)=>v&&typeof v=='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(q=>[q,v[q]])):v);
-const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],expenses:S.expenses||[],settle:S.settle||null,initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:null,groupName:typeof S.groupName=='string'?S.groupName:'',bills:(S.bills||[]),billSettle:S.billSettle||null,feed:Array.isArray(S.feed)?S.feed:[],events:Array.isArray(S.events)?S.events:[]});
-function getState(){if(!Array.isArray(sessions))sessions=[];if(!Array.isArray(loans))loans=[];if(!Array.isArray(expenses))expenses=[];if(!Array.isArray(bills))bills=[];if(!Array.isArray(feed))feed=[];if(!Array.isArray(events))events=[];if(!Array.isArray(players))players=[];sessions.forEach(x=>{if(!x.id)x.id=uid()});loans.forEach(l=>{if(!l.id)l.id=uid()});expenses.forEach(e=>{if(!e.id)e.id=uid()});
- return{players:[...players],sessions:sessions.map(x=>({id:x.id,date:(x.date||''),label:(x.label||''),v:(x.v&&typeof x.v==='object')?{...x.v}:{}})),loans:loans.map(l=>({id:l.id,date:l.date,who:l.who,amt:l.amt,src:l.src||null,g:l.g||'',done:!!l.done})),initLoan,game:game?{date:game.date,players:Array.isArray(game.players)?[...game.players]:[],exited:(game.exited&&typeof game.exited==='object')?{...game.exited}:{},settledPrior:(game.settledPrior&&typeof game.settledPrior==='object')?{...game.settledPrior}:{}}:null,readme,rules,groupName,expenses:expenses.map(e=>({id:e.id,date:e.date||'',desc:e.desc||'',paidBy:e.paidBy,amt:e.amt,split:e.split&&e.split.length?[...e.split]:null,g:e.g||'',done:!!e.done})),settle:settle?JSON.parse(JSON.stringify(settle)):null,bills:[],feed:(feed||[]).slice(0,40).map(x=>({id:x.id,at:x.at,text:x.text||''})),events:(events||[]).map(ev=>({id:ev.id,msg:ev.msg||'',date:ev.date||'',at:ev.at||0,by:ev.by||'',rsvps:Array.isArray(ev.rsvps)?ev.rsvps.map(r=>({name:r.name||'',status:r.status||'yes',at:r.at||0})):[]})),billSettle:billSettle?JSON.parse(JSON.stringify(billSettle)):null}}
+const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],expenses:S.expenses||[],settle:S.settle||null,initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:null,groupName:typeof S.groupName=='string'?S.groupName:'',bills:(S.bills||[]),billSettle:S.billSettle||null,feed:Array.isArray(S.feed)?S.feed:[],events:Array.isArray(S.events)?S.events:[],chipsBookings:Array.isArray(S.chipsBookings)?S.chipsBookings:[]});
+function getState(){if(!Array.isArray(sessions))sessions=[];if(!Array.isArray(loans))loans=[];if(!Array.isArray(expenses))expenses=[];if(!Array.isArray(bills))bills=[];if(!Array.isArray(feed))feed=[];if(!Array.isArray(events))events=[];if(!Array.isArray(chipsBookings))chipsBookings=[];if(!Array.isArray(players))players=[];sessions.forEach(x=>{if(!x.id)x.id=uid()});loans.forEach(l=>{if(!l.id)l.id=uid()});expenses.forEach(e=>{if(!e.id)e.id=uid()});
+ return{players:[...players],sessions:sessions.map(x=>({id:x.id,date:(x.date||''),label:(x.label||''),v:(x.v&&typeof x.v==='object')?{...x.v}:{}})),loans:loans.map(l=>({id:l.id,date:l.date,who:l.who,amt:l.amt,src:l.src||null,g:l.g||'',done:!!l.done})),initLoan,game:game?{date:game.date,players:Array.isArray(game.players)?[...game.players]:[],exited:(game.exited&&typeof game.exited==='object')?{...game.exited}:{},settledPrior:(game.settledPrior&&typeof game.settledPrior==='object')?{...game.settledPrior}:{}}:null,readme,rules,groupName,expenses:expenses.map(e=>({id:e.id,date:e.date||'',desc:e.desc||'',paidBy:e.paidBy,amt:e.amt,split:e.split&&e.split.length?[...e.split]:null,g:e.g||'',done:!!e.done})),settle:settle?JSON.parse(JSON.stringify(settle)):null,bills:[],feed:(feed||[]).slice(0,40).map(x=>({id:x.id,at:x.at,text:x.text||''})),events:(events||[]).map(ev=>({id:ev.id,msg:ev.msg||'',date:ev.date||'',timeFrom:ev.timeFrom||'',timeTo:ev.timeTo||'',food:!!ev.food,at:ev.at||0,by:ev.by||'',rsvps:Array.isArray(ev.rsvps)?ev.rsvps.map(r=>({name:r.name||'',status:r.status||'yes',foodPref:r.foodPref||'',at:r.at||0})):[]})),chipsBookings:(chipsBookings||[]).map(b=>({id:b.id,who:b.who||'',from:b.from||'',to:b.to||'',note:b.note||'',at:b.at||0})),billSettle:billSettle?JSON.parse(JSON.stringify(billSettle)):null}}
 function applyState(S){S=norm(S);players=Array.isArray(S.players)?[...S.players]:[];
  sessions=(Array.isArray(S.sessions)?S.sessions:[]).map(x=>{const v=(x&&x.v&&typeof x.v==='object')?{...x.v}:{};return{...(x||{}),v}});
  loans=(Array.isArray(S.loans)?S.loans:[]).map(l=>({...(l||{})}));
@@ -1093,12 +1303,13 @@ function applyState(S){S=norm(S);players=Array.isArray(S.players)?[...S.players]
  // One-time migrate old independent bills into expenses
  if(bills.length){const ids=new Set(expenses.map(e=>e.id).filter(Boolean));bills.forEach(b=>{if(!b)return;const id=b.id||uid();if(!ids.has(id)){expenses.push({...b,id});ids.add(id)}});bills=[]}
  feed=Array.isArray(S.feed)?S.feed.map(x=>({id:x&&x.id,at:x&&x.at,text:x&&x.text||''})).filter(x=>x.text):[];
- events=Array.isArray(S.events)?S.events.map(ev=>({id:ev&&ev.id||uid(),msg:(ev&&ev.msg)||'',date:(ev&&ev.date)||'',at:(ev&&ev.at)||0,by:(ev&&ev.by)||'',rsvps:Array.isArray(ev&&ev.rsvps)?ev.rsvps.map(r=>({name:(r&&r.name)||'',status:(r&&r.status)||'yes',at:(r&&r.at)||0})).filter(r=>r.name):[]})).filter(ev=>ev.msg||ev.date):[];
+ events=Array.isArray(S.events)?S.events.map(ev=>({id:ev&&ev.id||uid(),msg:(ev&&ev.msg)||'',date:(ev&&ev.date)||'',timeFrom:(ev&&ev.timeFrom)||'',timeTo:(ev&&ev.timeTo)||'',food:!!(ev&&ev.food),at:(ev&&ev.at)||0,by:(ev&&ev.by)||'',rsvps:Array.isArray(ev&&ev.rsvps)?ev.rsvps.map(r=>({name:(r&&r.name)||'',status:(r&&r.status)||'yes',foodPref:(r&&r.foodPref)||'',at:(r&&r.at)||0})).filter(r=>r.name):[]})).filter(ev=>ev.msg||ev.date):[];
+ chipsBookings=Array.isArray(S.chipsBookings)?S.chipsBookings.map(b=>({id:b&&b.id||uid(),who:(b&&b.who)||'',from:(b&&b.from)||'',to:(b&&b.to)||'',note:(b&&b.note)||'',at:(b&&b.at)||0})).filter(b=>b.who&&b.from&&b.to):[];
 
  if(!game){gc=false;finals={}}sortS();if(gid&&groupName)saveRecent(gid,groupName)}
 function mergeState(b,l,r){const o=norm(JSON.parse(JSON.stringify(r)));b=norm(b);
  l.players.forEach(p=>{if(!o.players.includes(p))o.players.push(p)});b.players.forEach(p=>{if(!l.players.includes(p))o.players=o.players.filter(x=>x!==p)});
- ['sessions','loans','expenses','bills','events'].forEach(k=>{const bm=new Map(b[k].map(x=>[x.id,canon(x)])),lm=new Set(l[k].map(x=>x.id));
+ ['sessions','loans','expenses','bills','events','chipsBookings'].forEach(k=>{const bm=new Map(b[k].map(x=>[x.id,canon(x)])),lm=new Set(l[k].map(x=>x.id));
   l[k].forEach(x=>{const i=o[k].findIndex(y=>y.id===x.id),was=bm.get(x.id);if(was===undefined){if(i<0)o[k].push(x)}else if(was!==canon(x)){if(i>=0)o[k][i]=x;else o[k].push(x)}});
   b[k].forEach(x=>{if(!lm.has(x.id)){const i=o[k].findIndex(y=>y.id===x.id);if(i>=0)o[k].splice(i,1)}})});
  if(l.initLoan!==b.initLoan)o.initLoan=l.initLoan;if(canon(l.settle)!==canon(b.settle))o.settle=l.settle;if(l.readme!==b.readme)o.readme=l.readme;if(l.rules!==b.rules)o.rules=l.rules;if(l.groupName!==b.groupName)o.groupName=l.groupName;if(canon(l.game)!==canon(b.game))o.game=l.game;if(canon(l.billSettle)!==canon(b.billSettle))o.billSettle=l.billSettle;return o}
@@ -1107,7 +1318,7 @@ function saveRecent(code,label){let r=getRecent().filter(x=>x.code!==code);r.uns
 function indHtml(){if(!gid)return'';const m={live:['#15803d','Live'],saving:['#d97706','Saving'],connecting:['#d97706','Connecting'],offline:['#dc2626','Offline'],error:['#dc2626','Error']}[cs]||['#6b7686',''];
  const mode=!accessLoaded?'':canOrganise()?'✏️ Admin':canEdit()?'✏️ Write':'👁 View';return`<span style="color:${m[0]}">●</span> ${m[1]}${mode?' · '+mode:''}`}
 function gbarHtml(){if(!gid)return'';
- return`${accessLoaded&&!canEdit()?'<button class="pri" id="unlock">🔑 Enter password</button>':''}<button data-mode="hub">🏠 Home</button><button data-gcopy>📋 Copy Group Code</button>${canEdit()?'<button data-grename>✎ Rename group</button>':''}<button data-gleave>🚪 Leave</button>`}
+ return`${accessLoaded&&!canEdit()?'<button class="pri" id="unlock">🔑 Enter password</button>':''}<button data-mode="hub">🏠 Home</button><button id="gref-page">↻ Refresh app</button><button data-gcopy>📋 Copy Group Code</button>${canEdit()?'<button data-grename>✎ Rename group</button>':''}<button data-gleave>🚪 Leave</button>`}
 function setSync(c){cs=c;try{const tb=document.querySelector('.topbar');if(tb)document.documentElement.style.setProperty('--tbh',tb.offsetHeight+'px')}catch(e){}const g=$('#gbar');if(g)g.innerHTML=gbarHtml();const ii=$('#ind');if(ii)ii.innerHTML=indHtml();const t=$('#ttl');if(t)t.textContent=gid?(groupName||gid.slice(0,6)+'…'):'';const dn=$('#dname');if(dn)dn.textContent=gid?(groupName||gid.slice(0,6)+'…'):''}
 function joinScreen(){
  if(adminOpen)return`<div class="jn"><div class="jn-title">Admin</div><div class="jn-sub">Pick a group or create one</div>${adminGroups.length?adminGroups.map(g=>`<div class="grow"><span><b>${E(g.name||g.code.slice(0,8))}</b><small class="mut">${E(g.code.slice(0,8))}…</small></span><button class="pri" data-gadm="${E(g.code)}">Enter</button></div>`).join(''):'<div class="mut" style="text-align:center">No groups yet</div>'}<button class="pri" id="gnew2">＋ New group</button><button id="gback">Back</button><button type="button" id="gref-join" class="jn-refresh">↻ Refresh app</button></div>`;
@@ -1154,6 +1365,7 @@ function render(){try{
  document.body.classList.toggle('mode-poker',appMode==='poker');
  document.body.classList.toggle('mode-bills',appMode==='bills');
  document.body.classList.toggle('mode-rsvp',appMode==='rsvp');
+ document.body.classList.toggle('mode-chips',appMode==='chips');
  if(!appMode){
   $('#v').innerHTML=hubScreen();
   setSync(cs);
@@ -1175,6 +1387,13 @@ function render(){try{
   try{syncUploadBtn()}catch(e){}
   queueMicrotask(()=>{try{persist()}catch(e){console.error(e)}});return;
  }
+ if(appMode==='chips'){
+  $('#v').innerHTML=chipsView();
+  setSync(cs);
+  ['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el)el.style.display='none'});
+  try{syncUploadBtn()}catch(e){}
+  queueMicrotask(()=>{try{persist()}catch(e){console.error(e)}});return;
+ }
  // poker mode — existing app
  render0();setSync(cs);document.body.classList.toggle('viewonly',!canEdit());if(!canEdit())lockUI();
  ['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el){el.disabled=!canEdit()||!sessions.length||!players.length;el.style.display=canEdit()?'':'none'}});
@@ -1190,7 +1409,7 @@ async function persistEvents(){
  let L;try{L=getState()}catch(e){console.error(e);return}
  const B=base||EMPTY();
  // Keep all other fields from base; only push events from local
- const payload={...B,events:(L.events||[]).map(ev=>({id:ev.id,msg:ev.msg||'',date:ev.date||'',at:ev.at||0,by:ev.by||'',rsvps:Array.isArray(ev.rsvps)?ev.rsvps.map(r=>({name:r.name||'',status:r.status||'yes',at:r.at||0})):[]}))};
+ const payload={...B,events:(L.events||[]).map(ev=>({id:ev.id,msg:ev.msg||'',date:ev.date||'',timeFrom:ev.timeFrom||'',timeTo:ev.timeTo||'',food:!!ev.food,at:ev.at||0,by:ev.by||'',rsvps:Array.isArray(ev.rsvps)?ev.rsvps.map(r=>({name:r.name||'',status:r.status||'yes',foodPref:r.foodPref||'',at:r.at||0})):[]}))};
  const c=canon(payload);if(c===canon(B)||c===lastSent)return;
  lastSent=c;inflight++;setSync('saving');
  try{
@@ -1212,11 +1431,11 @@ async function persistEvents(){
      if(!r||!r.name)return;
      const k=String(r.name).toLowerCase();
      const prev=rmap.get(k);
-     if(!prev||(r.at||0)>=(prev.at||0))rmap.set(k,{name:r.name,status:r.status||'yes',at:r.at||0});
+     if(!prev||(r.at||0)>=(prev.at||0))rmap.set(k,{name:r.name,status:r.status||'yes',foodPref:r.foodPref||'',at:r.at||0});
     });
     cur.rsvps=[...rmap.values()];
     // Prefer local msg/date if local is newer
-    if((e.at||0)>=(cur.at||0)){cur.msg=e.msg||cur.msg;cur.date=e.date||cur.date;cur.at=e.at||cur.at;cur.by=e.by||cur.by}
+    if((e.at||0)>=(cur.at||0)){cur.msg=e.msg||cur.msg;cur.date=e.date||cur.date;cur.timeFrom=e.timeFrom||cur.timeFrom||'';cur.timeTo=e.timeTo||cur.timeTo||'';cur.food=!!e.food;cur.at=e.at||cur.at;cur.by=e.by||cur.by}
    });
    // Deletions: if editor deleted, local list is missing that id vs base
    const baseIds=new Set((B.events||[]).map(e=>e.id));
@@ -1229,6 +1448,34 @@ async function persistEvents(){
   applying=true;try{applyState(base)}catch(e){console.error(e)}applying=false;
   cs=navigator.onLine===false?'offline':'live';setSync(cs);
  }catch(e){console.error('persistEvents',e);cs='error';setSync(cs);toast('Could not save RSVP — check connection')}
+ finally{inflight=Math.max(0,inflight-1);if(!inflight&&cs==='saving')setSync(navigator.onLine===false?'offline':'live')}
+}
+
+async function persistChips(){
+ if(!cloudOn||!synced||applying||!window.cloud||!gid)return;
+ let L;try{L=getState()}catch(e){console.error(e);return}
+ const B=base||EMPTY();
+ const payload={...B,chipsBookings:(L.chipsBookings||[]).map(b=>({id:b.id,who:b.who||'',from:b.from||'',to:b.to||'',note:b.note||'',at:b.at||0}))};
+ const c=canon(payload);if(c===canon(B)||c===lastSent)return;
+ lastSent=c;inflight++;setSync('saving');
+ try{
+  const out=await cloud.commit(gid,rj=>{
+   const remote=rj?JSON.parse(rj):EMPTY();
+   const rem=Array.isArray(remote.chipsBookings)?remote.chipsBookings:[];
+   const loc=Array.isArray(payload.chipsBookings)?payload.chipsBookings:[];
+   const byId=new Map();
+   rem.forEach(b=>{if(b&&b.id)byId.set(b.id,{...b})});
+   loc.forEach(b=>{if(b&&b.id)byId.set(b.id,{...b})});
+   const baseIds=new Set((B.chipsBookings||[]).map(b=>b.id));
+   const locIds=new Set(loc.map(b=>b.id));
+   baseIds.forEach(id=>{if(!locIds.has(id))byId.delete(id)});
+   const merged={...remote,chipsBookings:[...byId.values()]};
+   return JSON.stringify(merged);
+  });
+  base=norm(JSON.parse(out));
+  applying=true;try{applyState(base)}catch(e){console.error(e)}applying=false;
+  cs=navigator.onLine===false?'offline':'live';setSync(cs);
+ }catch(e){console.error('persistChips',e);cs='error';setSync(cs);toast('Could not save chips booking — check connection')}
  finally{inflight=Math.max(0,inflight-1);if(!inflight&&cs==='saving')setSync(navigator.onLine===false?'offline':'live')}
 }
 async function persist(){if(!cloudOn||!synced||applying||!window.cloud)return;let L,c;try{L=getState();c=canon(L)}catch(e){console.error('getState',e);return}if(c===canon(base||EMPTY())||c===lastSent)return;
@@ -1244,7 +1491,7 @@ function canView(){return true}
 function canOrganise(){if(Date.now()<unlockUntil)return true;if(!orgInfo)return false;try{return localStorage.getItem(orgKey())===orgInfo.hash}catch(e){return false}}
 function markOrganiser(){if(orgInfo)try{localStorage.setItem(orgKey(),orgInfo.hash)}catch(e){}unlockUntil=Date.now()+36e5}
 const normCode=c=>String(c||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
-const ALLOW='[data-t],[data-v],[data-x],[data-q],[data-mode],[data-pn],[data-rf],[data-rt],[data-hs],[data-hp],[data-all],[data-xall],#bkref,#gref,#ginvite,#gencode,#allowall,#genview,#allowview,#orgset,#orgrm,#copycode,#copyvcode,#gadmin,[data-sshare],[data-shide],[data-gcopy],[data-gleave],[data-gsw],[data-gopen],[data-gdel],#unlock,#unlockview,#unlockorg';
+const ALLOW='[data-t],[data-v],[data-x],[data-q],[data-mode],[data-pn],[data-rf],[data-rt],[data-hs],[data-hp],[data-all],[data-xall],#bkref,#gref,#gref-page,#ginvite,#gencode,#allowall,#genview,#allowview,#orgset,#orgrm,#copycode,#copyvcode,#gadmin,[data-sshare],[data-shide],[data-gcopy],[data-gleave],[data-gsw],[data-gopen],[data-gdel],#unlock,#unlockview,#unlockorg';
 function lockUI(){document.querySelectorAll('#v input,#v select,#v textarea,#v button,#v label.btn').forEach(el=>{if(!el.matches(ALLOW)){el.disabled=true;el.style.opacity='.5'}})}
 async function unlockEdit(){if(!access)return;const c=prompt('Enter the password:');if(c===null)return;
  for(const x of [c,normCode(c)]){const hh=await hashPass(x,access.salt,access.iter);if(hh===access.hash){try{localStorage.setItem(editKey(),hh)}catch(e){}toast('Editing enabled on this device');render();return}}
@@ -1521,14 +1768,16 @@ function startCloud(){if(!gid)return;
  if(cloud.watch)cloud.watch(gid,'viewaccess',json=>{if(gen!==connGen||json===undefined)return;viewAccess=(json&&json!=='null')?JSON.parse(json):null;viewLoaded=true;if(synced)renderSafe()});
  cloud.listen(gid,json=>{if(gen!==connGen)return;let S;
   try{S=json?norm(JSON.parse(json)):EMPTY()}catch(e){console.error('Bad group data',e);cloudErr='Group data could not be read. It may be damaged.';cs='error';synced=false;render();return}
-  if(!synced){synced=true;cs='live';if(window._connTimer){clearTimeout(window._connTimer);window._connTimer=null}const keepName=groupName;base=S;lastSent='';applying=true;try{applyState(S);if(keepName&&!groupName){groupName=keepName;if(gid)saveRecent(gid,groupName)}}catch(e){console.error('applyState',e);cloudErr='Could not load this group\'s data.';cs='error';synced=false;applying=false;render();return}applying=false;if(hashGame){if(game&&game.date===hashGame){tab='loans';toast('Opened the game of '+hashGame)}else if(game)toast('A different game is in progress ('+game.date+')')}
+  if(!synced){synced=true;cs='live';if(window._connTimer){clearTimeout(window._connTimer);window._connTimer=null}const keepName=groupName;base=S;lastSent='';applying=true;try{applyState(S);if(keepName&&!groupName){groupName=keepName;if(gid)saveRecent(gid,groupName)}}catch(e){console.error('applyState',e);cloudErr='Could not load this group\'s data.';cs='error';synced=false;applying=false;render();return}applying=false;if(hashGame){if(game&&game.date===hashGame){tab='loans';appMode='poker';toast('Opened the game of '+hashGame)}else if(game)toast('A different game is in progress ('+game.date+')')}
+  if(pendingMode){const m=pendingMode;pendingMode='';if(m==='rsvp'||m==='chips'||m==='bills'||m==='poker'){appMode=m;if(m==='poker')tab='hist';if(m==='bills')billTab='list';toast(m==='rsvp'?'Opened RSVP':m==='chips'?'Opened Chips':m==='bills'?'Opened Expenses':'Opened Cards')}}
+  if(pendingEv){pendingEv=''}
    ;(async()=>{try{const del=await cloud.get(gid,'deleted');if(del&&del.json&&del.json!=='null'&&!pendingOrgPass){removeRecent(gid);const gone=gid;leaveGroup();toast('Group '+(gone.slice(0,8))+'… no longer exists (deleted by the admin).');return}}catch(e){}
     loadOrg().then(()=>{if(gen===connGen)render()});
     if(pendingOrgPass){const pw=pendingOrgPass,setG=pendingSetGlobal,ep=pendingEditPw;pendingOrgPass=null;pendingSetGlobal=false;pendingEditPw=null;try{const salt=randHex(16),iter=150000,hash=await hashPass(pw,salt,iter);const payload=JSON.stringify({salt,iter,hash});await cloud.put(gid,'organiser',payload);if(ep){const s2=randHex(16),h2=await hashPass(ep,s2,150000);await cloud.put(gid,'access',JSON.stringify({salt:s2,iter:150000,hash:h2}));access={salt:s2,iter:150000,hash:h2};accessLoaded=true;lastCode=ep.slice(0,4)+'-'+ep.slice(4)}if(setG)await cloud.put(CFG,'createpass',payload);orgInfo={salt,iter,hash};orgLoaded=true;markOrganiser();await registerGroup(gid,groupName);if(gen===connGen)render()}catch(e){toast('Could not save admin password — set it on the Backups tab')}}
     else if(gen===connGen){render();queueMicrotask(()=>{try{persist()}catch(e){}})} })();return}
   if(inflight)return;reconcile(S)},e=>{if(gen!==connGen)return;cloudErr=((e&&e.code)||'error')+': '+((e&&e.message)||'');cs='error';synced=false;render()})}
-function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};bills=[];billSettle=null;billDraft={desc:'',amt:'',paid:'',shared:{}};feed=[];events=[];appMode='';billTab='list';xgrp={busy:false,err:'',list:[],picked:{},playerPicked:{},data:{},combined:null};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
-function setGroup(code,name,opts){const nm=(name!=null?String(name):'').trim().slice(0,40);const doReg=opts&&opts.register;gid=code;saveRecent(code,nm||code.slice(0,8));try{localStorage.setItem('ptc_group',code);history.replaceState(null,'','#g='+code)}catch(e){}clearLocal();groupName=nm;cs='connecting';synced=false;if(window.cloud&&cloud.stop){try{cloud.stop()}catch(e){}}startCloud();render();if(doReg)queueMicrotask(()=>registerGroup(code,nm).catch(()=>{}))}
+function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};bills=[];billSettle=null;billDraft={desc:'',amt:'',paid:'',shared:{}};feed=[];events=[];chipsBookings=[];appMode='';billTab='list';xgrp={busy:false,err:'',list:[],picked:{},playerPicked:{},data:{},combined:null};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
+function setGroup(code,name,opts){const nm=(name!=null?String(name):'').trim().slice(0,40);const doReg=opts&&opts.register;gid=code;saveRecent(code,nm||code.slice(0,8));try{localStorage.setItem('ptc_group',code);const modeBit=pendingMode?('&mode='+pendingMode):(hashMode?('&mode='+hashMode):'');history.replaceState(null,'','#g='+code+modeBit)}catch(e){}clearLocal();groupName=nm;cs='connecting';synced=false;if(window.cloud&&cloud.stop){try{cloud.stop()}catch(e){}}startCloud();render();if(doReg)queueMicrotask(()=>registerGroup(code,nm).catch(()=>{}))}
 async function checkAppUpdate(){
   if(!('serviceWorker' in navigator))return{updated:false,reason:'no-sw'};
   try{
@@ -1563,22 +1812,64 @@ async function checkAppUpdate(){
     return{updated:false,reason:hadWaiting?'activated':'latest'};
   }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
 }
-const CACHE_HINT='session-tracker-v51';
-async function refreshGroup(){
-  toast('Checking for app update…');
+const CACHE_HINT='session-tracker-v56';
+async function hardReloadApp(){
+  try{
+    if('caches' in window){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}
+  }catch(e){}
+  try{
+    if(navigator.serviceWorker){
+      const regs=await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r=>r.unregister()));
+    }
+  }catch(e){}
+  const u=new URL(location.href);
+  u.searchParams.set('_r',String(Date.now()));
+  location.replace(u.toString());
+}
+async function refreshGroup(forceHard){
+  toast(forceHard?'Refreshing app…':'Checking for app update…');
+  if(forceHard){
+    try{await hardReloadApp()}catch(e){location.reload()}
+    return;
+  }
   let upd={updated:false};
   try{upd=await checkAppUpdate()}catch(e){}
   if(upd&&upd.updated){toast('Updating app…');return}
-  if(!gid){toast('App is up to date');location.reload();return}
-  if(window.cloud&&cloud.stop)cloud.stop();
+  // Soft path: re-sync cloud; also probe SW version and hard-reload if mismatch
+  try{
+    if(navigator.serviceWorker){
+      const reg=await navigator.serviceWorker.getRegistration();
+      if(reg)await reg.update();
+      const res=await fetch('./sw.js?_='+Date.now(),{cache:'no-store'});
+      const txt=await res.text();
+      const m=txt.match(/session-tracker-v\d+/);
+      if(m&&m[0]!==CACHE_HINT){
+        toast('New version found — reloading…');
+        await hardReloadApp();
+        return;
+      }
+    }
+  }catch(e){}
+  if(!gid){toast('App is up to date');try{await hardReloadApp()}catch(e){location.reload()};return}
+  if(window.cloud&&cloud.stop)try{cloud.stop()}catch(e){}
   cloudOn=false;synced=false;cs='connecting';accessLoaded=false;viewLoaded=false;orgLoaded=false;base=null;lastSent='';inflight=0;
-  startCloud();render();toast('App up to date · syncing live data…')
+  startCloud();render();toast('Synced · tap Refresh again (or Shift+↻) for a full app reload')
 }
 function leaveGroup(){connGen++;if(window._connTimer){clearTimeout(window._connTimer);window._connTimer=null}adminOpen=false;adminPw=null;if(gid){saveRecent(gid,groupName||gid.slice(0,8));try{localStorage.removeItem(viewKey());localStorage.removeItem(editKey())}catch(e){}}if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;gid='';try{localStorage.removeItem('ptc_group');history.replaceState(null,'',location.pathname)}catch(e){}clearLocal();render()}
 function switchGroupUI(){tab='hist';leaveGroup()}
 function randCode(){const a='abcdefghjkmnpqrstuvwxyz23456789';let s='';crypto.getRandomValues(new Uint8Array(14)).forEach(x=>{s+=a[x%a.length]});return s}
 function copyLink(){const u=gid;if(navigator.clipboard)navigator.clipboard.writeText(u).then(()=>toast('Group code copied')).catch(()=>prompt('Copy this group code',u));else prompt('Copy this group code',u)}
 document.addEventListener('focusout',()=>{if(pendingRender)setTimeout(()=>{const a=document.activeElement;if(!(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName))){pendingRender=false;render()}},60)});
+window.addEventListener('hashchange',()=>{
+  try{
+    const h=location.hash||'';
+    const m=(h.match(/mode=(rsvp|chips|bills|poker)/)||[])[1]||'';
+    const gcode=(h.match(/g=([A-Za-z0-9_-]{8,40})/)||[])[1]||'';
+    if(gcode&&gcode!==gid){pendingMode=m||'rsvp';openExistingGroup(gcode);return}
+    if(m&&gid){appMode=m;if(m==='poker')tab='hist';if(m==='bills')billTab='list';render()}
+  }catch(e){console.error(e)}
+});
 window.addEventListener('online',()=>{if(cloudOn){setSync('live');persist()}});window.addEventListener('offline',()=>setSync('offline'));
 ;(function bootApp(){
   const bootGid=gid;
