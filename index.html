@@ -1316,6 +1316,22 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   render();
   toast(created.length?('Deleted user and '+created.length+' group(s)'):'Email registration deleted');
  })();return}
+ else if(g('data-emreset')){(async()=>{
+  const i=+g('data-emreset').dataset.emreset;
+  if(!(await ensureCloud()))return toast('Could not connect');
+  await loadEmailUsers();
+  const u=emailUsers[i];if(!u)return;
+  const had=!!u.passHash;
+  if(had&&!confirm('Reset the password for '+u.email+'?\n\nTheir old password stops working. You will get a one-time code (OTP) to give them; they enter it on the sign-in page and choose a new password.'))return;
+  if(had){u.passHash=null;u.passSalt=null;u.passIter=null;u.resetAt=Date.now()}
+  try{
+   await saveEmailUsers(emailUsers);
+   await issueEmailOtp(u.email);
+   await loadEmailUsers();
+   toast(had?'Password reset. Share the OTP shown below with the user':'New OTP ready. Share it with the user');
+   render();
+  }catch(e){toast((e&&e.message)||'Could not reset the password')}
+ })();return}
  else if(g('data-emedit')){(async()=>{
   const i=+g('data-emedit').dataset.emedit;
   await loadEmailUsers();
@@ -1337,7 +1353,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(t.id=='eu_logout'){saveEmailSession(null);emailAuthMode='';emailOtpPending=null;toast('Signed out');render();return}
  else if(t.id=='eu_newgame'){emailOrganiseGame();return}
 
- else if(t.id=='gback'){adminOpen=false;adminPw=null;adminSection='groups';persistAdminSession(false);render()}
+ else if(t.id=='gback'){adminOpen=false;adminPw=null;adminSection='groups';persistAdminSession(false);saveEmailSession(null);emailAuthMode='';emailOtpPending=null;render()}
  else if(g('data-gadm')){openExistingGroup(g('data-gadm').dataset.gadm,'',true)}
  else if(g('data-grename')){if(!canEdit())return toast('View only: enter the password first');const n=prompt('Group name:',groupName||'');if(n===null)return;groupName=n.trim().slice(0,40);if(gid){saveRecent(gid,groupName||gid.slice(0,8));registerGroup(gid,groupName).catch(()=>{})}render();toast(groupName?'Group renamed to '+groupName:'Name cleared');queueMicrotask(persist)}
  else if(g('data-gopen')){const c=g('data-gopen').dataset.gopen;if(c&&c!==gid)openExistingGroup(c)}
@@ -1346,6 +1362,16 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(t.id=='gadmin'){guard('manage all groups',()=>{loadGroupAdmin()},true)}
  else if(g('data-gcopy')){copyLink()}
  else if(g('data-glink')){copySiteLink()}
+ else if(t.id=='sl_save'){(async()=>{
+  const v=(($('#sl_url')&&$('#sl_url').value)||'').trim();
+  if(v&&!/^https?:\/\/\S+$/.test(v))return toast('Enter a full link starting with https://');
+  if(!(await ensureCloud()))return toast('Could not connect');
+  try{
+   await window.cloud.put(CFG,'shortlink',v?JSON.stringify({url:v,base:siteBase()}):'null');
+   try{if(v)localStorage.setItem('ptc_shortlink',JSON.stringify({base:siteBase(),url:v,custom:true}));else localStorage.removeItem('ptc_shortlink')}catch(e){}
+   toast(v?'Short link saved':'Short link cleared');render();
+  }catch(e){toast('Could not save the link')}
+ })();return}
  else if(t.id=='gref'||t.id=='gref2'||t.id=='gref-join'||t.id=='gref-page'){refreshGroup(!!e.shiftKey||t.id==='gref2');if(tab=='backup')setTimeout(loadBackups,1500)}
  else if(g('data-gleave')){if(confirm('Leave this group on this device? The shared data stays in the cloud.'))leaveGroup()}
  else if(g('data-gswitch')){if(confirm('Switch to another group? You can return later from Recent groups.'))switchGroupUI()}
@@ -1448,7 +1474,7 @@ function saveRecent(code,label){let r=getRecent().filter(x=>x.code!==code);r.uns
 function indHtml(){if(!gid)return'';const m={live:['#15803d','Live'],saving:['#d97706','Saving'],connecting:['#d97706','Connecting'],offline:['#dc2626','Offline'],error:['#dc2626','Error']}[cs]||['#6b7686',''];
  const mode=!accessLoaded?'':canOrganise()?(isOwner()?'✏️ Organiser':'✏️ Admin'):canEdit()?'✏️ Write':'👁 View';return`<span style="color:${m[0]}">●</span> ${m[1]}${mode?' · '+mode:''}`}
 function gbarHtml(){if(!gid)return'';
- return`${accessLoaded&&!canEdit()?'<button class="pri" id="unlock">🔑 Enter password</button>':''}<button data-mode="hub">🏠 Home</button><button data-gcopy>📋 Copy Group Code</button><button data-glink>🔗 Copy link</button>${canEdit()?'<button data-grename>✎ Rename group</button>':''}<button data-gleave>🚪 Leave</button>`}
+ return`<button data-mode="hub">🏠 Home</button><button data-gcopy>📋 Copy Group Code</button><button data-glink>🔗 Copy link</button>${canEdit()?'<button data-grename>✎ Rename group</button>':''}<button data-gleave>🚪 Leave</button>`}
 function setSync(c){cs=c;try{const tb=document.querySelector('.topbar');if(tb)document.documentElement.style.setProperty('--tbh',tb.offsetHeight+'px')}catch(e){}const g=$('#gbar');if(g)g.innerHTML=gbarHtml();const ii=$('#ind');if(ii)ii.innerHTML=indHtml();const t=$('#ttl');if(t)t.textContent=gid?(groupName||gid.slice(0,6)+'…'):'';const dn=$('#dname');if(dn)dn.textContent=gid?(groupName||gid.slice(0,6)+'…'):''}
 function normEmail(e){return String(e||'').trim().toLowerCase()}
 function saveEmailSession(u){
@@ -1536,6 +1562,14 @@ function adminGroupsSection(){
    ${block('Created by registered users','Organised under each player who started a game',userBlocks?userBlocks:[],userG.length?userBlocks:'<div class="mut" style="margin:6px 0">None yet</div>')}
    ${otherG.length?block('Other / older groups','Created before creator tracking',otherG.map(groupRowHtml)):''}
    <div style="border-top:1px solid var(--bd);padding-top:12px;margin-top:8px">
+    <div style="font-weight:700;margin-bottom:4px">Short link (optional)</div>
+    <div class="mut" style="font-size:12px;margin-bottom:8px">Paste your own short link, e.g. a tinyurl. "Copy link" will use it. Leave empty to shorten automatically.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+     <input id="sl_url" type="url" placeholder="https://tinyurl.com/your-alias" value="${E((()=>{try{const c=JSON.parse(localStorage.getItem('ptc_shortlink')||'null');return c&&c.custom?c.url:''}catch(e){return ''}})())}" style="flex:1;min-width:160px">
+     <button id="sl_save">Save</button>
+    </div>
+   </div>
+   <div style="border-top:1px solid var(--bd);padding-top:12px;margin-top:12px">
     <div style="font-weight:700;margin-bottom:8px">Create group (admin)</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
      <input id="admin_gname" type="text" placeholder="New group name" maxlength="40" style="flex:1;min-width:140px">
@@ -1562,10 +1596,11 @@ function adminEmailsSection(){
     const dispName=u.name?E(u.name)+' · ':'';
     return`<div class="card" style="text-align:left;margin:0 0 10px;padding:12px;color:var(--tx)" data-emidx="${i}">
      <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
-      <div style="color:var(--tx)"><b style="color:var(--tx)">${dispName}${E(u.email)}</b><div class="mut" style="margin-top:2px">${hasPass?'Password set':'Awaiting first login / OTP'}</div>
+      <div style="color:var(--tx)"><b style="color:var(--tx)">${dispName}${E(u.email)}</b><div class="mut" style="margin-top:2px">${hasPass?'Password set':(u.resetAt?'Password reset · waiting for OTP':'Awaiting first login / OTP')}</div>
       <div style="font-size:13px;margin-top:4px;color:var(--tx)">Groups: ${gLabels}</div>${otpInfo}</div>
       <div style="display:flex;flex-direction:column;gap:6px">
        <button type="button" data-emedit="${i}" style="padding:6px 10px;font-size:12px">Edit</button>
+        <button type="button" data-emreset="${i}" style="padding:6px 10px;font-size:12px" title="${hasPass?'Forgot password: clear it and issue an OTP':'Issue a fresh OTP'}">${hasPass?'Reset password':'New OTP'}</button>
        <button type="button" data-emdel="${i}" style="padding:6px 10px;font-size:12px">Delete</button>
       </div>
      </div>
@@ -1614,11 +1649,12 @@ function joinScreen(){
  // Email user signed in — show their groups + organise
  if(emailUser&&emailUser.email&&!gid){
   const gs=Array.isArray(emailUser.groups)?emailUser.groups:[];
-  if(!window._glLoaded&&!window._glLoading){window._glLoading=true;loadGroupList().then(l=>{adminGroups=l;window._glLoaded=true}).catch(()=>{}).finally(()=>{window._glLoading=false;render()})}
+  loadMyGroupMeta();
   const rows=gs.length?gs.map(c=>{
    const rn=((typeof getRecent==='function'?getRecent():[]).find(x=>x.code===c)||{}).name||'';
-   const g=(adminGroups||[]).find(x=>x.code===c)||{code:c,name:rn};
-   const nm=g.name||rn||c.slice(0,8);
+   const gm=gmetaGet()[c]||{};
+   const g=(adminGroups||[]).find(x=>x.code===c)||{code:c,name:gm.name||rn,byEmail:gm.byEmail||''};
+   const nm=g.name||gm.name||rn||c.slice(0,8);
    const mine=normEmail(g.byEmail||'')&&normEmail(g.byEmail||'')===normEmail(emailUser.email);
    return`<div class="grow"><span><b>${E(nm)}</b><small class="mut">${E(c.slice(0,8))}…</small></span><span class="gbtns"><button class="pri" data-gopen="${E(c)}">Enter</button>${mine?`<button class="rm" data-grm="${E(c)}" title="Remove this group">Remove</button>`:''}</span></div>`;
   }).join(''):'<div class="mut" style="text-align:center;margin:12px 0">No groups assigned yet. Ask admin, or organise a new game below.</div>';
@@ -1689,7 +1725,7 @@ async function adminLogin(){
  if(info){if(await hashPass(a,info.salt,info.iter)!==info.hash)return toast('Wrong admin password')}
  else{const b=await askPw('Type it again to confirm',{title:'Admin password',ok:'Save'});if(b!==a)return toast('The two entries did not match');
   const salt=randHex(16),iter=150000,hash=await hashPass(a,salt,iter);try{await window.cloud.put(CFG,'createpass',JSON.stringify({salt,iter,hash}))}catch(e){return toast('Could not save the admin password')}}
- adminPw=a;adminSection='groups';
+ saveEmailSession(null);emailAuthMode='';emailOtpPending=null;adminPw=a;adminSection='groups';
  try{adminGroups=await loadGroupList()}catch(e){adminGroups=[]}
  try{await loadEmailUsers()}catch(e){emailUsers=[]}
  adminOpen=true;persistAdminSession(true);render()}
@@ -1726,7 +1762,7 @@ async function emailContinue(){
  if(u.passHash&&u.passSalt){
   if(!pass)return toast('Enter your password');
   const h=await hashPass(pass,u.passSalt,u.passIter||150000);
-  if(h!==u.passHash)return toast('Wrong password');
+  if(h!==u.passHash)return toast('Wrong password. Forgot it? Ask your admin to reset it.');
   const remember=!!($('#eu_remember')&&$('#eu_remember').checked);
   try{
    if(remember)localStorage.setItem('ptc_email_remember',JSON.stringify({email,pass}));
@@ -1737,7 +1773,8 @@ async function emailContinue(){
   try{adminGroups=await loadGroupList()}catch(e){}
   toast('Signed in');render();return;
  }
- // First-time: OTP flow
+ // First-time / reset: OTP flow (keep an unexpired OTP the admin may already have shared)
+ if(u.pendingOtp&&u.otpExp&&u.otpExp>Date.now()){emailOtpPending=email;emailAuthMode='otp';toast('Enter the OTP your admin gave you');render();return}
  try{
   await issueEmailOtp(email);
   emailOtpPending=email;emailAuthMode='otp';
@@ -1784,6 +1821,7 @@ async function emailOrganiseGame(){
  pendingGroupMeta={by:'user',byName:(emailUser.name||'').trim()||emailUser.email,byEmail:emailUser.email};
  try{
   await registerGroup(code,n);
+  gmetaSave([{code,name:n,byEmail:emailUser.email}]);
   await loadEmailUsers();
   const u=findEmailUser(emailUser.email);
   if(u){
@@ -1966,14 +2004,34 @@ async function persist(){if(!cloudOn||!synced||applying||!window.cloud)return;le
  inflight--;if(!inflight&&cs!='offline')reconcile(base);else setSync(cs)}
 let access=null,accessLoaded=false,lastCode='',viewAccess=null,viewLoaded=false,lastViewCode='';
 const editKey=()=>'ptc_edit_'+gid,viewKey=()=>'ptc_view_'+gid,orgKey=()=>'ptc_org_'+gid;
-function canEdit(){if(canOrganise())return true;if(!accessLoaded){try{if(localStorage.getItem(editKey()))return true}catch(e){}return true}if(!access)return true;try{return localStorage.getItem(editKey())===access.hash}catch(e){return false}}
+function canEdit(){return true}
 function canView(){return true}
+function gmetaGet(){try{return JSON.parse(localStorage.getItem('ptc_gmeta')||'{}')||{}}catch(e){return {}}}
+function gmetaSave(list){try{const m=gmetaGet();(list||[]).forEach(g=>{if(g&&g.code)m[g.code]={name:g.name||'',byEmail:g.byEmail||''}});localStorage.setItem('ptc_gmeta',JSON.stringify(m))}catch(e){}}
+async function loadMyGroupMeta(){
+ if(window._glLoading||window._glLoaded)return;window._glLoading=true;
+ try{if(!(await ensureCloud()))throw new Error('offline');const l=await loadGroupList(true);adminGroups=l;gmetaSave(l);window._glLoaded=true;window._glTries=0;window._glLoading=false;render()}
+ catch(e){window._glLoading=false;window._glTries=(window._glTries||0)+1;if(window._glTries<6)setTimeout(loadMyGroupMeta,1500*window._glTries)}
+}
 function isSessionAdmin(){try{return !!adminOpen||sessionStorage.getItem('ptc_admin_open')==='1'||Date.now()<unlockUntil}catch(e){return !!adminOpen}}
 function myGroupCodes(){return new Set(emailUser&&Array.isArray(emailUser.groups)?emailUser.groups:[])}
 function visibleGroupsFor(list){list=Array.isArray(list)?list:[];if(!emailUser||!emailUser.email||isSessionAdmin())return list;const mine=myGroupCodes(),me=normEmail(emailUser.email);return list.filter(g=>g&&(mine.has(g.code)||normEmail(g.byEmail||'')===me))}
-function copySiteLink(){let u=location.origin+location.pathname;u=u.replace(/index\.html$/i,'');if(navigator.clipboard)navigator.clipboard.writeText(u).then(()=>toast('Link copied')).catch(()=>prompt('Copy this link',u));else prompt('Copy this link',u)}
+function siteBase(){return (location.origin+location.pathname).replace(/index\.html$/i,'')}
+async function shortenUrl(u){
+ const ok=s=>{s=String(s||'').trim();return /^https?:\/\/\S+$/.test(s)?s:null};
+ const go=async url=>{const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),6000);try{const r=await fetch(url,{signal:ctl.signal});if(!r.ok)throw new Error('bad');return ok(await r.text())}finally{clearTimeout(t)}};
+ for(const url of ['https://is.gd/create.php?format=simple&url=','https://v.gd/create.php?format=simple&url=','https://tinyurl.com/api-create.php?url=']){try{const s=await go(url+encodeURIComponent(u));if(s)return s}catch(e){}}
+ return null}
+async function copySiteLink(){
+ const base=siteBase();let u=null;
+ try{const c=JSON.parse(localStorage.getItem('ptc_shortlink')||'null');if(c&&c.base===base&&c.url)u=c.url}catch(e){}
+ if(!u){try{if(window.cloud){const d=await withTimeout(window.cloud.get(CFG,'shortlink'),4000);if(d&&d.json&&d.json!=='null'){const j=JSON.parse(d.json);if(j&&j.url&&(!j.base||j.base===base))u=j.url}}}catch(e){}}
+ if(!u){toast('Shortening link…');u=await shortenUrl(base)}
+ if(u){try{localStorage.setItem('ptc_shortlink',JSON.stringify({base,url:u}))}catch(e){}}
+ const out=u||base,msg=u?'Short link copied':'Link copied (could not shorten it)';
+ if(navigator.clipboard)navigator.clipboard.writeText(out).then(()=>toast(msg)).catch(()=>prompt('Copy this link',out));else prompt('Copy this link',out)}
 async function removeGroupFromList(code){
- const row=(adminGroups||[]).find(x=>x.code===code)||{};const name=row.name||code.slice(0,8);
+ const row=(adminGroups||[]).find(x=>x.code===code)||gmetaGet()[code]||{};const name=row.name||code.slice(0,8);
  const mine=!!(emailUser&&emailUser.email&&normEmail(row.byEmail||'')===normEmail(emailUser.email));
  if(!isSessionAdmin()&&!mine)return toast('Only the admin or the person who created this group can remove it');
  if(!confirm('Remove "'+name+'" for everyone?\nThis permanently deletes its sessions, loans, expenses and backups. This cannot be undone.'))return;
