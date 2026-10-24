@@ -238,7 +238,8 @@ body.dopen #scrim{opacity:1;pointer-events:auto}
 #gbar{gap:6px;font-size:13px}
 #drawer #gbar{display:flex;flex-direction:column;gap:10px;font-size:15px}
 #drawer #gbar button{width:100%;font-size:15px;padding:12px 16px;text-align:left}
-.nogrp #fab,.nogrp #drawer,.nogrp #scrim,.nogrp .ind{display:none}
+.nogrp #drawer,.nogrp #scrim,.nogrp .ind{display:none}
+body.adminon #fab{display:none}
 @media(prefers-reduced-motion:reduce){#drawer,#scrim,main{transition:none;animation:none}}
 #v{/* transitions disabled for stability */}
 #v.v-show{opacity:1;transform:none}
@@ -282,6 +283,18 @@ body.mode-bills .topbar .tabs{display:none}
 .admin-ico-emoji{font-size:28px;line-height:1}
 .admin-ico-label{font-size:12px;text-align:center}
 .admin-ico:active{transform:scale(.96)}
+
+/* password fields: eye toggle + admin popup */
+.pwwrap{position:relative;display:block;width:100%}
+.pwwrap input{width:100%;padding-right:46px!important;box-sizing:border-box}
+.pwwrap .eye{position:absolute;right:6px;top:50%;margin-top:-17px;width:34px;height:34px;padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important;border-radius:50%;font-size:17px;line-height:1;cursor:pointer;transform:none!important;color:var(--mut)}
+#apop{position:fixed;inset:0;z-index:9500;background:rgba(20,5,50,.55);display:flex;align-items:center;justify-content:center;padding:20px}
+.apbox{width:min(92vw,340px);background:var(--card);border:1px solid var(--bd);border-radius:20px;padding:20px;box-shadow:0 24px 60px -20px rgba(0,0,0,.6)}
+.aptitle{font-weight:800;font-size:18px;margin-bottom:6px}
+.apmsg{color:var(--mut);font-size:14px;margin-bottom:14px;white-space:pre-line}
+.apbox input{width:100%;padding:13px 46px 13px 14px;font-size:16px;border-radius:12px;text-align:left}
+.aprow{display:flex;gap:10px;margin-top:14px}.aprow button{flex:1;padding:12px}
+.nogrp #v{padding-bottom:100px}
 </style></head><body><div id="welcome"><img src="icon-512.png" alt=""><h2>Welcome Folks! 👑</h2><button id="enterBtn" type="button">Enter</button></div><main>
 <div class="topbar">
 <div class="hd"><h1><img src="icon-192.png" alt="" style="height:1.15em;width:1.15em;border-radius:22%;vertical-align:-0.2em;margin-right:.3em"><span class="ttl" id="ttl"></span></h1><span id="ind" class="ind"></span><button id="gref" class="rbtn" title="Refresh live data · Shift+click for full app reload" aria-label="Refresh">↻</button></div>
@@ -291,7 +304,7 @@ body.mode-bills .topbar .tabs{display:none}
 <div id="v"></div></main><div id="toast"></div>
 <script>
 const $=s=>document.querySelector(s),E=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let adminPw=null,adminOpen=false,adminGroups=[],pendingEditPw=null,adminSection='groups',emailUsers=[],emailUser=null,emailAuthMode='',emailOtpPending=null,pendingGroupMeta=null;
+let adminPw=null,adminOpen=false,adminGroups=[],pendingEditPw=null,adminSection='groups',emailUsers=[],emailUser=null,emailAuthMode='',emailOtpPending=null,pendingGroupMeta=null,ownerEmail='';
 let aiFn,aiTips={},aiKey='',aiBusy=false,aiMsg='',excl={},game=null,gc=false,finals={},plays={},initLoan=500,loans=[],loanDraft={},ld=new Date().toLocaleDateString('en-CA'),hsort='desc',hpl='file',ALLP=[],PERIOD={a:0,b:-1,N:0},rf=0,rt=-1,players=[],sessions=[],draft={},tab='hist',dd=new Date().toLocaleDateString('en-CA'),appMode='',billTab='list',bills=[],billDraft={desc:'',amt:'',paid:'',shared:{}},billSettle=null,feed=[],events=[],chipsBookings=[],xgrp={busy:false,err:'',list:[],picked:{},data:{},combined:null};
 const num=v=>typeof v==='number'&&isFinite(v),f=n=>num(n)?n.toLocaleString():'',cls=n=>n>0?'pos':n<0?'neg':'';
 const iso2ser=d=>Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10))/864e5+25569;
@@ -1071,8 +1084,22 @@ async function save(name,data){
  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data]));a.download=name;a.click()}
 const last=()=>(sessions.map(s=>s.date).filter(Boolean).sort().pop()||dd);
 // ---- events ----
+function askPw(msg,opts){opts=opts||{};return new Promise(res=>{
+ const old=document.getElementById('apop');if(old)old.remove();
+ const w=document.createElement('div');w.id='apop';
+ w.innerHTML=`<div class="apbox" role="dialog" aria-modal="true"><div class="aptitle">${E(opts.title||'Password')}</div><div class="apmsg">${E(msg||'')}</div><div class="pwwrap"><input id="ap_in" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${E(opts.placeholder||'Password')}"><button type="button" class="eye" data-eye aria-label="Show password">👁</button></div><div class="aprow"><button type="button" id="ap_cancel">Cancel</button><button type="button" class="pri" id="ap_ok">${E(opts.ok||'OK')}</button></div></div>`;
+ document.body.appendChild(w);const inp=w.querySelector('#ap_in');setTimeout(()=>{try{inp.focus()}catch(e){}},40);
+ const done=v=>{w.remove();res(v)};
+ w.querySelector('#ap_ok').onclick=()=>done(inp.value);
+ w.querySelector('#ap_cancel').onclick=()=>done(null);
+ w.addEventListener('click',e=>{if(e.target===w)done(null)});
+ inp.addEventListener('keydown',e=>{if(e.key==='Enter')done(inp.value);else if(e.key==='Escape')done(null)});
+})}
+function enhancePw(){document.querySelectorAll('input[type=password]').forEach(i=>{if(i.closest('.pwwrap'))return;const w=document.createElement('span');w.className='pwwrap';i.parentNode.insertBefore(w,i);w.appendChild(i);const b=document.createElement('button');b.type='button';b.className='eye';b.setAttribute('data-eye','');b.setAttribute('aria-label','Show password');b.textContent='👁';w.appendChild(b)})}
+let _epw=0;new MutationObserver(()=>{if(_epw)return;_epw=requestAnimationFrame(()=>{_epw=0;enhancePw()})}).observe(document.body,{childList:true,subtree:true});
 const closeDrawer=()=>document.body.classList.remove('dopen');
-document.addEventListener('click',e=>{const t=e.target;if(t.closest('#fab')){document.body.classList.toggle('dopen')}else if(t.closest('#ind')&&gid){document.body.classList.add('dopen')}else if(t.closest('#scrim')){closeDrawer()}else if(t.closest('#drawer button')){setTimeout(closeDrawer,60)}});
+document.addEventListener('click',e=>{const t=e.target;const eb=t.closest('[data-eye]');if(eb){const w=eb.closest('.pwwrap'),i=w&&w.querySelector('input');if(i){const show=i.type==='password';i.type=show?'text':'password';eb.textContent=show?'🙈':'👁';eb.setAttribute('aria-label',show?'Hide password':'Show password')}return}
+if(t.closest('#fab')){if(!gid){if(!adminOpen)adminLogin()}else document.body.classList.toggle('dopen')}else if(t.closest('#ind')&&gid){document.body.classList.add('dopen')}else if(t.closest('#scrim')){closeDrawer()}else if(t.closest('#drawer button')){setTimeout(closeDrawer,60)}});
 window.addEventListener('resize',()=>{try{const tb=document.querySelector('.topbar');if(tb)document.documentElement.style.setProperty('--tbh',tb.offsetHeight+'px')}catch(e){}});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer();if(e.key==='Enter'){const id=e.target&&e.target.id;if(id==='gc_in'||id==='gp_in'){const b=$('#gjoin');if(b)b.click()}else if(id==='eu_email'||id==='eu_pass'){const b=$('#eu_login');if(b)b.click()}else if(id==='eu_otp'){const b=$('#eu_verify_otp');if(b)b.click()}else if(id==='eu_pass1'||id==='eu_pass2'){const b=$('#eu_setpass');if(b)b.click()}}});
 document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']');
@@ -1221,11 +1248,11 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   if(!(await ensureCloud()))return toast('Could not connect');
   let info=null;try{info=await loadCreatePass()}catch(e){return toast('Could not load admin password')}
   if(!info)return toast('No admin password set yet');
-  const cur=prompt('Current admin password:');if(cur===null)return;
+  const cur=await askPw('Enter your current admin password',{title:'Admin password',ok:'Next'});if(cur===null)return;
   if(await hashPass(cur,info.salt,info.iter)!==info.hash)return toast('Wrong current password');
-  const n1=prompt('New admin password (at least 4 characters):');if(n1===null)return;
+  const n1=await askPw('New admin password (at least 4 characters)',{title:'Admin password',ok:'Next'});if(n1===null)return;
   if(n1.length<4)return toast('Use at least 4 characters');
-  const n2=prompt('Confirm new admin password:');if(n2===null)return;
+  const n2=await askPw('Confirm the new admin password',{title:'Admin password',ok:'Save'});if(n2===null)return;
   if(n1!==n2)return toast('New passwords do not match');
   const salt=randHex(16),iter=150000,hash=await hashPass(n1,salt,iter);
   try{
@@ -1313,7 +1340,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(g('data-grename')){if(!canEdit())return toast('View only: enter the password first');const n=prompt('Group name:',groupName||'');if(n===null)return;groupName=n.trim().slice(0,40);if(gid){saveRecent(gid,groupName||gid.slice(0,8));registerGroup(gid,groupName).catch(()=>{})}render();toast(groupName?'Group renamed to '+groupName:'Name cleared');queueMicrotask(persist)}
  else if(g('data-gopen')){const c=g('data-gopen').dataset.gopen;if(c&&c!==gid)openExistingGroup(c)}
  else if(g('data-gdel')){deleteGroupFully(g('data-gdel').dataset.gdel)}
- else if(t.id=='gadmin'){guard('manage all groups',()=>{loadGroupAdmin()})}
+ else if(t.id=='gadmin'){guard('manage all groups',()=>{loadGroupAdmin()},true)}
  else if(g('data-gcopy')){copyLink()}
  else if(t.id=='gref'||t.id=='gref2'||t.id=='gref-join'||t.id=='gref-page'){refreshGroup(!!e.shiftKey||t.id==='gref2');if(tab=='backup')setTimeout(loadBackups,1500)}
  else if(g('data-gleave')){if(confirm('Leave this group on this device? The shared data stays in the cloud.'))leaveGroup()}
@@ -1415,7 +1442,7 @@ function mergeState(b,l,r){const o=norm(JSON.parse(JSON.stringify(r)));b=norm(b)
 function getRecent(){try{return JSON.parse(localStorage.getItem('ptc_recent')||'[]')}catch(e){return[]}}
 function saveRecent(code,label){let r=getRecent().filter(x=>x.code!==code);r.unshift({code,label:label||code.slice(0,8),last:Date.now()});if(r.length>12)r=r.slice(0,12);try{localStorage.setItem('ptc_recent',JSON.stringify(r))}catch(e){}}
 function indHtml(){if(!gid)return'';const m={live:['#15803d','Live'],saving:['#d97706','Saving'],connecting:['#d97706','Connecting'],offline:['#dc2626','Offline'],error:['#dc2626','Error']}[cs]||['#6b7686',''];
- const mode=!accessLoaded?'':canOrganise()?'✏️ Admin':canEdit()?'✏️ Write':'👁 View';return`<span style="color:${m[0]}">●</span> ${m[1]}${mode?' · '+mode:''}`}
+ const mode=!accessLoaded?'':canOrganise()?(isOwner()?'✏️ Organiser':'✏️ Admin'):canEdit()?'✏️ Write':'👁 View';return`<span style="color:${m[0]}">●</span> ${m[1]}${mode?' · '+mode:''}`}
 function gbarHtml(){if(!gid)return'';
  return`${accessLoaded&&!canEdit()?'<button class="pri" id="unlock">🔑 Enter password</button>':''}<button data-mode="hub">🏠 Home</button><button data-gcopy>📋 Copy Group Code</button>${canEdit()?'<button data-grename>✎ Rename group</button>':''}<button data-gleave>🚪 Leave</button>`}
 function setSync(c){cs=c;try{const tb=document.querySelector('.topbar');if(tb)document.documentElement.style.setProperty('--tbh',tb.offsetHeight+'px')}catch(e){}const g=$('#gbar');if(g)g.innerHTML=gbarHtml();const ii=$('#ind');if(ii)ii.innerHTML=indHtml();const t=$('#ttl');if(t)t.textContent=gid?(groupName||gid.slice(0,6)+'…'):'';const dn=$('#dname');if(dn)dn.textContent=gid?(groupName||gid.slice(0,6)+'…'):''}
@@ -1645,16 +1672,14 @@ function joinScreen(){
   <label style="display:block;text-align:left;font-size:12px;font-weight:700;margin:0 0 4px;opacity:.85">Group code</label>
   <input id="gc_in" placeholder="Group code" autocomplete="off" autocapitalize="off" spellcheck="false">
   <button id="gjoin">Join the table ✨</button>
-  <div class="jn-or">or</div>
-  <button id="gadminlogin">🔑 Admin</button>
  </div>`;
 }
 async function adminLogin(){
  if(!(await ensureCloud()))return toast('Could not connect. Check your internet and try again.');
  let info=null;try{info=await loadCreatePass()}catch(e){return toast('Could not check admin access')}
- const a=prompt(info?'Admin password:':'No admin password yet. Choose one (at least 4 characters):');if(a===null)return;if(a.length<4)return toast('Use at least 4 characters');
+ const a=await askPw(info?'Enter the admin password':'No admin password yet. Choose one (at least 4 characters).',{title:'Admin',ok:info?'Unlock':'Continue'});if(a===null)return;if(a.length<4)return toast('Use at least 4 characters');
  if(info){if(await hashPass(a,info.salt,info.iter)!==info.hash)return toast('Wrong admin password')}
- else{const b=prompt('Type it again to confirm:');if(b!==a)return toast('The two entries did not match');
+ else{const b=await askPw('Type it again to confirm',{title:'Admin password',ok:'Save'});if(b!==a)return toast('The two entries did not match');
   const salt=randHex(16),iter=150000,hash=await hashPass(a,salt,iter);try{await window.cloud.put(CFG,'createpass',JSON.stringify({salt,iter,hash}))}catch(e){return toast('Could not save the admin password')}}
  adminPw=a;adminSection='groups';
  try{adminGroups=await loadGroupList()}catch(e){adminGroups=[]}
@@ -1761,7 +1786,7 @@ async function emailOrganiseGame(){
   }
  }catch(e){console.error(e)}
  pendingOrgPass=null;pendingEditPw=null;
- setGroup(code,n,{register:true});
+ setGroup(code,n,{register:true});ownerEmail=normEmail(emailUser.email);render();
  toast('New game organised');
 }
 function connectCard(){return`<div class="card"><b>${cs=='error'?'Could not connect':'Connecting…'}</b>${cloudErr?`<div class="mut" style="margin:6px 0">${E(cloudErr)}</div>`:''}${cs=='error'?`<p class="mut">Check that you are online and try again.</p><button class="pri" id="gref2" style="width:100%;margin-bottom:8px">Try again</button><button data-gleave style="width:100%">Use a different group code</button>`:`<p class="mut" style="margin-top:8px">Loading group data…</p><button data-gleave style="width:100%;margin-top:10px">Cancel</button>`}</div>`}
@@ -1777,7 +1802,7 @@ function syncUploadBtn(){
   }catch(e){console.error('syncUploadBtn',e)}
 }
 function render(){try{
- document.body.classList.toggle('nogrp',!gid);document.documentElement.classList.toggle('nogrp',!gid);
+ document.body.classList.toggle('nogrp',!gid);document.body.classList.toggle('adminon',!!adminOpen);document.documentElement.classList.toggle('nogrp',!gid);
  const vEl=$('#v');if(!vEl){console.error('Missing #v');return}
  if(!gid){vEl.innerHTML=joinScreen();return}
  if(!synced){$('#v').innerHTML=connectCard();setSync(cs);return}
@@ -1935,12 +1960,14 @@ let access=null,accessLoaded=false,lastCode='',viewAccess=null,viewLoaded=false,
 const editKey=()=>'ptc_edit_'+gid,viewKey=()=>'ptc_view_'+gid,orgKey=()=>'ptc_org_'+gid;
 function canEdit(){if(canOrganise())return true;if(!accessLoaded){try{if(localStorage.getItem(editKey()))return true}catch(e){}return true}if(!access)return true;try{return localStorage.getItem(editKey())===access.hash}catch(e){return false}}
 function canView(){return true}
-function canOrganise(){if(Date.now()<unlockUntil)return true;if(!orgInfo)return false;try{return localStorage.getItem(orgKey())===orgInfo.hash}catch(e){return false}}
+function isOwner(){try{return !!(gid&&emailUser&&emailUser.email&&ownerEmail&&normEmail(emailUser.email)===ownerEmail)}catch(e){return false}}
+async function loadOwner(code){ownerEmail='';try{const l=await loadGroupList();const r=l.find(x=>x.code===code);if(gid===code){ownerEmail=normEmail((r&&r.byEmail)||'');if(ownerEmail)render()}}catch(e){}}
+function canOrganise(){if(isOwner())return true;if(Date.now()<unlockUntil)return true;if(!orgInfo)return false;try{return localStorage.getItem(orgKey())===orgInfo.hash}catch(e){return false}}
 function markOrganiser(){if(orgInfo)try{localStorage.setItem(orgKey(),orgInfo.hash)}catch(e){}unlockUntil=Date.now()+36e5}
 const normCode=c=>String(c||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
 const ALLOW='[data-t],[data-v],[data-x],[data-q],[data-mode],[data-pn],[data-rf],[data-rt],[data-hs],[data-hp],[data-all],[data-xall],#bkref,#gref,#gref-page,#ginvite,#gencode,#allowall,#genview,#allowview,#orgset,#orgrm,#copycode,#copyvcode,#gadmin,[data-sshare],[data-shide],[data-gcopy],[data-gleave],[data-gsw],[data-gopen],[data-gdel],#unlock,#unlockview,#unlockorg';
 function lockUI(){document.querySelectorAll('#v input,#v select,#v textarea,#v button,#v label.btn').forEach(el=>{if(!el.matches(ALLOW)){el.disabled=true;el.style.opacity='.5'}})}
-async function unlockEdit(){if(!access)return;const c=prompt('Enter the password:');if(c===null)return;
+async function unlockEdit(){if(!access)return;const c=await askPw('Enter the group password',{title:'Password',ok:'Unlock'});if(c===null)return;
  for(const x of [c,normCode(c)]){const hh=await hashPass(x,access.salt,access.iter);if(hh===access.hash){try{localStorage.setItem(editKey(),hh)}catch(e){}toast('Editing enabled on this device');render();return}}
  toast('Wrong password')}
 async function unlockView(){if(!viewAccess){toast('No view code is set yet. Ask the admin to create one, or use the admin password.');return}
@@ -1950,7 +1977,7 @@ async function unlockAsOrganiser(){
  if(!(await ensureCloud()))return toast('Could not connect. Check your internet and try again.');
  await loadOrg();
  if(!orgInfo)return toast('No admin password is set for this group. Use the view code, or set an admin password from a device that already has access.');
- const pw=prompt('Enter the admin password:');if(pw===null)return;
+ const pw=await askPw('Enter the admin password',{title:'Admin password',ok:'Unlock'});if(pw===null)return;
  if(await hashPass(pw,orgInfo.salt,orgInfo.iter)!==orgInfo.hash)return toast('Wrong admin password');
  try{
   if(viewAccess)localStorage.setItem(viewKey(),viewAccess.hash);
@@ -1959,7 +1986,7 @@ async function unlockAsOrganiser(){
  markOrganiser();
  toast('Organiser access granted on this device');
  tab='backup';render();loadGroupAdmin()}
-async function genCode(){if(!orgInfo){if(!canEdit())return toast('Enter the password first, or ask the admin');if(!confirm('First set an admin password. Only you will be able to create passwords with it.'))return;await setPass();if(!orgInfo)return}
+async function genCode(){if(!orgInfo&&!isOwner()){if(!canEdit())return toast('Enter the password first, or ask the admin');if(!confirm('First set an admin password. Only you will be able to create passwords with it.'))return;await setPass();if(!orgInfo)return}
  else if(!(await checkPass('generate a password')))return;
  const a='ABCDEFGHJKMNPQRSTUVWXYZ23456789';let c='';crypto.getRandomValues(new Uint8Array(8)).forEach(x=>{c+=a[x%a.length]});
  const salt=randHex(16),iter=150000,hash=await hashPass(c,salt,iter);
@@ -2030,7 +2057,7 @@ async function openExistingGroup(code,pw,asAdmin,silent){
  if(!(await ensureCloud())){toast('Could not connect. Check your internet and try again.');try{render()}catch(e){}return;}
  try{const del=await window.cloud.get(code,'deleted');if(del&&del.json&&del.json!=='null'){removeRecent(code);try{localStorage.removeItem('ptc_group');history.replaceState(null,'',location.pathname)}catch(e){}if(!silent)toast('This group no longer exists.');return}}catch(e){}
  try{localStorage.removeItem('ptc_view_'+code);localStorage.removeItem('ptc_edit_'+code);localStorage.removeItem('ptc_org_'+code)}catch(e){}
- if(asAdmin){pendingOrgPass=adminPw;pendingSetGlobal=false}
+ if(asAdmin){if(adminPw&&adminPw!=='session'){pendingOrgPass=adminPw;pendingSetGlobal=false}persistAdminSession(true)}
  else if(pw){
   let ok=false;
   try{const r=await window.cloud.get(code,'access');const ac=(r&&r.json&&r.json!=='null')?JSON.parse(r.json):null;
@@ -2039,7 +2066,7 @@ async function openExistingGroup(code,pw,asAdmin,silent){
   }catch(e){return toast('Could not check the password. Try again.')}
   if(!ok)return toast('Wrong password')}
  adminOpen=false;adminPw=null;
- setGroup(code,null,{register:false});
+ setGroup(code,null,{register:false});if(asAdmin&&!pendingOrgPass)unlockUntil=Date.now()+36e5;
  // If signed in with email, attach this group to their list
  if(emailUser&&emailUser.email){
   (async()=>{try{
@@ -2064,23 +2091,23 @@ async function createNewGroup(){
  if(!(await ensureCloud()))return toast('Could not connect. Check your internet and try again.');
  let info=null;try{info=await loadCreatePass()}catch(e){return toast('Could not check create access: '+(e&&e.code||e&&e.message||'error'))}
  const hasGlobal=!!info;
- const a=prompt(hasGlobal?'Enter the admin password to create a new group:':'No create passcode is set yet. Choose an admin password (at least 4 characters).\nYou will need this same passcode to create more groups later.');
+ const a=await askPw(hasGlobal?'Enter the admin password to create a new group:':'No create passcode is set yet. Choose an admin password (at least 4 characters).\nYou will need this same passcode to create more groups later.',{title:'Admin password',ok:'Continue'});
  if(a===null)return;if(a.length<4)return toast('Use at least 4 characters');
  if(hasGlobal){const h=await hashPass(a,info.salt,info.iter);if(h!==info.hash)return toast('Wrong admin password');pendingOrgPass=a;pendingSetGlobal=false}
- else{const b=prompt('Type the admin password again to confirm:');if(b!==a)return toast('The two entries did not match');pendingOrgPass=a;pendingSetGlobal=true}
+ else{const b=await askPw('Type the admin password again to confirm',{title:'Admin password',ok:'Confirm'});if(b!==a)return toast('The two entries did not match');pendingOrgPass=a;pendingSetGlobal=true}
  setGroup(randCode(),(n||'').trim(),{register:true});toast('Group created. Tap Copy Group Code to share it.')}
 const randHex=n=>[...crypto.getRandomValues(new Uint8Array(n))].map(b=>b.toString(16).padStart(2,'0')).join('');
 async function hashPass(pw,saltHex,iter){const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveBits']),bits=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:Uint8Array.from(saltHex.match(/../g).map(h=>parseInt(h,16))),iterations:iter},key,256);return[...new Uint8Array(bits)].map(b=>b.toString(16).padStart(2,'0')).join('')}
 async function loadOrg(){orgLoaded=false;try{const d=await withTimeout(cloud.get(gid,'organiser'));orgInfo=d?JSON.parse(d.json):null;orgLoaded=true;
  if(orgInfo){try{const m=await cloud.get(CFG,'createpass');if(!m||!m.json||m.json==='null')await cloud.put(CFG,'createpass',JSON.stringify(orgInfo))}catch(e){}}}catch(e){}return orgLoaded}
-async function checkPass(label){if(Date.now()<unlockUntil)return true;await loadOrg();
+async function checkPass(label,strict){if(!strict&&isOwner())return true;if(Date.now()<unlockUntil)return true;await loadOrg();
  if(!orgLoaded){toast('Could not check the admin password. Check your connection and try again.');return false}
- if(!orgInfo)return true;const pw=prompt('Admin password needed to '+label+':');if(pw===null)return false;
+ if(!orgInfo)return true;const pw=await askPw('Admin password needed to '+label,{title:'Admin password',ok:'Unlock'});if(pw===null)return false;
  if(await hashPass(pw,orgInfo.salt,orgInfo.iter)===orgInfo.hash){markOrganiser();return true}toast('Wrong passcode');return false}
-async function guard(label,fn){if(await checkPass(label))fn()}
+async function guard(label,fn,strict){if(await checkPass(label,strict))fn()}
 async function setPass(){if(!orgInfo&&!canEdit())return toast('Enter the password first, or ask the admin');if(orgInfo&&!(await checkPass('change the passcode')))return;
- const a=prompt('New admin password (at least 4 characters):');if(a===null)return;if(a.length<4)return toast('Use at least 4 characters');
- const b=prompt('Type it again to confirm:');if(b!==a)return toast('The two entries did not match');
+ const a=await askPw('New admin password (at least 4 characters)',{title:'Admin password',ok:'Next'});if(a===null)return;if(a.length<4)return toast('Use at least 4 characters');
+ const b=await askPw('Type it again to confirm',{title:'Admin password',ok:'Save'});if(b!==a)return toast('The two entries did not match');
  const salt=randHex(16),iter=150000,hash=await hashPass(a,salt,iter);
  try{const payload=JSON.stringify({salt,iter,hash});await cloud.put(gid,'organiser',payload);await cloud.put(CFG,'createpass',payload);orgInfo={salt,iter,hash};orgLoaded=true;markOrganiser();render();toast('Admin password saved (also used to create new groups)')}catch(e){toast('Could not save the passcode')}}
 async function removePass(){if(!orgInfo)return;if(!(await checkPass('remove the passcode')))return;if(!confirm('Remove the admin password? Anyone will be able to upload, restore and delete sessions.'))return;
@@ -2254,8 +2281,8 @@ function startCloud(){if(!gid)return;
     if(pendingOrgPass){const pw=pendingOrgPass,setG=pendingSetGlobal,ep=pendingEditPw;pendingOrgPass=null;pendingSetGlobal=false;pendingEditPw=null;try{const salt=randHex(16),iter=150000,hash=await hashPass(pw,salt,iter);const payload=JSON.stringify({salt,iter,hash});await cloud.put(gid,'organiser',payload);if(ep){const s2=randHex(16),h2=await hashPass(ep,s2,150000);await cloud.put(gid,'access',JSON.stringify({salt:s2,iter:150000,hash:h2}));access={salt:s2,iter:150000,hash:h2};accessLoaded=true;lastCode=ep.slice(0,4)+'-'+ep.slice(4)}if(setG)await cloud.put(CFG,'createpass',payload);orgInfo={salt,iter,hash};orgLoaded=true;markOrganiser();await registerGroup(gid,groupName);if(gen===connGen)render()}catch(e){toast('Could not save admin password — set it on the Backups tab')}}
     else if(gen===connGen){render();queueMicrotask(()=>{try{persist()}catch(e){}})} })();return}
   if(inflight)return;reconcile(S)},e=>{if(gen!==connGen)return;cloudErr=((e&&e.code)||'error')+': '+((e&&e.message)||'');cs='error';synced=false;render()})}
-function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};bills=[];billSettle=null;billDraft={desc:'',amt:'',paid:'',shared:{}};feed=[];events=[];chipsBookings=[];appMode='';billTab='list';xgrp={busy:false,err:'',list:[],picked:{},playerPicked:{},data:{},combined:null};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
-function setGroup(code,name,opts){const nm=(name!=null?String(name):'').trim().slice(0,40);const doReg=opts&&opts.register;gid=code;saveRecent(code,nm||code.slice(0,8));try{localStorage.setItem('ptc_group',code);const modeBit=pendingMode?('&mode='+pendingMode):(hashMode?('&mode='+hashMode):'');history.replaceState(null,'','#g='+code+modeBit)}catch(e){}clearLocal();groupName=nm;cs='connecting';synced=false;if(window.cloud&&cloud.stop){try{cloud.stop()}catch(e){}}startCloud();render();if(doReg)queueMicrotask(()=>registerGroup(code,nm).catch(()=>{}))}
+function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};bills=[];billSettle=null;billDraft={desc:'',amt:'',paid:'',shared:{}};feed=[];events=[];chipsBookings=[];appMode='';billTab='list';xgrp={busy:false,err:'',list:[],picked:{},playerPicked:{},data:{},combined:null};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;ownerEmail='';players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
+function setGroup(code,name,opts){const nm=(name!=null?String(name):'').trim().slice(0,40);const doReg=opts&&opts.register;gid=code;saveRecent(code,nm||code.slice(0,8));try{localStorage.setItem('ptc_group',code);const modeBit=pendingMode?('&mode='+pendingMode):(hashMode?('&mode='+hashMode):'');history.replaceState(null,'','#g='+code+modeBit)}catch(e){}clearLocal();groupName=nm;cs='connecting';synced=false;if(window.cloud&&cloud.stop){try{cloud.stop()}catch(e){}}startCloud();render();loadOwner(code);if(doReg)queueMicrotask(()=>registerGroup(code,nm).catch(()=>{}))}
 async function checkAppUpdate(){
   if(!('serviceWorker' in navigator))return{updated:false,reason:'no-sw'};
   try{
@@ -2359,7 +2386,7 @@ async function refreshGroup(forceHard){
   cloudOn=false;synced=false;cs='connecting';base=null;lastSent='';inflight=0;
   startCloud();render();toast('Live data refreshed · Shift+click top ↻ for full app reload')
 }
-function leaveGroup(){connGen++;if(window._connTimer){clearTimeout(window._connTimer);window._connTimer=null}adminOpen=false;adminPw=null;if(gid){saveRecent(gid,groupName||gid.slice(0,8));try{localStorage.removeItem(viewKey());localStorage.removeItem(editKey())}catch(e){}}if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;gid='';try{localStorage.removeItem('ptc_group');history.replaceState(null,'',location.pathname)}catch(e){}clearLocal();render()}
+function leaveGroup(){connGen++;if(window._connTimer){clearTimeout(window._connTimer);window._connTimer=null}const keepAdmin=(()=>{try{return sessionStorage.getItem('ptc_admin_open')==='1'}catch(e){return false}})();if(keepAdmin){adminOpen=true;adminPw=adminPw||'session';adminSection=adminSection||'groups';loadGroupList().then(l=>{adminGroups=l;render()}).catch(()=>{})}else{adminOpen=false;adminPw=null}if(gid){saveRecent(gid,groupName||gid.slice(0,8));try{localStorage.removeItem(viewKey());localStorage.removeItem(editKey())}catch(e){}}if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;gid='';try{localStorage.removeItem('ptc_group');history.replaceState(null,'',location.pathname)}catch(e){}clearLocal();render()}
 function switchGroupUI(){tab='hist';leaveGroup()}
 function randCode(){const a='abcdefghjkmnpqrstuvwxyz23456789';let s='';crypto.getRandomValues(new Uint8Array(14)).forEach(x=>{s+=a[x%a.length]});return s}
 function copyLink(){const u=gid;if(navigator.clipboard)navigator.clipboard.writeText(u).then(()=>toast('Group code copied')).catch(()=>prompt('Copy this group code',u));else prompt('Copy this group code',u)}
