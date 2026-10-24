@@ -949,7 +949,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
 
  else if(t.id=='jb'){if(!game)return;let n=($('#jn').value||'').trim();if(!n)return toast('Enter a player name');n=players.find(q=>q.toLowerCase()==n.toLowerCase())||n;
   if(game.players.includes(n))return toast(n+' is already in this game');if(!players.includes(n))players.push(n);
-  game.players.push(n);plays[n]=true;render();queueMicrotask(()=>{try{persist()}catch(e){}});toast(n+' added to the game')}}
+  game.players.push(n);plays[n]=true;render();queueMicrotask(()=>{try{persist()}catch(e){}});toast(n+' added to the game')}
  
  else if(t.id=='gfin'){if(!game)return;const rows=loanRows(game.players),res={};let miss=0;
   rows.forEach(r=>{const a=parseFloat(finals[r.p]);if(isNaN(a)){miss=1;return}res[r.p]=Math.round((a-r.cur)*100)/100});
@@ -1440,7 +1440,7 @@ async function checkAppUpdate(){
     return{updated:false,reason:hadWaiting?'activated':'latest'};
   }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
 }
-const CACHE_HINT='session-tracker-v50';
+const CACHE_HINT='session-tracker-v51';
 async function refreshGroup(){
   toast('Checking for app update…');
   let upd={updated:false};
