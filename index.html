@@ -244,7 +244,7 @@ body.dopen #scrim{opacity:1;pointer-events:auto}
 /* ===== App hub (Cards / Expenses / Feed) ===== */
 body.mode-hub .tabs,body.mode-hub .intro,body.mode-hub .bar{display:none!important}
 body.mode-bills .tabs,body.mode-bills .intro{display:none!important}
-body.mode-feed .tabs,body.mode-feed .intro{display:none!important}
+body.mode-rsvp .tabs,body.mode-rsvp .intro{display:none!important}
 .hub{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin:24px 0 12px;max-width:720px;margin-left:auto;margin-right:auto}
 @media(max-width:640px){.hub{grid-template-columns:1fr}}
 .hub-card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:26px 16px;min-height:150px;border:1px solid var(--bd);border-radius:22px;background:var(--card);box-shadow:var(--sh);cursor:pointer;transition:transform .12s ease;text-align:center;position:relative;overflow:hidden}
@@ -264,7 +264,7 @@ body.mode-feed .tabs,body.mode-feed .intro{display:none!important}
 .topbar .tabs{margin-bottom:0;padding-bottom:2px}
 .topbar .hd{margin-bottom:8px}
 .bills-nav{position:sticky;top:calc(var(--tbh,61px) - 1px);z-index:150;margin:0 -16px 14px;padding:8px 16px;background:var(--bar);border-bottom:1px solid var(--bd);box-shadow:0 6px 16px -12px rgba(29,20,64,.35);border-radius:0}
-body.mode-bills .topbar,body.mode-feed .topbar{border-bottom:0;box-shadow:none;margin-bottom:0}
+body.mode-bills .topbar,body.mode-rsvp .topbar{border-bottom:0;box-shadow:none;margin-bottom:0}
 #ind{cursor:pointer}
 .nogrp .topbar{background:transparent;border-bottom:0;box-shadow:none}
 body.mode-hub .topbar .tabs{display:none}
@@ -282,7 +282,7 @@ body.mode-bills .topbar .tabs{display:none}
 <script>
 const $=s=>document.querySelector(s),E=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let adminPw=null,adminOpen=false,adminGroups=[],pendingEditPw=null;
-let aiFn,aiTips={},aiKey='',aiBusy=false,aiMsg='',excl={},game=null,gc=false,finals={},plays={},initLoan=500,loans=[],loanDraft={},ld=new Date().toLocaleDateString('en-CA'),hsort='desc',hpl='file',ALLP=[],PERIOD={a:0,b:-1,N:0},rf=0,rt=-1,players=[],sessions=[],draft={},tab='hist',dd=new Date().toLocaleDateString('en-CA'),appMode='',billTab='list',bills=[],billDraft={desc:'',amt:'',paid:'',shared:{}},billSettle=null,feed=[],xgrp={busy:false,err:'',list:[],picked:{},data:{},combined:null};
+let aiFn,aiTips={},aiKey='',aiBusy=false,aiMsg='',excl={},game=null,gc=false,finals={},plays={},initLoan=500,loans=[],loanDraft={},ld=new Date().toLocaleDateString('en-CA'),hsort='desc',hpl='file',ALLP=[],PERIOD={a:0,b:-1,N:0},rf=0,rt=-1,players=[],sessions=[],draft={},tab='hist',dd=new Date().toLocaleDateString('en-CA'),appMode='',billTab='list',bills=[],billDraft={desc:'',amt:'',paid:'',shared:{}},billSettle=null,feed=[],events=[],xgrp={busy:false,err:'',list:[],picked:{},data:{},combined:null};
 const num=v=>typeof v==='number'&&isFinite(v),f=n=>num(n)?n.toLocaleString():'',cls=n=>n>0?'pos':n<0?'neg':'';
 const iso2ser=d=>Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10))/864e5+25569;
 const ser2iso=n=>new Date(Math.round((n-25569)*864e5)).toISOString().slice(0,10);
@@ -306,16 +306,57 @@ function logFeed(text){
   if(feed.length>40)feed=feed.slice(0,40);
  }catch(e){}
 }
-function feedView(){
- const items=Array.isArray(feed)?feed:[];
+function rsvpView(){
+ const list=Array.isArray(events)?[...events]:[];
+ list.sort((a,b)=>(a.date||'').localeCompare(b.date||'')||((b.at||0)-(a.at||0)));
+ const today=new Date().toLocaleDateString('en-CA');
  let h=`<div class="bills-nav"><button type="button" class="back-hub" data-mode="hub">← Home</button></div>
- <div class="card"><b>Group feed</b><div class="mut" style="margin:4px 0 10px">Recent activity in this group (sessions, expenses, loans). Visible to everyone in the group.</div>`;
- if(!items.length)h+='<p class="mut">No activity yet. Complete a game, add an expense, or save loans to see updates here.</p>';
- else h+=items.map(it=>{
-  const when=it.at?new Date(it.at).toLocaleString():'';
-  return`<div style="padding:10px 0;border-bottom:1px solid var(--bd)"><div style="font-weight:700">${E(it.text)}</div><div class="mut" style="font-size:12px;margin-top:2px">${E(when)}</div></div>`;
- }).join('');
- h+=`</div>`;
+ <div class="card"><b>📅 Group events</b><div class="mut" style="margin:4px 0 12px">Create a date + note (e.g. “party at my house”). Anyone in the group — including view-only — can RSVP yes / no / maybe.</div>
+ <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Message</label>
+ <input id="ev_msg" type="text" placeholder="Party at my house / brunch / trip…" maxlength="120" style="width:100%;margin-bottom:10px">
+ <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Date</label>
+ <input id="ev_date" type="date" value="${today}" style="width:100%;margin-bottom:12px">
+ <button type="button" class="pri" id="ev_add" style="width:100%">Create event</button>
+ </div>`;
+ if(!list.length){
+  h+=`<div class="card"><p class="mut" style="margin:0">No events yet. Create one above.</p></div>`;
+  return h;
+ }
+ list.forEach(ev=>{
+  const rsvps=Array.isArray(ev.rsvps)?ev.rsvps:[];
+  const yes=rsvps.filter(r=>r.status==='yes'), no=rsvps.filter(r=>r.status==='no'), maybe=rsvps.filter(r=>r.status==='maybe');
+  const when=ev.date?ev.date:(ev.at?new Date(ev.at).toLocaleDateString():'');
+  const namesList=(arr)=>arr.length?arr.map(r=>E(r.name)).join(', '):'<span class="mut">—</span>';
+  h+=`<div class="card" data-evid="${E(ev.id)}">
+   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+    <div><b style="font-size:17px">${E(ev.msg||'Event')}</b>
+     <div class="mut" style="margin-top:4px">📆 ${E(when)}${ev.by?' · by '+E(ev.by):''}</div></div>
+    ${canEdit()?`<button type="button" data-evdel="${E(ev.id)}" style="flex-shrink:0;padding:6px 10px;font-size:12px">Delete</button>`:''}
+   </div>
+   <div style="display:flex;gap:10px;flex-wrap:wrap;margin:12px 0 8px;font-size:13px">
+    <span style="background:#dcfce7;color:#166534;padding:4px 10px;border-radius:999px;font-weight:700">Yes ${yes.length}</span>
+    <span style="background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:999px;font-weight:700">Maybe ${maybe.length}</span>
+    <span style="background:#fee2e2;color:#991b1b;padding:4px 10px;border-radius:999px;font-weight:700">No ${no.length}</span>
+   </div>
+   <div style="font-size:13px;line-height:1.5;margin-bottom:12px">
+    <div><b>Yes:</b> ${namesList(yes)}</div>
+    <div><b>Maybe:</b> ${namesList(maybe)}</div>
+    <div><b>No:</b> ${namesList(no)}</div>
+   </div>
+   <div style="border-top:1px solid var(--bd);padding-top:12px">
+    <label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px">Your name</label>
+    <input type="text" class="ev-name" data-evid="${E(ev.id)}" placeholder="Name" maxlength="40" list="ev_players" style="width:100%;margin-bottom:8px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+     <button type="button" class="pri" data-evrsvp="${E(ev.id)}" data-status="yes" style="flex:1;min-width:80px">Yes</button>
+     <button type="button" data-evrsvp="${E(ev.id)}" data-status="maybe" style="flex:1;min-width:80px">Maybe</button>
+     <button type="button" data-evrsvp="${E(ev.id)}" data-status="no" style="flex:1;min-width:80px">No</button>
+    </div>
+   </div>
+  </div>`;
+ });
+ if(players.length){
+  h+=`<datalist id="ev_players">${players.map(p=>`<option value="${E(p)}">`).join('')}</datalist>`;
+ }
  return h;
 }
 
@@ -323,7 +364,7 @@ function hubScreen(){
  return`<div class="hub">
   <button type="button" class="hub-card" data-mode="poker"><div class="hub-ico">🃏</div><b>Cards</b><span>Sessions, loans &amp; game expenses</span></button>
   <button type="button" class="hub-card" data-mode="bills"><div class="hub-ico">🧾</div><b>Expenses</b><span>Shared bills · synced with Cards</span></button>
-  <button type="button" class="hub-card" data-mode="feed"><div class="hub-ico">📢</div><b>Feed</b><span>Group activity updates</span></button>
+  <button type="button" class="hub-card" data-mode="rsvp"><div class="hub-ico">📅</div><b>RSVP</b><span>Events · dates · responses</span></button>
  </div>
  <p class="mut" style="text-align:center;margin-top:8px">Choose a section for this group</p>`;
 }
@@ -884,6 +925,37 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  if(t.id=='xgrp-fetch'){xgrpFetch();return}
  if(t.id=='xgrp-import'){xgrpImport();return}
  if(g('data-mode')){appMode=g('data-mode').dataset.mode==='hub'?'':g('data-mode').dataset.mode;if(appMode==='poker')tab='hist';if(appMode==='bills')billTab='list';render();return}
+ if(t.id=='ev_add'){
+  const msg=(($('#ev_msg')&&$('#ev_msg').value)||'').trim().slice(0,120);
+  const date=(($('#ev_date')&&$('#ev_date').value)||'').trim();
+  if(!msg)return toast('Write a short message for the event');
+  if(!date)return toast('Pick a date');
+  if(!Array.isArray(events))events=[];
+  events.push({id:uid(),msg,date,at:Date.now(),by:'',rsvps:[]});
+  render();toast('Event created');queueMicrotask(()=>{try{persistEvents()}catch(e){console.error(e)}});return}
+ if(g('data-evdel')){
+  if(!canEdit())return toast('Only editors can delete events');
+  const id=g('data-evdel').dataset.evdel;
+  if(!confirm('Delete this event and all RSVPs?'))return;
+  events=(events||[]).filter(ev=>ev.id!==id);
+  render();toast('Event deleted');queueMicrotask(()=>{try{persistEvents()}catch(e){console.error(e)}});return}
+ if(g('data-evrsvp')){
+  const id=g('data-evrsvp').dataset.evrsvp;
+  const status=g('data-evrsvp').dataset.status||'yes';
+  const card=g('data-evrsvp').closest('[data-evid]')||g('data-evrsvp').closest('.card');
+  const nameInp=card?card.querySelector('.ev-name'):null;
+  const name=((nameInp&&nameInp.value)||'').trim().slice(0,40);
+  if(!name)return toast('Enter your name to RSVP');
+  if(!['yes','no','maybe'].includes(status))return;
+  if(!Array.isArray(events))events=[];
+  const ev=events.find(x=>x.id===id);
+  if(!ev)return toast('Event not found');
+  if(!Array.isArray(ev.rsvps))ev.rsvps=[];
+  const key=name.toLowerCase();
+  const existing=ev.rsvps.find(r=>(r.name||'').toLowerCase()===key);
+  if(existing){existing.status=status;existing.at=Date.now()}
+  else ev.rsvps.push({name,status,at:Date.now()});
+  render();toast(name+' · '+status);queueMicrotask(()=>{try{persistEvents()}catch(e){console.error(e)}});return}
  if(g('data-btab')){billTab=g('data-btab').dataset.btab;render();return}
  if(g('data-t')){const nt=g('data-t').dataset.t;if(nt===tab)return;tab=nt;swapView(()=>{render0();upd();syncUploadBtn();if(tab=='backup')loadBackups()});document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t==tab))}
  else if(g('data-all')){const v=+g('data-all').dataset.all;OPTS.forEach(o=>sel[o[0]]=v);render()}
@@ -1003,12 +1075,12 @@ document.addEventListener('change',e=>{const t=e.target;
 let gid='',cs='connecting',cloudErr='',synced=false,cloudOn=false,connGen=0,base=null,inflight=0,lastSent='',applying=false,pendingRender=false;
 try{gid=((location.hash||'').match(/g=([A-Za-z0-9_-]{8,40})/)||[])[1]||localStorage.getItem('ptc_group')||''}catch(e){}
 const hashGame=((location.hash||'').match(/game=(\d{4}-\d{2}-\d{2})/)||[])[1]||'';
-const EMPTY=()=>({players:[],sessions:[],loans:[],expenses:[],settle:null,initLoan:500,game:null,readme:null,rules:null,groupName:'',bills:[],billSettle:null,feed:[]});
+const EMPTY=()=>({players:[],sessions:[],loans:[],expenses:[],settle:null,initLoan:500,game:null,readme:null,rules:null,groupName:'',bills:[],billSettle:null,feed:[],events:[]});
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
 const canon=x=>JSON.stringify(x,(k,v)=>v&&typeof v=='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(q=>[q,v[q]])):v);
-const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],expenses:S.expenses||[],settle:S.settle||null,initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:null,groupName:typeof S.groupName=='string'?S.groupName:'',bills:(S.bills||[]),billSettle:S.billSettle||null,feed:feed});
-function getState(){if(!Array.isArray(sessions))sessions=[];if(!Array.isArray(loans))loans=[];if(!Array.isArray(expenses))expenses=[];if(!Array.isArray(bills))bills=[];if(!Array.isArray(feed))feed=[];if(!Array.isArray(players))players=[];sessions.forEach(x=>{if(!x.id)x.id=uid()});loans.forEach(l=>{if(!l.id)l.id=uid()});expenses.forEach(e=>{if(!e.id)e.id=uid()});
- return{players:[...players],sessions:sessions.map(x=>({id:x.id,date:(x.date||''),label:(x.label||''),v:(x.v&&typeof x.v==='object')?{...x.v}:{}})),loans:loans.map(l=>({id:l.id,date:l.date,who:l.who,amt:l.amt,src:l.src||null,g:l.g||'',done:!!l.done})),initLoan,game:game?{date:game.date,players:Array.isArray(game.players)?[...game.players]:[],exited:(game.exited&&typeof game.exited==='object')?{...game.exited}:{},settledPrior:(game.settledPrior&&typeof game.settledPrior==='object')?{...game.settledPrior}:{}}:null,readme,rules,groupName,expenses:expenses.map(e=>({id:e.id,date:e.date||'',desc:e.desc||'',paidBy:e.paidBy,amt:e.amt,split:e.split&&e.split.length?[...e.split]:null,g:e.g||'',done:!!e.done})),settle:settle?JSON.parse(JSON.stringify(settle)):null,bills:[],feed:(feed||[]).slice(0,40).map(x=>({id:x.id,at:x.at,text:x.text||''})),billSettle:billSettle?JSON.parse(JSON.stringify(billSettle)):null}}
+const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],expenses:S.expenses||[],settle:S.settle||null,initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:null,groupName:typeof S.groupName=='string'?S.groupName:'',bills:(S.bills||[]),billSettle:S.billSettle||null,feed:Array.isArray(S.feed)?S.feed:[],events:Array.isArray(S.events)?S.events:[]});
+function getState(){if(!Array.isArray(sessions))sessions=[];if(!Array.isArray(loans))loans=[];if(!Array.isArray(expenses))expenses=[];if(!Array.isArray(bills))bills=[];if(!Array.isArray(feed))feed=[];if(!Array.isArray(events))events=[];if(!Array.isArray(players))players=[];sessions.forEach(x=>{if(!x.id)x.id=uid()});loans.forEach(l=>{if(!l.id)l.id=uid()});expenses.forEach(e=>{if(!e.id)e.id=uid()});
+ return{players:[...players],sessions:sessions.map(x=>({id:x.id,date:(x.date||''),label:(x.label||''),v:(x.v&&typeof x.v==='object')?{...x.v}:{}})),loans:loans.map(l=>({id:l.id,date:l.date,who:l.who,amt:l.amt,src:l.src||null,g:l.g||'',done:!!l.done})),initLoan,game:game?{date:game.date,players:Array.isArray(game.players)?[...game.players]:[],exited:(game.exited&&typeof game.exited==='object')?{...game.exited}:{},settledPrior:(game.settledPrior&&typeof game.settledPrior==='object')?{...game.settledPrior}:{}}:null,readme,rules,groupName,expenses:expenses.map(e=>({id:e.id,date:e.date||'',desc:e.desc||'',paidBy:e.paidBy,amt:e.amt,split:e.split&&e.split.length?[...e.split]:null,g:e.g||'',done:!!e.done})),settle:settle?JSON.parse(JSON.stringify(settle)):null,bills:[],feed:(feed||[]).slice(0,40).map(x=>({id:x.id,at:x.at,text:x.text||''})),events:(events||[]).map(ev=>({id:ev.id,msg:ev.msg||'',date:ev.date||'',at:ev.at||0,by:ev.by||'',rsvps:Array.isArray(ev.rsvps)?ev.rsvps.map(r=>({name:r.name||'',status:r.status||'yes',at:r.at||0})):[]})),billSettle:billSettle?JSON.parse(JSON.stringify(billSettle)):null}}
 function applyState(S){S=norm(S);players=Array.isArray(S.players)?[...S.players]:[];
  sessions=(Array.isArray(S.sessions)?S.sessions:[]).map(x=>{const v=(x&&x.v&&typeof x.v==='object')?{...x.v}:{};return{...(x||{}),v}});
  loans=(Array.isArray(S.loans)?S.loans:[]).map(l=>({...(l||{})}));
@@ -1020,12 +1092,13 @@ function applyState(S){S=norm(S);players=Array.isArray(S.players)?[...S.players]
  bills=(Array.isArray(S.bills)?S.bills:[]).map(e=>({...(e||{})}));billSettle=S.billSettle||null;
  // One-time migrate old independent bills into expenses
  if(bills.length){const ids=new Set(expenses.map(e=>e.id).filter(Boolean));bills.forEach(b=>{if(!b)return;const id=b.id||uid();if(!ids.has(id)){expenses.push({...b,id});ids.add(id)}});bills=[]}
- feed=Array.isArray(S.feed)?S.feed.map(x=>({id:x&&x.id,at:x&&x.at,text:x&&x.text||''})).filter(x=>x.text):[]
+ feed=Array.isArray(S.feed)?S.feed.map(x=>({id:x&&x.id,at:x&&x.at,text:x&&x.text||''})).filter(x=>x.text):[];
+ events=Array.isArray(S.events)?S.events.map(ev=>({id:ev&&ev.id||uid(),msg:(ev&&ev.msg)||'',date:(ev&&ev.date)||'',at:(ev&&ev.at)||0,by:(ev&&ev.by)||'',rsvps:Array.isArray(ev&&ev.rsvps)?ev.rsvps.map(r=>({name:(r&&r.name)||'',status:(r&&r.status)||'yes',at:(r&&r.at)||0})).filter(r=>r.name):[]})).filter(ev=>ev.msg||ev.date):[];
 
  if(!game){gc=false;finals={}}sortS();if(gid&&groupName)saveRecent(gid,groupName)}
 function mergeState(b,l,r){const o=norm(JSON.parse(JSON.stringify(r)));b=norm(b);
  l.players.forEach(p=>{if(!o.players.includes(p))o.players.push(p)});b.players.forEach(p=>{if(!l.players.includes(p))o.players=o.players.filter(x=>x!==p)});
- ['sessions','loans','expenses','bills'].forEach(k=>{const bm=new Map(b[k].map(x=>[x.id,canon(x)])),lm=new Set(l[k].map(x=>x.id));
+ ['sessions','loans','expenses','bills','events'].forEach(k=>{const bm=new Map(b[k].map(x=>[x.id,canon(x)])),lm=new Set(l[k].map(x=>x.id));
   l[k].forEach(x=>{const i=o[k].findIndex(y=>y.id===x.id),was=bm.get(x.id);if(was===undefined){if(i<0)o[k].push(x)}else if(was!==canon(x)){if(i>=0)o[k][i]=x;else o[k].push(x)}});
   b[k].forEach(x=>{if(!lm.has(x.id)){const i=o[k].findIndex(y=>y.id===x.id);if(i>=0)o[k].splice(i,1)}})});
  if(l.initLoan!==b.initLoan)o.initLoan=l.initLoan;if(canon(l.settle)!==canon(b.settle))o.settle=l.settle;if(l.readme!==b.readme)o.readme=l.readme;if(l.rules!==b.rules)o.rules=l.rules;if(l.groupName!==b.groupName)o.groupName=l.groupName;if(canon(l.game)!==canon(b.game))o.game=l.game;if(canon(l.billSettle)!==canon(b.billSettle))o.billSettle=l.billSettle;return o}
@@ -1080,7 +1153,7 @@ function render(){try{
  document.body.classList.toggle('mode-hub',!appMode);
  document.body.classList.toggle('mode-poker',appMode==='poker');
  document.body.classList.toggle('mode-bills',appMode==='bills');
- document.body.classList.toggle('mode-feed',appMode==='feed');
+ document.body.classList.toggle('mode-rsvp',appMode==='rsvp');
  if(!appMode){
   $('#v').innerHTML=hubScreen();
   setSync(cs);
@@ -1095,8 +1168,8 @@ function render(){try{
   try{syncUploadBtn()}catch(e){}
   queueMicrotask(()=>{try{persist()}catch(e){console.error(e)}});return;
  }
- if(appMode==='feed'){
-  $('#v').innerHTML=feedView();
+ if(appMode==='rsvp'){
+  $('#v').innerHTML=rsvpView();
   setSync(cs);
   ['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el)el.style.display='none'});
   try{syncUploadBtn()}catch(e){}
@@ -1111,6 +1184,53 @@ function render(){try{
 }
 function renderSafe(){const a=document.activeElement;if(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)){pendingRender=true;return}render()}
 function reconcile(S){base=norm(S);lastSent='';try{if(canon(getState())!==canon(base)){applying=true;try{applyState(base)}catch(e){console.error(e)}applying=false;renderSafe()}}catch(e){console.error('reconcile',e);applying=false;renderSafe()}setSync(navigator.onLine===false?'offline':'live')}
+async function persistEvents(){
+ /* Allow anyone with group access (including view-only) to create/RSVP events */
+ if(!cloudOn||!synced||applying||!window.cloud||!gid)return;
+ let L;try{L=getState()}catch(e){console.error(e);return}
+ const B=base||EMPTY();
+ // Keep all other fields from base; only push events from local
+ const payload={...B,events:(L.events||[]).map(ev=>({id:ev.id,msg:ev.msg||'',date:ev.date||'',at:ev.at||0,by:ev.by||'',rsvps:Array.isArray(ev.rsvps)?ev.rsvps.map(r=>({name:r.name||'',status:r.status||'yes',at:r.at||0})):[]}))};
+ const c=canon(payload);if(c===canon(B)||c===lastSent)return;
+ lastSent=c;inflight++;setSync('saving');
+ try{
+  const out=await cloud.commit(gid,rj=>{
+   const remote=rj?JSON.parse(rj):EMPTY();
+   const remE=Array.isArray(remote.events)?remote.events:[];
+   const locE=Array.isArray(payload.events)?payload.events:[];
+   const byId=new Map();
+   remE.forEach(e=>{if(e&&e.id)byId.set(e.id,{...e,rsvps:Array.isArray(e.rsvps)?e.rsvps.map(r=>({...r})):[]})});
+   locE.forEach(e=>{
+    if(!e||!e.id)return;
+    if(!byId.has(e.id)){byId.set(e.id,{...e,rsvps:Array.isArray(e.rsvps)?e.rsvps.map(r=>({...r})):[]});return}
+    const cur=byId.get(e.id);
+    // Local may have deleted — if missing from loc entirely we keep remote (handled by locE loop only updating present ids)
+    // Merge rsvps by name (case-insensitive), newer at wins
+    const rmap=new Map();
+    (cur.rsvps||[]).forEach(r=>{if(r&&r.name)rmap.set(String(r.name).toLowerCase(),{...r})});
+    (e.rsvps||[]).forEach(r=>{
+     if(!r||!r.name)return;
+     const k=String(r.name).toLowerCase();
+     const prev=rmap.get(k);
+     if(!prev||(r.at||0)>=(prev.at||0))rmap.set(k,{name:r.name,status:r.status||'yes',at:r.at||0});
+    });
+    cur.rsvps=[...rmap.values()];
+    // Prefer local msg/date if local is newer
+    if((e.at||0)>=(cur.at||0)){cur.msg=e.msg||cur.msg;cur.date=e.date||cur.date;cur.at=e.at||cur.at;cur.by=e.by||cur.by}
+   });
+   // Deletions: if editor deleted, local list is missing that id vs base
+   const baseIds=new Set((B.events||[]).map(e=>e.id));
+   const locIds=new Set(locE.map(e=>e.id));
+   baseIds.forEach(id=>{if(!locIds.has(id))byId.delete(id)});
+   const merged={...remote,events:[...byId.values()]};
+   return JSON.stringify(merged);
+  });
+  base=norm(JSON.parse(out));
+  applying=true;try{applyState(base)}catch(e){console.error(e)}applying=false;
+  cs=navigator.onLine===false?'offline':'live';setSync(cs);
+ }catch(e){console.error('persistEvents',e);cs='error';setSync(cs);toast('Could not save RSVP — check connection')}
+ finally{inflight=Math.max(0,inflight-1);if(!inflight&&cs==='saving')setSync(navigator.onLine===false?'offline':'live')}
+}
 async function persist(){if(!cloudOn||!synced||applying||!window.cloud)return;let L,c;try{L=getState();c=canon(L)}catch(e){console.error('getState',e);return}if(c===canon(base||EMPTY())||c===lastSent)return;
  if(!canEdit()){applying=true;applyState(base||EMPTY());applying=false;toast('View only: enter the password to make changes');renderSafe();return}
  lastSent=c;inflight++;setSync('saving');
@@ -1407,7 +1527,7 @@ function startCloud(){if(!gid)return;
     if(pendingOrgPass){const pw=pendingOrgPass,setG=pendingSetGlobal,ep=pendingEditPw;pendingOrgPass=null;pendingSetGlobal=false;pendingEditPw=null;try{const salt=randHex(16),iter=150000,hash=await hashPass(pw,salt,iter);const payload=JSON.stringify({salt,iter,hash});await cloud.put(gid,'organiser',payload);if(ep){const s2=randHex(16),h2=await hashPass(ep,s2,150000);await cloud.put(gid,'access',JSON.stringify({salt:s2,iter:150000,hash:h2}));access={salt:s2,iter:150000,hash:h2};accessLoaded=true;lastCode=ep.slice(0,4)+'-'+ep.slice(4)}if(setG)await cloud.put(CFG,'createpass',payload);orgInfo={salt,iter,hash};orgLoaded=true;markOrganiser();await registerGroup(gid,groupName);if(gen===connGen)render()}catch(e){toast('Could not save admin password — set it on the Backups tab')}}
     else if(gen===connGen){render();queueMicrotask(()=>{try{persist()}catch(e){}})} })();return}
   if(inflight)return;reconcile(S)},e=>{if(gen!==connGen)return;cloudErr=((e&&e.code)||'error')+': '+((e&&e.message)||'');cs='error';synced=false;render()})}
-function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};bills=[];billSettle=null;billDraft={desc:'',amt:'',paid:'',shared:{}};feed=[];appMode='';billTab='list';xgrp={busy:false,err:'',list:[],picked:{},playerPicked:{},data:{},combined:null};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
+function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};bills=[];billSettle=null;billDraft={desc:'',amt:'',paid:'',shared:{}};feed=[];events=[];appMode='';billTab='list';xgrp={busy:false,err:'',list:[],picked:{},playerPicked:{},data:{},combined:null};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
 function setGroup(code,name,opts){const nm=(name!=null?String(name):'').trim().slice(0,40);const doReg=opts&&opts.register;gid=code;saveRecent(code,nm||code.slice(0,8));try{localStorage.setItem('ptc_group',code);history.replaceState(null,'','#g='+code)}catch(e){}clearLocal();groupName=nm;cs='connecting';synced=false;if(window.cloud&&cloud.stop){try{cloud.stop()}catch(e){}}startCloud();render();if(doReg)queueMicrotask(()=>registerGroup(code,nm).catch(()=>{}))}
 async function checkAppUpdate(){
   if(!('serviceWorker' in navigator))return{updated:false,reason:'no-sw'};
