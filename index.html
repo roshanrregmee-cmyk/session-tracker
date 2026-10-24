@@ -364,7 +364,7 @@ function rsvpView(){
      <div class="mut" style="margin-top:4px">📆 ${E(when)}${E(timeStr)}${foodOn?' · 🍽 food':''}${ev.by?' · by '+E(ev.by):''}</div></div>
     <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
      <button type="button" data-evshare="${E(ev.id)}" style="padding:6px 10px;font-size:12px">Share</button>
-     <button type="button" data-evdel="${E(ev.id)}" style="padding:6px 10px;font-size:12px">Delete</button>
+     ${canEdit()?`<button type="button" data-evdel="${E(ev.id)}" style="padding:6px 10px;font-size:12px">Delete</button>`:''}
     </div>
    </div>
    <div style="display:flex;gap:10px;flex-wrap:wrap;margin:12px 0 8px;font-size:13px">
@@ -486,7 +486,7 @@ function chipsView(){
       <div style="font-weight:800">${E(b.who)}${active?' <span style="background:#dbeafe;color:#1e40af;font-size:11px;padding:2px 8px;border-radius:999px;margin-left:4px">NOW</span>':''}</div>
       <div class="mut" style="margin-top:2px">${E(b.from)} → ${E(b.to)}${b.note?' · '+E(b.note):''}</div>
      </div>
-     <button type="button" data-chdel="${E(b.id)}" style="flex-shrink:0;padding:6px 10px;font-size:12px">Remove</button>
+     ${canEdit()?`<button type="button" data-chdel="${E(b.id)}" style="flex-shrink:0;padding:6px 10px;font-size:12px">Remove</button>`:''}
     </div>`;
   };
   h+=`<div class="card"><b>Bookings</b>`;
@@ -1100,6 +1100,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   };
   share();return}
  if(g('data-evdel')){
+  if(!canEdit())return toast('View only: only editors can delete events');
   const id=g('data-evdel').dataset.evdel;
   if(!confirm('Delete this event and all RSVPs?'))return;
   events=(events||[]).filter(ev=>ev.id!==id);
@@ -1146,6 +1147,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   chipsBookings.push({id:uid(),who,from:fr,to,note,at:Date.now()});
   render();toast('Booked for '+who);queueMicrotask(()=>{try{persistChips()}catch(e){console.error(e)}});return}
  if(g('data-chdel')){
+  if(!canEdit())return toast('View only: only editors can remove chips bookings');
   const id=g('data-chdel').dataset.chdel;
   if(!confirm('Remove this chips booking?'))return;
   chipsBookings=(chipsBookings||[]).filter(b=>b.id!==id);
@@ -1825,7 +1827,7 @@ async function checkAppUpdate(){
     return{updated:false,reason:hadWaiting?'activated':'latest'};
   }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
 }
-const CACHE_HINT='session-tracker-v57';
+const CACHE_HINT='session-tracker-v58';
 async function hardReloadApp(){
   try{
     if('caches' in window){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}
