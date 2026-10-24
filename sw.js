@@ -1,5 +1,5 @@
 // Basic Service Worker for Session Tracker PWA
-const CACHE_NAME = 'session-tracker-v45';
+const CACHE_NAME = 'session-tracker-v49';
 const ASSETS = [
   './',
   './index.html',
@@ -21,6 +21,13 @@ self.addEventListener('install', (event) => {
     })
   );
   self.skipWaiting();
+});
+
+// Allow page refresh button to activate waiting worker immediately
+self.addEventListener('message', (event) => {
+  if (event && event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 // Activate - clean old caches

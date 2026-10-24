@@ -123,23 +123,23 @@ input:focus,select:focus{outline:none;border-color:var(--ac);box-shadow:0 0 0 3p
 .ind{font-size:10px;color:var(--mut);white-space:nowrap;border:1px solid var(--bd);border-radius:999px;padding:2px 8px;background:var(--card);font-weight:600}.ind:empty{display:none}
 .rbtn{width:28px;height:28px;padding:0;font-size:15px;line-height:1;border-radius:50%}
 .srt{display:flex;gap:8px;margin:0 0 8px;font-size:12px}.srt label{flex:1;display:flex;align-items:center;gap:5px;min-width:0;margin:0}.srt select{flex:1;min-width:0;font-size:12px;padding:3px 6px}
-/* join screen — full viewport, no scroll, floating king */
-.nogrp{overflow:hidden!important;height:100dvh;height:100vh}
-.nogrp body,.nogrp{overscroll-behavior:none}
-body.nogrp{overflow:hidden!important;height:100dvh;height:100vh;touch-action:manipulation}
-html.nogrp{overflow:hidden!important;height:100dvh;height:100vh}
-body.nogrp main{padding:0!important;margin:0!important;max-width:none;height:100dvh;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;position:relative}
+/* join screen — centered, floating king, scroll only if needed (e.g. keyboard) */
+.nogrp{overscroll-behavior:none}
+body.nogrp{min-height:100dvh;min-height:100vh;touch-action:manipulation}
+html.nogrp{min-height:100dvh;min-height:100vh}
+body.nogrp main{padding:12px 0 24px!important;margin:0!important;max-width:none;min-height:100dvh;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;box-sizing:border-box}
 body.nogrp .topbar{position:static;margin:0;padding:0;background:transparent;border:0;box-shadow:none;width:100%;display:flex;flex-direction:column;align-items:center}
 body.nogrp .intro,.nogrp .intro{display:none!important}
 .nogrp .hd{justify-content:center;margin:0;padding:0}
 .nogrp h1{justify-content:center;margin:0 0 8px;padding:0;position:relative;z-index:2}
 .nogrp h1 .ttl{display:none}
 .nogrp h1 img{
-  height:min(42vw,168px)!important;width:min(42vw,168px)!important;margin:0!important;
+  height:min(34vw,132px)!important;width:min(34vw,132px)!important;margin:0!important;
   border-radius:28%;
   box-shadow:0 18px 40px -10px rgba(255,61,129,.55),0 8px 20px -8px rgba(255,138,31,.4);
   animation:kingFloat 3.2s ease-in-out infinite,kingGlow 2.4s ease-in-out infinite alternate;
   transform-origin:50% 60%;
+  will-change:transform;
 }
 @keyframes kingFloat{
   0%,100%{transform:translateY(0) rotate(-2deg)}
@@ -154,7 +154,8 @@ body.nogrp .intro,.nogrp .intro{display:none!important}
   .nogrp h1 img{animation:none}
 }
 .nogrp #v{width:100%;max-width:420px;padding:0 20px;box-sizing:border-box;position:relative;z-index:2}
-.jn{max-width:400px;margin:0 auto;display:flex;flex-direction:column;gap:14px;align-items:stretch}
+.jn{max-width:400px;margin:0 auto;display:flex;flex-direction:column;gap:14px;align-items:stretch;position:relative;z-index:3;width:100%}
+.jn .jn-title{color:var(--ac)} /* fallback if background-clip unsupported */
 .jn .jn-title{
   text-align:center;font-size:clamp(22px,6vw,30px);font-weight:800;letter-spacing:-.5px;
   background:linear-gradient(90deg,var(--g1),var(--g2) 55%,#c026d3);
@@ -267,7 +268,7 @@ body.mode-bills .topbar .tabs{display:none}
 #enterBtn{color:#e9366f;border:0;box-shadow:0 12px 26px -10px rgba(0,0,0,.45)}
 </style></head><body><div id="welcome"><img src="icon-512.png" alt=""><h2>Welcome Folks! 👑</h2><button id="enterBtn" type="button">Enter</button></div><main>
 <div class="topbar">
-<div class="hd"><h1><img src="icon-192.png" alt="" style="height:1.15em;width:1.15em;border-radius:22%;vertical-align:-0.2em;margin-right:.3em"><span class="ttl" id="ttl"></span></h1><span id="ind" class="ind"></span><button id="gref" class="rbtn" title="Refresh data from cloud" aria-label="Refresh">↻</button></div>
+<div class="hd"><h1><img src="icon-192.png" alt="" style="height:1.15em;width:1.15em;border-radius:22%;vertical-align:-0.2em;margin-right:.3em"><span class="ttl" id="ttl"></span></h1><span id="ind" class="ind"></span><button id="gref" class="rbtn" title="Refresh live data · check for app update" aria-label="Refresh">↻</button></div>
 <div class="intro mut">Add sessions, track loans and expenses.</div>
 <div class="tabs"><button data-t="hist">History</button><button data-t="add">New session</button><button data-t="loans">Loans</button><button data-t="expenses">Expenses</button><button data-t="dash">Dashboard</button><button data-t="backup">Backups</button><button data-t="rules">Rules</button></div>
 </div>
@@ -933,7 +934,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(t.id=='orgrm'){removePass()}
  else if(t.id=='bkfull'){guard('restore a backup',()=>{if(bk.full&&confirm('Replace ALL shared data (sessions, loans, players and any game in progress) with this backup, for everyone?')){applyState(JSON.parse(bk.full.json));tab='hist';render();toast('Backup restored')}})}
  else if(t.id=='bkstd'){guard('restore the standing',()=>{if(bk.standing&&confirm('Replace the current game and its loans with this saved standing?')){const d=JSON.parse(bk.standing.json);loans=loans.filter(l=>l.done).concat(d.loans.map(l=>({...l})));expenses=expenses.filter(e=>e.done).concat((d.expenses||[]).map(e=>({...e,id:e.id||uid()})));game={date:d.game.date,players:[...d.game.players]};initLoan=d.initLoan;d.game.players.forEach(q=>{if(!players.includes(q))players.push(q)});gc=false;finals={};loanDraft={};tab='loans';render();toast('Standing restored')}})}
- else if(t.id=='gjoin'){const c=($('#gc_in').value||'').trim();if(!/^[A-Za-z0-9_-]{8,40}$/.test(c))return toast('Use 8 to 40 letters, numbers, - or _');openExistingGroup(c,$('#gp_in')?$('#gp_in').value:'')}
+ else if(t.id=='gjoin'){const c=($('#gc_in').value||'').trim();if(!/^[A-Za-z0-9_-]{8,40}$/.test(c))return toast('Use 8 to 40 letters, numbers, - or _');const btn=$('#gjoin');if(btn){btn.disabled=true;btn.textContent='Connecting…'}toast('Connecting to group…');Promise.resolve(openExistingGroup(c,$('#gp_in')?$('#gp_in').value:'')).finally(()=>{const b=$('#gjoin');if(b){b.disabled=false;b.textContent='Join the table ✨'}})}
  else if(t.id=='gnew'){createNewGroup()}
  else if(t.id=='gadminlogin'){adminLogin()}
  else if(t.id=='gnew2'){adminCreate()}
@@ -944,7 +945,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(g('data-gdel')){deleteGroupFully(g('data-gdel').dataset.gdel)}
  else if(t.id=='gadmin'){guard('manage all groups',()=>{loadGroupAdmin()})}
  else if(g('data-gcopy')){copyLink()}
- else if(t.id=='gref'){refreshGroup();if(tab=='backup')setTimeout(loadBackups,1500)}
+ else if(t.id=='gref'||t.id=='gref2'){refreshGroup();if(tab=='backup')setTimeout(loadBackups,1500)}
  else if(g('data-gleave')){if(confirm('Leave this group on this device? The shared data stays in the cloud.'))leaveGroup()}
  else if(g('data-gswitch')){if(confirm('Switch to another group? You can return later from Recent groups.'))switchGroupUI()}
  else if(g('data-gsw')){openExistingGroup(g('data-gsw').dataset.gsw)}
@@ -962,7 +963,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   game.players=game.players.filter(x=>x!==p);
   delete finals[p];delete loanDraft[p];
   if(gc&&!game.players.length)gc=false;
-  persist();render();toast(p+' cashed out · '+(result>0?'+':'')+result+' · can rejoin later')}
+  render();queueMicrotask(()=>{try{persist()}catch(e){}});toast(p+' cashed out · '+(result>0?'+':'')+result+' · can rejoin later')}
  else if(t.id=='gcb'){gc=!gc;render();if(gc){requestAnimationFrame(()=>{const el=document.getElementById('gcPanel');if(el)el.scrollIntoView({behavior:'smooth',block:'center'})})}}
 
  else if(t.id=='jb'){if(!game)return;let n=($('#jn').value||'').trim();if(!n)return toast('Enter a player name');n=players.find(q=>q.toLowerCase()==n.toLowerCase())||n;
@@ -974,15 +975,15 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
     if(club){
       delete game.exited[exitedKey];
       if(game.settledPrior){const pk=Object.keys(game.settledPrior).find(k=>k.toLowerCase()===n.toLowerCase());if(pk!==undefined)delete game.settledPrior[pk]}
-      game.players.push(n);plays[n]=true;persist();render();toast(n+' rejoined — results will be clubbed');
+      game.players.push(n);plays[n]=true;render();queueMicrotask(()=>{try{persist()}catch(e){}});toast(n+' rejoined — results will be clubbed');
     }else{
       if(!confirm('Keep the cashed-out result ('+rs+') as already settled and start a new buy-in for '+n+'?'))return;
       if(!game.settledPrior)game.settledPrior={};
       game.settledPrior[n]=(game.settledPrior[n]||0)+r;
       delete game.exited[exitedKey];
-      game.players.push(n);plays[n]=true;persist();render();toast(n+' rejoined — prior cash-out kept as settled');
+      game.players.push(n);plays[n]=true;render();queueMicrotask(()=>{try{persist()}catch(e){}});toast(n+' rejoined — prior cash-out kept as settled');
     }
-  }else{game.players.push(n);plays[n]=true;persist();render();toast(n+' added to the game')}}}
+  }else{game.players.push(n);plays[n]=true;render();queueMicrotask(()=>{try{persist()}catch(e){}});toast(n+' added to the game')}}
  else if(t.id=='gfin-early'){if(!game||!(game.exited&&Object.keys(game.exited).length))return;
   const prior={...(game.settledPrior||{})},res={...game.exited};
   Object.keys(prior).forEach(p=>{res[p]=Math.round(((res[p]||0)+prior[p])*100)/100});
@@ -1231,7 +1232,7 @@ async function deleteGroupFully(code){
 }
 async function openExistingGroup(code,pw,asAdmin,silent){
  if(!code)return;
- if(!(await ensureCloud()))return toast('Could not connect. Check your internet and try again.');
+ if(!(await ensureCloud())){toast('Could not connect. Check your internet and try again.');try{render()}catch(e){}return;}
  try{const del=await window.cloud.get(code,'deleted');if(del&&del.json&&del.json!=='null'){removeRecent(code);try{localStorage.removeItem('ptc_group');history.replaceState(null,'',location.pathname)}catch(e){}if(!silent)toast('This group no longer exists.');return}}catch(e){}
  try{localStorage.removeItem('ptc_view_'+code);localStorage.removeItem('ptc_edit_'+code);localStorage.removeItem('ptc_org_'+code)}catch(e){}
  if(asAdmin){pendingOrgPass=adminPw;pendingSetGlobal=false}
@@ -1450,15 +1451,68 @@ function startCloud(){if(!gid)return;
   if(inflight)return;reconcile(S)},e=>{if(gen!==connGen)return;cloudErr=((e&&e.code)||'error')+': '+((e&&e.message)||'');cs='error';synced=false;render()})}
 function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};bills=[];billSettle=null;billDraft={desc:'',amt:'',paid:'',shared:{}};feed=[];appMode='';billTab='list';xgrp={busy:false,err:'',list:[],picked:{},playerPicked:{},data:{},combined:null};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
 function setGroup(code,name,opts){const nm=(name!=null?String(name):'').trim().slice(0,40);const doReg=opts&&opts.register;gid=code;saveRecent(code,nm||code.slice(0,8));try{localStorage.setItem('ptc_group',code);history.replaceState(null,'','#g='+code)}catch(e){}clearLocal();groupName=nm;cs='connecting';synced=false;if(window.cloud&&cloud.stop){try{cloud.stop()}catch(e){}}startCloud();render();if(doReg)queueMicrotask(()=>registerGroup(code,nm).catch(()=>{}))}
-function refreshGroup(){if(!gid){location.reload();return}if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;synced=false;cs='connecting';accessLoaded=false;viewLoaded=false;orgLoaded=false;base=null;lastSent='';inflight=0;startCloud();render();toast('Refreshing…')}
+async function checkAppUpdate(){
+  if(!('serviceWorker' in navigator))return{updated:false,reason:'no-sw'};
+  try{
+    let reg=await navigator.serviceWorker.getRegistration();
+    if(!reg){try{reg=await navigator.serviceWorker.register('./sw.js')}catch(e){return{updated:false,reason:'reg-fail'}}}
+    const hadWaiting=!!reg.waiting;
+    try{await reg.update()}catch(e){}
+    const waiting=reg.waiting||(reg.installing&&null);
+    if(reg.waiting){
+      return await new Promise(resolve=>{
+        let done=false;
+        const finish=()=>{if(done)return;done=true;resolve({updated:true,reason:'new-sw'})};
+        navigator.serviceWorker.addEventListener('controllerchange',()=>{finish();window.location.reload()}, {once:true});
+        try{reg.waiting.postMessage({type:'SKIP_WAITING'})}catch(e){}
+        setTimeout(()=>{if(!done){done=true;try{caches.keys().then(ks=>Promise.all(ks.map(k=>caches.delete(k)))).finally(()=>location.reload())}catch(e){location.reload()}resolve({updated:true,reason:'timeout-reload'})}},2500);
+      });
+    }
+    // No waiting worker — fetch live sw.js; if cache name differs, clear caches & reload
+    try{
+      const res=await fetch('./sw.js?_=' + Date.now(),{cache:'no-store'});
+      if(res&&res.ok){
+        const text=await res.text();
+        const mNew=(text.match(/session-tracker-v\d+/)||[])[0];
+        if(mNew&&mNew!==CACHE_HINT){
+          if('caches' in window){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}
+          try{const regs=await navigator.serviceWorker.getRegistrations();await Promise.all(regs.map(r=>r.unregister()))}catch(e){}
+          location.reload();
+          return{updated:true,reason:'new-deploy'};
+        }
+      }
+    }catch(e){}
+    return{updated:false,reason:hadWaiting?'activated':'latest'};
+  }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
+}
+const CACHE_HINT='session-tracker-v49';
+async function refreshGroup(){
+  toast('Checking for app update…');
+  let upd={updated:false};
+  try{upd=await checkAppUpdate()}catch(e){}
+  if(upd&&upd.updated){toast('Updating app…');return}
+  if(!gid){toast('App is up to date');location.reload();return}
+  if(window.cloud&&cloud.stop)cloud.stop();
+  cloudOn=false;synced=false;cs='connecting';accessLoaded=false;viewLoaded=false;orgLoaded=false;base=null;lastSent='';inflight=0;
+  startCloud();render();toast('App up to date · syncing live data…')
+}
 function leaveGroup(){connGen++;if(window._connTimer){clearTimeout(window._connTimer);window._connTimer=null}adminOpen=false;adminPw=null;if(gid){saveRecent(gid,groupName||gid.slice(0,8));try{localStorage.removeItem(viewKey());localStorage.removeItem(editKey())}catch(e){}}if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;gid='';try{localStorage.removeItem('ptc_group');history.replaceState(null,'',location.pathname)}catch(e){}clearLocal();render()}
 function switchGroupUI(){tab='hist';leaveGroup()}
 function randCode(){const a='abcdefghjkmnpqrstuvwxyz23456789';let s='';crypto.getRandomValues(new Uint8Array(14)).forEach(x=>{s+=a[x%a.length]});return s}
 function copyLink(){const u=gid;if(navigator.clipboard)navigator.clipboard.writeText(u).then(()=>toast('Group code copied')).catch(()=>prompt('Copy this group code',u));else prompt('Copy this group code',u)}
 document.addEventListener('focusout',()=>{if(pendingRender)setTimeout(()=>{const a=document.activeElement;if(!(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName))){pendingRender=false;render()}},60)});
 window.addEventListener('online',()=>{if(cloudOn){setSync('live');persist()}});window.addEventListener('offline',()=>setSync('offline'));
-if(gid){const boot=gid;gid='';(async()=>{try{await openExistingGroup(boot,'',false,true)}catch(e){console.error(e)}finally{if(!gid)render();else if(!synced)render()}})()}
-else{try{render()}catch(e){console.error(e);document.body.insertAdjacentHTML('beforeend','<pre style="padding:16px;color:red">Start error: '+e.message+'</pre>')}}
+;(function bootApp(){
+  const bootGid=gid;
+  if(bootGid)gid='';
+  try{render()}catch(e){console.error(e);try{document.body.insertAdjacentHTML('beforeend','<pre style="padding:16px;color:red">Start error: '+e.message+'</pre>')}catch(x){}}
+  if(!bootGid)return;
+  (async()=>{
+    try{await openExistingGroup(bootGid,'',false,true)}
+    catch(e){console.error(e)}
+    finally{try{if(!gid)render();else if(!synced)render()}catch(e){console.error(e)}}
+  })();
+})();
 </script>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
@@ -1484,8 +1538,15 @@ window.dispatchEvent(new Event('cloudready'));
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js')
-      .then(reg => console.log('Service Worker registered', reg.scope))
+      .then(reg => {
+        console.log('Service Worker registered', reg.scope);
+        setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 60 * 1000);
+      })
       .catch(err => console.log('Service Worker registration failed', err));
+  });
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    // New SW took over after SKIP_WAITING — optional soft flag
+    try { sessionStorage.setItem('sw_updated', '1'); } catch (e) {}
   });
 }
 </script>
@@ -1499,9 +1560,13 @@ if ('serviceWorker' in navigator) {
   if(seen){try{w.remove()}catch(e){}return;}
   function dismiss(ev){
     if(ev){try{ev.preventDefault();ev.stopPropagation()}catch(e){}}
+    if(w.dataset.done==='1')return;
+    w.dataset.done='1';
     try{sessionStorage.setItem('welcomed','1')}catch(e){}
     w.classList.add('hide');
-    setTimeout(function(){try{w.remove()}catch(e){}},400);
+    w.style.pointerEvents='none';
+    try{if(typeof render==='function')render()}catch(e){}
+    setTimeout(function(){try{w.remove()}catch(e){}},350);
   }
   var btn=document.getElementById('enterBtn');
   if(btn){
