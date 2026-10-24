@@ -1121,12 +1121,12 @@ const TT={trends:'Trend Comments',loans:'Current standing',loantbl:'Current stan
 function drawDash0(d){
  const st=stats(),k=kpis(),ds=sessions.map(s=>s.date).filter(Boolean).sort(),[win,loss]=split(st),[lo,hi]=rng(st),C=cum(),n=sessions.length,rc=recs();
  const sr=series(),per=PERIOD.N>n?` of ${PERIOD.N} (${PERIOD.txt})`:'';
- const T=(t,x,y)=>{d.setFont('helvetica','bold').setFontSize(9).setTextColor(20).text(t,x,y);d.setFont('helvetica','normal')};
+ const T=(t,x,y)=>{d.setFont('helvetica','bold').setFontSize(10).setTextColor(20).text(t,x,y);d.setFont('helvetica','normal')};
  const box=(x,y,w,h)=>d.setDrawColor(215).setLineWidth(.3).roundedRect(x,y,w,h,2,2);
  const axes=(X0,X1,Y0,Y1,l,h,xt)=>{d.setDrawColor(210).setLineWidth(.2).rect(X0,Y0,X1-X0,Y1-Y0);d.setFontSize(6).setTextColor(110);
   for(let i=0;i<4;i++){const v=l+(h-l)*i/3;d.text(Math.round(v).toLocaleString(),X0-1,Y1-(v-l)/(h-l)*(Y1-Y0)+1,{align:'right'})}
   xt.forEach(q=>d.text(q[0],X0+q[1]*(X1-X0),Y1+4,{align:'center'}));const zy=Y1-(0-l)/(h-l)*(Y1-Y0);d.setDrawColor(130).line(X0,zy,X1,zy)};
- const pp=(items,x,y,w,h,hole)=>{const r=Math.min(h/2,w*.38,60),cx=x+r+1,cy=y+h/2,sp=Math.min(4.5,h/Math.max(1,items.length));
+ const pp=(items,x,y,w,h,hole)=>{const r=Math.min(h/2-2,w*.36,55),cx=x+r+2,cy=y+h/2,sp=Math.min(5.2,h/Math.max(1,items.length));
   pdfPie(d,items,cx,cy,r,x+2*r+5,y+Math.max(0,(h-items.length*sp)/2)+3,sp);
   if(hole&&items.length){d.setFillColor(255,255,255).circle(cx,cy,r*.55,'F');d.setFontSize(9).setTextColor(20).text(String(items.reduce((a,b)=>a+b.v,0)),cx,cy+1.5,{align:'center'})}};
  const hb=(x,y,w,h,it,fm,clr)=>{fm=fm||(v=>v.toLocaleString());const neg=it.some(i=>i.v<0),nw=Math.min(22,w*.3),vw=16,iw=w-nw-vw,cx=neg?x+nw+iw/2:x+nw,mx=Math.max(1,...it.map(i=>Math.abs(i.v))),sc=(neg?iw/2-1:iw-1)/mx,rh=Math.min(20,h/Math.max(1,it.length)),fs=Math.min(12,rh*1.8);
@@ -1211,7 +1211,11 @@ function drawDash0(d){
    const hs=p.map(b=>b.mn);let slack=av(pi)-hs.reduce((s,v)=>s+v,0)-g*(p.length-1);
    for(let it=0;it<4&&slack>.05;it++){const cap=p.map((b,i)=>b.mx-hs[i]),tc=cap.reduce((s,v)=>s+v,0);if(tc<=0)break;const give=Math.min(slack,tc);p.forEach((b,i)=>{hs[i]+=give*cap[i]/tc});slack-=give}
    const gap=p.length>1?g+Math.min(6,slack/(p.length-1)):g;let y=pi?15:start0;p.forEach((b,i)=>{b.draw(y,hs[i]);y+=hs[i]+gap});foot(pi+1)})}
-function pdfBuf(){const d=new jspdf.jsPDF({orientation:'landscape'});drawDash(d);return d.output('arraybuffer')}
+function pdfBuf(){
+ const d=new jspdf.jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+ try{drawDash(d)}catch(e){console.error(e);d.setFontSize(12);d.text('Could not draw dashboard: '+(e&&e.message||e),14,20)}
+ return d.output('arraybuffer')
+}
 function countPages(){let n=1;const dry=new Proxy({},{get:(t,p)=>p=='addPage'?()=>{n++;return dry}:()=>dry});try{drawDash(dry)}catch(e){}return n}
 function canvasDoc(S=12,P=1){
  const cv=document.createElement('canvas');cv.width=297*S;cv.height=210*S*P;const x=cv.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,cv.width,cv.height);let page=0;
@@ -1234,13 +1238,25 @@ function canvasDoc(S=12,P=1){
    row(o.head[0],o.headStyles.fillColor,'head');o.body.forEach((r,i)=>row(r,i%2?[245,247,250]:null,'body',i))}};
  return d}
 async function shareImg(){
- const pgs=countPages(),d=canvasDoc(pgs>2?8:12,pgs);drawDash(d);const blob=await new Promise(r=>d.cv.toBlob(r,'image/jpeg',.92)),name=`Session_Dashboard_${last()}.jpg`,file=new File([blob],name,{type:'image/jpeg'});
- try{if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'Session Dashboard'});return}}catch(e){if(e.name=='AbortError')return}
+ const pgs=Math.max(1,countPages());
+ const scale=pgs>3?6:pgs>2?8:10;
+ const d=canvasDoc(scale,pgs);
+ drawDash(d);
+ const blob=await new Promise((resolve,reject)=>{
+  try{d.cv.toBlob(b=>{if(!b)reject(new Error('Image encode failed'));else resolve(b)},'image/jpeg',0.93)}
+  catch(e){reject(e)}
+ });
+ const name=`Session_Dashboard_${last()}.jpg`,file=new File([blob],name,{type:'image/jpeg'});
+ try{if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'Session Dashboard'});return}}catch(e){if(e&&e.name==='AbortError')return}
  await save(name,blob)}
 async function save(name,data){
  let dl=null;try{dl=window.claude?await window.claude.use('downloads'):null}catch(e){}
  if(dl){try{await dl.save({filename:name,data});toast('Saved '+name)}catch(e){if(e.code!=='declined')toast('Could not save: '+(e.message||e.code))}return}
- const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data]));a.download=name;a.click()}
+ const blob=(data instanceof Blob)?data:new Blob([data]);
+ const a=document.createElement('a');
+ a.href=URL.createObjectURL(blob);a.download=name;a.style.display='none';
+ document.body.appendChild(a);a.click();
+ setTimeout(()=>{try{URL.revokeObjectURL(a.href);a.remove()}catch(e){}},1500)}
 const last=()=>(sessions.map(s=>s.date).filter(Boolean).sort().pop()||dd);
 // ---- events ----
 function askPw(msg,opts){opts=opts||{};return new Promise(res=>{
@@ -1559,9 +1575,34 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   loans.push(...add);loanDraft={};render();toast('Saved')}
  else if(g('data-lsg')){const b=g('data-lsg'),p=b.dataset.lsg,x=(loanDraft[p]=loanDraft[p]||{}),v=x.amt||'';x.amt=v[0]=='-'?v.slice(1):(v?'-'+v:'-');b.previousElementSibling.value=x.amt}
  else if(g('data-ldel')){if(confirm('Delete this loan entry?')){loans.splice(+g('data-ldel').dataset.ldel,1);render()}}
- else if(t.id=='xl'){if(!canView())return toast('Enter the password first');if(!canEdit())return toast('View only: export is for editors');if(!sessions.length)return;save(`Session_Balances_${last()}.xlsx`,xlsxBuf())}
- else if(t.id=='jpg'){if(!canView())return toast('Enter the password first');if(!canEdit())return toast('View only: sharing is for editors');shareImg().catch(e=>toast('Could not create image: '+(e&&e.message||e)))}
- else if(t.id=='pdf'){if(!canView())return toast('Enter the password first');if(!canEdit())return toast('View only: export is for editors');save(`Session_Dashboard_${last()}.pdf`,pdfBuf())}
+ else if(t.id=='xl'){
+  if(!canView())return toast('Enter the password first');
+  if(!sessions.length)return toast('No sessions to export');
+  if(window._exportBusy)return;
+  window._exportBusy=true;toast('Building Excel…');
+  try{save(`Session_Balances_${last()}.xlsx`,xlsxBuf());toast('Excel ready')}
+  catch(e){toast('Excel failed: '+(e&&e.message||e))}
+  finally{setTimeout(()=>{window._exportBusy=false},800)}
+ }
+ else if(t.id=='jpg'){
+  if(!canView())return toast('Enter the password first');
+  if(!sessions.length||!players.length)return toast('Nothing to share yet');
+  if(window._exportBusy)return;
+  window._exportBusy=true;toast('Creating image…');
+  shareImg().then(()=>toast('Image ready')).catch(e=>{if(e&&e.name==='AbortError')return;toast('Could not create image: '+(e&&e.message||e))}).finally(()=>{window._exportBusy=false})
+ }
+ else if(t.id=='pdf'){
+  if(!canView())return toast('Enter the password first');
+  if(!sessions.length||!players.length)return toast('Nothing to export yet');
+  if(window._exportBusy)return;
+  window._exportBusy=true;toast('Building PDF…');
+  try{
+    const buf=pdfBuf();
+    save(`Session_Dashboard_${last()}.pdf`,buf);
+    toast('PDF ready');
+  }catch(e){toast('PDF failed: '+(e&&e.message||e))}
+  finally{setTimeout(()=>{window._exportBusy=false},800)}
+ }
  else if(g('data-prm')){if(!game||!canEdit())return toast('View only: enter the password first');const p=g('data-prm').dataset.prm;if(game.players.length<=1)return toast('Need at least one player in the game');if(!confirm('Remove '+p+' from this game?'))return;
   game.players=game.players.filter(q=>q!==p);delete loanDraft[p];delete finals[p];render();toast(p+' removed from this game')}
  else if(g('data-pdel')){const p=g('data-pdel').dataset.pdel;guard('delete a player',()=>{if(!confirm('Delete player '+p+' from the group roster? Their past session results stay in History.'))return;players=players.filter(q=>q!==p);if(game)game.players=game.players.filter(q=>q!==p);delete plays[p];delete excl[p];render();toast(p+' removed from the roster')})}
@@ -2071,7 +2112,7 @@ function render(){try{
  }
  // poker mode — existing app
  render0();setSync(cs);document.body.classList.toggle('viewonly',!canEdit());if(!canEdit())lockUI();
- ['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el){el.disabled=!canEdit()||!sessions.length||!players.length;el.style.display=canEdit()?'':'none'}});
+ ['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el){el.disabled=!canView()||!sessions.length||!players.length;el.style.display=''}});
  try{syncUploadBtn()}catch(e){}
  queueMicrotask(()=>{try{persist()}catch(e){console.error(e)}})
 }catch(err){console.error(err);try{const v=$('#v');if(v&&!v.innerHTML)v.innerHTML='<div class="card"><b>Something went wrong</b><p class="mut">'+(err&&err.message||err)+'</p><button class="pri" data-gleave>Leave group</button></div>';toast('Display error: '+(err&&err.message||err))}catch(e){}}
@@ -2529,7 +2570,7 @@ function startCloud(){if(!gid)return;
  cloud.listen(gid,json=>{if(gen!==connGen)return;let S;
   try{S=json?norm(JSON.parse(json)):EMPTY()}catch(e){console.error('Bad group data',e);cloudErr='Group data could not be read. It may be damaged.';cs='error';synced=false;render();return}
   if(!synced){synced=true;cs='live';if(window._connTimer){clearTimeout(window._connTimer);window._connTimer=null}const keepName=groupName;base=S;lastSent='';applying=true;try{applyState(S);if(keepName&&!groupName){groupName=keepName;if(gid)saveRecent(gid,groupName)}}catch(e){console.error('applyState',e);cloudErr='Could not load this group\'s data.';cs='error';synced=false;applying=false;render();return}applying=false;if(hashGame){if(game&&game.date===hashGame){tab='loans';appMode='poker';toast('Opened the game of '+hashGame)}else if(game)toast('A different game is in progress ('+game.date+')')}
-  if(pendingMode){const m=pendingMode;pendingMode='';if(m==='rsvp'||m==='news'||m==='poker'){appMode=m;if(m==='poker')tab='hist';toast(m==='rsvp'?'Opened RSVP':m==='news'?'Opened Newsletter':'Opened Cards')}}
+  if(pendingMode||hashMode){const m=pendingMode||hashMode;pendingMode='';if(m==='rsvp'||m==='news'||m==='poker'){appMode=m;if(m==='poker')tab='hist';try{history.replaceState(null,'','#g='+gid+'&mode='+m)}catch(e){}if(m==='rsvp')toast('Opened RSVP');else if(m==='news')toast('Opened Newsletter');else toast('Opened Cards')}}
   if(pendingEv){pendingEv=''}
    ;(async()=>{try{const del=await cloud.get(gid,'deleted');if(del&&del.json&&del.json!=='null'&&!pendingOrgPass){removeRecent(gid);const gone=gid;leaveGroup();toast('Group '+(gone.slice(0,8))+'… no longer exists (deleted by the admin).');return}}catch(e){}
     loadOrg().then(()=>{if(gen===connGen)render()});
@@ -2537,7 +2578,7 @@ function startCloud(){if(!gid)return;
     else if(gen===connGen){render();queueMicrotask(()=>{try{persist()}catch(e){}})} })();return}
   if(inflight)return;reconcile(S)},e=>{if(gen!==connGen)return;cloudErr=((e&&e.code)||'error')+': '+((e&&e.message)||'');cs='error';synced=false;render()})}
 function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};bills=[];billSettle=null;billDraft={desc:'',amt:'',paid:'',shared:{}};feed=[];events=[];chipsBookings=[];appMode='';billTab='list';xgrp={busy:false,err:'',list:[],picked:{},playerPicked:{},data:{},combined:null};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;ownerEmail='';players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
-function setGroup(code,name,opts){const nm=(name!=null?String(name):'').trim().slice(0,40);const doReg=opts&&opts.register;gid=code;saveRecent(code,nm||code.slice(0,8));try{localStorage.setItem('ptc_group',code);const modeBit=pendingMode?('&mode='+pendingMode):(hashMode?('&mode='+hashMode):'');history.replaceState(null,'','#g='+code+modeBit)}catch(e){}clearLocal();groupName=nm;cs='connecting';synced=false;if(window.cloud&&cloud.stop){try{cloud.stop()}catch(e){}}startCloud();render();loadOwner(code);if(doReg)queueMicrotask(()=>registerGroup(code,nm).catch(()=>{}))}
+function setGroup(code,name,opts){const nm=(name!=null?String(name):'').trim().slice(0,40);const doReg=opts&&opts.register;gid=code;saveRecent(code,nm||code.slice(0,8));try{localStorage.setItem('ptc_group',code);const modeBit=pendingMode?('&mode='+pendingMode):(hashMode?('&mode='+hashMode):'');history.replaceState(null,'','#g='+code+modeBit)}catch(e){}clearLocal();groupName=nm;cs='connecting';synced=false;if(pendingMode==='rsvp'||hashMode==='rsvp'){appMode='rsvp'}else if(pendingMode==='news'||hashMode==='news'){appMode='news'}else if(pendingMode==='poker'||hashMode==='poker'){appMode='poker';tab='hist'};if(window.cloud&&cloud.stop){try{cloud.stop()}catch(e){}}startCloud();render();loadOwner(code);if(doReg)queueMicrotask(()=>registerGroup(code,nm).catch(()=>{}))}
 async function checkAppUpdate(){
   if(!('serviceWorker' in navigator))return{updated:false,reason:'no-sw'};
   try{
@@ -2572,7 +2613,7 @@ async function checkAppUpdate(){
     return{updated:false,reason:hadWaiting?'activated':'latest'};
   }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
 }
-const CACHE_HINT='session-tracker-v63';
+const CACHE_HINT='session-tracker-v70';
 async function hardReloadApp(){
   try{
     if('caches' in window){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}
@@ -2649,10 +2690,10 @@ document.addEventListener('focusout',()=>{if(pendingRender)setTimeout(()=>{const
 window.addEventListener('hashchange',()=>{
   try{
     const h=location.hash||'';
-    const m=(h.match(/mode=(rsvp|chips|bills|poker)/)||[])[1]||'';
+    const m=(h.match(/mode=(rsvp|news|poker|hub)/)||[])[1]||'';
     const gcode=(h.match(/g=([A-Za-z0-9_-]{8,40})/)||[])[1]||'';
-    if(gcode&&gcode!==gid){pendingMode=m||'rsvp';openExistingGroup(gcode);return}
-    if(m&&gid){appMode=m;if(m==='poker')tab='hist';if(m==='bills')billTab='list';render()}
+    if(gcode&&gcode!==gid){pendingMode=m||'rsvp';if(m==='rsvp')appMode='rsvp';openExistingGroup(gcode);return}
+    if(m&&gid){appMode=m==='hub'?'':m;if(m==='poker')tab='hist';render()}
   }catch(e){console.error(e)}
 });
 window.addEventListener('online',()=>{if(cloudOn){setSync('live');persist()}});window.addEventListener('offline',()=>setSync('offline'));
