@@ -284,7 +284,7 @@ body.mode-bills .topbar .tabs{display:none}
 <div id="v"></div></main><div id="toast"></div>
 <script>
 const $=s=>document.querySelector(s),E=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let adminPw=null,adminOpen=false,adminGroups=[],pendingEditPw=null,adminSection='groups',emailUsers=[],emailUser=null,emailAuthMode='',emailOtpPending=null;
+let adminPw=null,adminOpen=false,adminGroups=[],pendingEditPw=null,adminSection='groups',emailUsers=[],emailUser=null,emailAuthMode='',emailOtpPending=null,pendingGroupMeta=null;
 let aiFn,aiTips={},aiKey='',aiBusy=false,aiMsg='',excl={},game=null,gc=false,finals={},plays={},initLoan=500,loans=[],loanDraft={},ld=new Date().toLocaleDateString('en-CA'),hsort='desc',hpl='file',ALLP=[],PERIOD={a:0,b:-1,N:0},rf=0,rt=-1,players=[],sessions=[],draft={},tab='hist',dd=new Date().toLocaleDateString('en-CA'),appMode='',billTab='list',bills=[],billDraft={desc:'',amt:'',paid:'',shared:{}},billSettle=null,feed=[],events=[],chipsBookings=[],xgrp={busy:false,err:'',list:[],picked:{},data:{},combined:null};
 const num=v=>typeof v==='number'&&isFinite(v),f=n=>num(n)?n.toLocaleString():'',cls=n=>n>0?'pos':n<0?'neg':'';
 const iso2ser=d=>Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10))/864e5+25569;
@@ -1213,13 +1213,23 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(t.id=='em_add'){(async()=>{
   if(!(await ensureCloud()))return toast('Could not connect');
   const email=normEmail(($('#em_email')&&$('#em_email').value)||'');
+  const name=(($('#em_name')&&$('#em_name').value)||'').trim().slice(0,40);
   if(!email||!email.includes('@'))return toast('Enter a valid email');
   const sel=$('#em_groups');const groups=sel?Array.from(sel.selectedOptions).map(o=>o.value).filter(Boolean):[];
   await loadEmailUsers();
   let u=findEmailUser(email);
-  if(u){u.groups=groups;u.email=email;toast('Updated '+email)}
-  else{emailUsers.push({email,groups,passHash:null,createdAt:Date.now()});toast('Registered '+email)}
+  if(u){u.groups=groups;u.email=email;if(name)u.name=name;toast('Updated '+email)}
+  else{emailUsers.push({email,name,groups,passHash:null,createdAt:Date.now()});toast('Registered '+email)}
   await saveEmailUsers(emailUsers);render();
+ })();return}
+ else if(g('data-emcopyotp')){(async()=>{
+  const i=+g('data-emcopyotp').dataset.emcopyotp;
+  await loadEmailUsers();
+  const u=emailUsers[i];
+  if(!u||!u.pendingOtp)return toast('No OTP to copy');
+  const otp=String(u.pendingOtp);
+  if(navigator.clipboard)navigator.clipboard.writeText(otp).then(()=>toast('OTP copied')).catch(()=>prompt('Copy OTP',otp));
+  else prompt('Copy OTP',otp);
  })();return}
  else if(g('data-emdel')){(async()=>{
   const i=+g('data-emdel').dataset.emdel;
@@ -1230,12 +1240,9 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   const i=+g('data-emedit').dataset.emedit;
   await loadEmailUsers();
   const u=emailUsers[i];if(!u)return;
-  const em=$('#em_email');if(em)em.value=u.email;
-  const sel=$('#em_groups');
-  if(sel){Array.from(sel.options).forEach(o=>{o.selected=(u.groups||[]).includes(o.value)})}
   adminSection='emails';render();
-  // re-fill after render
   setTimeout(()=>{
+   const nm=$('#em_name');if(nm)nm.value=u.name||'';
    const em2=$('#em_email');if(em2)em2.value=u.email;
    const sel2=$('#em_groups');
    if(sel2){Array.from(sel2.options).forEach(o=>{o.selected=(u.groups||[]).includes(o.value)})}
@@ -1250,7 +1257,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(t.id=='eu_logout'){saveEmailSession(null);emailAuthMode='';emailOtpPending=null;toast('Signed out');render();return}
  else if(t.id=='eu_newgame'){emailOrganiseGame();return}
 
- else if(t.id=='gback'){adminOpen=false;adminPw=null;adminSection='groups';render()}
+ else if(t.id=='gback'){adminOpen=false;adminPw=null;adminSection='groups';persistAdminSession(false);render()}
  else if(g('data-gadm')){openExistingGroup(g('data-gadm').dataset.gadm,'',true)}
  else if(g('data-grename')){if(!canEdit())return toast('View only: enter the password first');const n=prompt('Group name:',groupName||'');if(n===null)return;groupName=n.trim().slice(0,40);if(gid){saveRecent(gid,groupName||gid.slice(0,8));registerGroup(gid,groupName).catch(()=>{})}render();toast(groupName?'Group renamed to '+groupName:'Name cleared');queueMicrotask(persist)}
  else if(g('data-gopen')){const c=g('data-gopen').dataset.gopen;if(c&&c!==gid)openExistingGroup(c)}
@@ -1319,6 +1326,8 @@ document.addEventListener('change',e=>{const t=e.target;
 let gid='',cs='connecting',cloudErr='',synced=false,cloudOn=false,connGen=0,base=null,inflight=0,lastSent='',applying=false,pendingRender=false;
 try{gid=((location.hash||'').match(/g=([A-Za-z0-9_-]{8,40})/)||[])[1]||localStorage.getItem('ptc_group')||''}catch(e){}
 try{loadEmailSession()}catch(e){}
+// Restore admin panel after page refresh (session only)
+;(async()=>{try{if(await restoreAdminSession()){render()}}catch(e){}})();
 const hashGame=((location.hash||'').match(/game=(\d{4}-\d{2}-\d{2})/)||[])[1]||'';
 const hashMode=((location.hash||'').match(/mode=(rsvp|chips|bills|poker|hub)/)||[])[1]||'';
 const hashEv=((location.hash||'').match(/ev=([A-Za-z0-9_-]+)/)||[])[1]||'';
@@ -1361,12 +1370,29 @@ function gbarHtml(){if(!gid)return'';
 function setSync(c){cs=c;try{const tb=document.querySelector('.topbar');if(tb)document.documentElement.style.setProperty('--tbh',tb.offsetHeight+'px')}catch(e){}const g=$('#gbar');if(g)g.innerHTML=gbarHtml();const ii=$('#ind');if(ii)ii.innerHTML=indHtml();const t=$('#ttl');if(t)t.textContent=gid?(groupName||gid.slice(0,6)+'…'):'';const dn=$('#dname');if(dn)dn.textContent=gid?(groupName||gid.slice(0,6)+'…'):''}
 function normEmail(e){return String(e||'').trim().toLowerCase()}
 function saveEmailSession(u){
-  emailUser=u?{email:u.email,groups:Array.isArray(u.groups)?[...u.groups]:[]}:null;
+  emailUser=u?{email:u.email,name:(u.name||'').trim().slice(0,40),groups:Array.isArray(u.groups)?[...u.groups]:[]}:null;
   try{if(emailUser)localStorage.setItem('ptc_email_user',JSON.stringify(emailUser));else localStorage.removeItem('ptc_email_user')}catch(e){}
 }
 function loadEmailSession(){
-  try{const j=localStorage.getItem('ptc_email_user');if(!j)return null;const u=JSON.parse(j);if(u&&u.email){emailUser={email:normEmail(u.email),groups:Array.isArray(u.groups)?u.groups:[]};return emailUser}}catch(e){}
+  try{const j=localStorage.getItem('ptc_email_user');if(!j)return null;const u=JSON.parse(j);if(u&&u.email){emailUser={email:normEmail(u.email),name:(u.name||'').trim(),groups:Array.isArray(u.groups)?u.groups:[]};return emailUser}}catch(e){}
   return null;
+}
+function persistAdminSession(on){
+  try{
+    if(on){sessionStorage.setItem('ptc_admin_open','1');sessionStorage.setItem('ptc_admin_section',adminSection||'groups')}
+    else{sessionStorage.removeItem('ptc_admin_open');sessionStorage.removeItem('ptc_admin_section')}
+  }catch(e){}
+}
+async function restoreAdminSession(){
+  try{
+    if(sessionStorage.getItem('ptc_admin_open')!=='1')return false;
+    if(!(await ensureCloud()))return false;
+    adminSection=sessionStorage.getItem('ptc_admin_section')||'groups';
+    try{adminGroups=await loadGroupList()}catch(e){adminGroups=[]}
+    try{await loadEmailUsers()}catch(e){emailUsers=[]}
+    adminOpen=true;adminPw=adminPw||'session';
+    return true;
+  }catch(e){return false}
 }
 async function loadEmailUsers(){
   try{
@@ -1388,17 +1414,51 @@ async function refreshEmailUserGroups(){
   if(!emailUser||!emailUser.email)return;
   await loadEmailUsers();
   const u=findEmailUser(emailUser.email);
-  if(u)saveEmailSession({email:u.email,groups:u.groups||[]});
+  if(u)saveEmailSession({email:u.email,name:u.name||'',groups:u.groups||[]});
+}
+function groupRowHtml(g){
+  return`<div class="grow"><span><b>${E(g.name||g.code.slice(0,8))}</b><small class="mut">${E(g.code.slice(0,8))}…</small></span><button class="pri" data-gadm="${E(g.code)}">Enter</button></div>`;
 }
 function adminGroupsSection(){
-  const list=adminGroups.length?adminGroups.map(g=>`<div class="grow"><span><b>${E(g.name||g.code.slice(0,8))}</b><small class="mut">${E(g.code.slice(0,8))}…</small></span><button class="pri" data-gadm="${E(g.code)}">Enter</button></div>`).join(''):'<div class="mut" style="text-align:center;margin:8px 0">No groups yet — create one below</div>';
+  const groups=Array.isArray(adminGroups)?adminGroups:[];
+  const adminG=groups.filter(g=>g.by==='admin');
+  const userG=groups.filter(g=>g.by==='user');
+  const otherG=groups.filter(g=>g.by!=='admin'&&g.by!=='user');
+  // Bucket user-created by organizer email/name
+  const byUser={};
+  userG.forEach(g=>{
+    const key=normEmail(g.byEmail||'')||(g.byName||'unknown');
+    if(!byUser[key])byUser[key]={label:g.byName||g.byEmail||'Player',email:g.byEmail||'',items:[]};
+    if(g.byName)byUser[key].label=g.byName;
+    byUser[key].items.push(g);
+  });
+  const userBlocks=Object.keys(byUser).sort((a,b)=>byUser[a].label.localeCompare(byUser[b].label)).map(k=>{
+    const b=byUser[k];
+    const sub=b.email&&b.label!==b.email?`<div class="mut" style="font-size:12px;margin:0 0 6px">${E(b.email)}</div>`:'';
+    return`<div style="margin:10px 0 6px;padding:10px;background:rgba(0,0,0,.04);border-radius:12px">
+      <div style="font-weight:800;font-size:14px;margin-bottom:4px">${E(b.label)}</div>${sub}
+      ${b.items.map(groupRowHtml).join('')||'<div class="mut">No groups</div>'}
+    </div>`;
+  }).join('');
+  const block=(title,hint,items,empty)=>{
+    return`<div style="margin-bottom:14px">
+      <div style="font-weight:800;font-size:15px;margin-bottom:2px">${title}</div>
+      <div class="mut" style="font-size:12px;margin-bottom:8px">${hint}</div>
+      ${items.length?items:(empty||'<div class="mut" style="margin:6px 0">None yet</div>')}
+    </div>`;
+  };
   return`<div class="card" style="text-align:left;max-width:420px;margin:0 auto 14px">
    <b>Groups</b>
-   <div class="mut" style="margin:4px 0 10px">All groups · open or create</div>
-   ${list}
-   <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-    <input id="admin_gname" type="text" placeholder="New group name" maxlength="40" style="flex:1;min-width:140px">
-    <button class="pri" id="gnew2">＋ Create group</button>
+   <div class="mut" style="margin:4px 0 14px">Organised by who created them</div>
+   ${block('Created by admin','Groups you created from Admin',adminG.map(groupRowHtml))}
+   ${block('Created by registered users','Organised under each player who started a game',userBlocks?userBlocks:[],userG.length?userBlocks:'<div class="mut" style="margin:6px 0">None yet</div>')}
+   ${otherG.length?block('Other / older groups','Created before creator tracking',otherG.map(groupRowHtml)):''}
+   <div style="border-top:1px solid var(--bd);padding-top:12px;margin-top:8px">
+    <div style="font-weight:700;margin-bottom:8px">Create group (admin)</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+     <input id="admin_gname" type="text" placeholder="New group name" maxlength="40" style="flex:1;min-width:140px">
+     <button class="pri" id="gnew2">＋ Create group</button>
+    </div>
    </div>
   </div>`;
 }
@@ -1408,11 +1468,20 @@ function adminEmailsSection(){
     const gs=Array.isArray(u.groups)?u.groups:[];
     const gLabels=gs.map(c=>{const g=(adminGroups||[]).find(x=>x.code===c);return E(g?g.name||c.slice(0,8):c.slice(0,8))}).join(', ')||'<span class="mut">none</span>';
     const hasPass=!!(u.passHash);
-    const otpInfo=u.pendingOtp&&u.otpExp&&u.otpExp>Date.now()?`<div style="margin-top:6px;font-size:12px;background:#fef3c7;padding:6px 8px;border-radius:8px">Pending OTP: <b>${E(u.pendingOtp)}</b> (share with user · expires soon)</div>`:'';
-    return`<div class="card" style="text-align:left;margin:0 0 10px;padding:12px" data-emidx="${i}">
+    const otpLive=u.pendingOtp&&u.otpExp&&u.otpExp>Date.now();
+    const otpInfo=otpLive?`<div style="margin-top:8px;font-size:14px;background:#fef3c7;color:#78350f;padding:10px 12px;border-radius:10px;border:1px solid #f59e0b">
+      <div style="font-weight:700;color:#78350f;margin-bottom:4px">Pending OTP</div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-size:22px;font-weight:800;letter-spacing:4px;color:#111827;font-variant-numeric:tabular-nums">${E(u.pendingOtp)}</span>
+        <button type="button" data-emcopyotp="${i}" style="padding:6px 12px;font-size:12px;font-weight:700;background:#fff;color:#111827;border:1px solid #d1d5db">Copy OTP</button>
+      </div>
+      <div style="font-size:11px;color:#92400e;margin-top:6px">Share with the user · expires soon</div>
+    </div>`:'';
+    const dispName=u.name?E(u.name)+' · ':'';
+    return`<div class="card" style="text-align:left;margin:0 0 10px;padding:12px;color:var(--tx)" data-emidx="${i}">
      <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
-      <div><b>${E(u.email)}</b><div class="mut" style="margin-top:2px">${hasPass?'Password set':'Awaiting first login / OTP'}</div>
-      <div style="font-size:13px;margin-top:4px">Groups: ${gLabels}</div>${otpInfo}</div>
+      <div style="color:var(--tx)"><b style="color:var(--tx)">${dispName}${E(u.email)}</b><div class="mut" style="margin-top:2px">${hasPass?'Password set':'Awaiting first login / OTP'}</div>
+      <div style="font-size:13px;margin-top:4px;color:var(--tx)">Groups: ${gLabels}</div>${otpInfo}</div>
       <div style="display:flex;flex-direction:column;gap:6px">
        <button type="button" data-emedit="${i}" style="padding:6px 10px;font-size:12px">Edit</button>
        <button type="button" data-emdel="${i}" style="padding:6px 10px;font-size:12px">Delete</button>
@@ -1423,6 +1492,8 @@ function adminEmailsSection(){
   return`<div class="card" style="text-align:left;max-width:420px;margin:0 auto 14px">
    <b>Email registrations</b>
    <div class="mut" style="margin:4px 0 12px">Register players by email. Assign groups they play in (or leave blank). They verify with OTP once, set a password, then sign in with email + password.</div>
+   <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Name</label>
+   <input id="em_name" type="text" placeholder="Player display name" maxlength="40" style="width:100%;margin-bottom:10px">
    <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Email</label>
    <input id="em_email" type="email" placeholder="player@email.com" style="width:100%;margin-bottom:10px">
    <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Groups (optional)</label>
@@ -1452,8 +1523,9 @@ function joinScreen(){
    const g=(adminGroups||[]).find(x=>x.code===c)||{code:c,name:c.slice(0,8)+'…'};
    return`<div class="grow"><span><b>${E(g.name||c.slice(0,8))}</b><small class="mut">${E(c.slice(0,8))}…</small></span><button class="pri" data-gopen="${E(c)}">Enter</button></div>`;
   }).join(''):'<div class="mut" style="text-align:center;margin:12px 0">No groups assigned yet. Ask admin, or organise a new game below.</div>';
-  return`<div class="jn" style="max-width:420px"><div class="jn-title">Hi</div>
-   <div class="jn-sub">${E(emailUser.email)}</div>
+  const title=emailUser.name||emailUser.email;
+  return`<div class="jn" style="max-width:420px"><div class="jn-title">${E(title)}</div>
+   <div class="jn-sub">${emailUser.name?E(emailUser.email):'Your account'}</div>
    <div class="card" style="text-align:left;margin:12px 0">
     <b>Your groups</b>
     <div class="mut" style="margin:4px 0 10px">Groups you are currently in</div>
@@ -1465,10 +1537,7 @@ function joinScreen(){
     <input id="eu_gname" type="text" placeholder="Game / group name" maxlength="40" style="width:100%;margin-bottom:10px">
     <button type="button" class="pri" id="eu_newgame" style="width:100%">Organise new game</button>
    </div>
-   <div class="jn-or">or</div>
-   <input id="gc_in" placeholder="Join with group code" autocomplete="off" autocapitalize="off" spellcheck="false">
-   <button id="gjoin">Join with code</button>
-   <button type="button" id="eu_logout" style="margin-top:10px">Sign out</button>
+   <button type="button" id="eu_logout" style="margin-top:14px">Sign out</button>
   </div>`;
  }
  // OTP / set password flow
@@ -1485,18 +1554,28 @@ function joinScreen(){
  if(emailAuthMode==='setpass'&&emailOtpPending){
   return`<div class="jn"><div class="jn-title">Set password</div>
    <div class="jn-sub">One-time setup for<br><b>${E(emailOtpPending)}</b></div>
+   <label style="display:block;text-align:left;font-size:12px;font-weight:700;margin:0 0 4px">Your name</label>
+   <input id="eu_name" type="text" placeholder="How you appear in the app" maxlength="40" autocomplete="name">
+   <label style="display:block;text-align:left;font-size:12px;font-weight:700;margin:10px 0 4px">Password</label>
    <input id="eu_pass1" type="password" placeholder="New password (min 4)" autocomplete="new-password">
    <input id="eu_pass2" type="password" placeholder="Confirm password" autocomplete="new-password" style="margin-top:8px">
    <button class="pri" id="eu_setpass" style="margin-top:10px">Save password &amp; continue</button>
    <button type="button" id="eu_auth_back" style="margin-top:8px">Back</button>
   </div>`;
  }
+ const saved=(()=>{try{return JSON.parse(localStorage.getItem('ptc_email_remember')||'null')}catch(e){return null}})();
+ const se=saved&&saved.email?E(saved.email):'';
+ const sp=saved&&saved.pass?E(saved.pass):'';
+ const rm=saved?' checked':'';
  return`<div class="jn"><div class="jn-title">Session Tracker</div>
   <div class="jn-sub">Sign in with email or group code</div>
   <label style="display:block;text-align:left;font-size:12px;font-weight:700;margin:0 0 4px;opacity:.85">Email</label>
-  <input id="eu_email" type="email" placeholder="you@email.com" autocomplete="username">
+  <input id="eu_email" type="email" placeholder="you@email.com" autocomplete="username" value="${se}">
   <label style="display:block;text-align:left;font-size:12px;font-weight:700;margin:10px 0 4px;opacity:.85">Password</label>
-  <input id="eu_pass" type="password" placeholder="Password (if already set)" autocomplete="current-password">
+  <input id="eu_pass" type="password" placeholder="Password (if already set)" autocomplete="current-password" value="${sp}">
+  <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;cursor:pointer;text-align:left">
+   <input id="eu_remember" type="checkbox" style="width:18px;height:18px"${rm}> Remember my credentials
+  </label>
   <button class="pri" id="eu_login" style="margin-top:12px">Continue with email</button>
   <div class="jn-or">or</div>
   <label style="display:block;text-align:left;font-size:12px;font-weight:700;margin:0 0 4px;opacity:.85">Group code</label>
@@ -1516,13 +1595,16 @@ async function adminLogin(){
  adminPw=a;adminSection='groups';
  try{adminGroups=await loadGroupList()}catch(e){adminGroups=[]}
  try{await loadEmailUsers()}catch(e){emailUsers=[]}
- adminOpen=true;render()}
+ adminOpen=true;persistAdminSession(true);render()}
 async function adminCreate(){
  const nameEl=$('#admin_gname');
  const n=nameEl?nameEl.value.trim():prompt('Group name:');
  if(n===null)return;if(nameEl&&!n)return toast('Enter a group name');
  let ep=null;if(confirm('Generate a Password for players now? You can also do it later from Backups.')){const a='ABCDEFGHJKMNPQRSTUVWXYZ23456789';ep='';crypto.getRandomValues(new Uint8Array(8)).forEach(x=>{ep+=a[x%a.length]})}
- pendingOrgPass=adminPw;pendingSetGlobal=false;pendingEditPw=ep;adminOpen=false;adminPw=null;
+ pendingOrgPass=adminPw;pendingSetGlobal=false;pendingEditPw=ep;
+ pendingGroupMeta={by:'admin',byName:'Admin',byEmail:''};
+ persistAdminSession(true);
+ adminOpen=false;adminPw=null;
  setGroup(randCode(),(n||'').trim(),{register:true});toast(ep?'Group created. Open Backups to copy the Password.':'Group created.')}
 async function issueEmailOtp(email){
  const e=normEmail(email);
@@ -1548,7 +1630,12 @@ async function emailContinue(){
   if(!pass)return toast('Enter your password');
   const h=await hashPass(pass,u.passSalt,u.passIter||150000);
   if(h!==u.passHash)return toast('Wrong password');
-  saveEmailSession({email:u.email,groups:u.groups||[]});
+  const remember=!!($('#eu_remember')&&$('#eu_remember').checked);
+  try{
+   if(remember)localStorage.setItem('ptc_email_remember',JSON.stringify({email,pass}));
+   else localStorage.removeItem('ptc_email_remember');
+  }catch(e){}
+  saveEmailSession({email:u.email,name:u.name||'',groups:u.groups||[]});
   emailAuthMode='';emailOtpPending=null;
   try{adminGroups=await loadGroupList()}catch(e){}
   toast('Signed in');render();return;
@@ -1575,16 +1662,19 @@ async function emailVerifyOtp(){
 async function emailSetPassword(){
  const p1=(($('#eu_pass1')&&$('#eu_pass1').value)||'');
  const p2=(($('#eu_pass2')&&$('#eu_pass2').value)||'');
+ const name=(($('#eu_name')&&$('#eu_name').value)||'').trim().slice(0,40);
+ if(!name)return toast('Enter your name');
  if(p1.length<4)return toast('Use at least 4 characters');
  if(p1!==p2)return toast('Passwords do not match');
  await loadEmailUsers();
  const u=findEmailUser(emailOtpPending);
  if(!u)return toast('User not found');
  const salt=randHex(16),iter=150000,hash=await hashPass(p1,salt,iter);
- u.passSalt=salt;u.passIter=iter;u.passHash=hash;
+ u.passSalt=salt;u.passIter=iter;u.passHash=hash;u.name=name;
  u.otpHash=null;u.otpSalt=null;u.otpExp=null;u.pendingOtp=null;
  await saveEmailUsers(emailUsers);
- saveEmailSession({email:u.email,groups:u.groups||[]});
+ try{localStorage.setItem('ptc_email_remember',JSON.stringify({email:u.email,pass:p1}))}catch(e){}
+ saveEmailSession({email:u.email,name:u.name,groups:u.groups||[]});
  emailAuthMode='';emailOtpPending=null;
  try{adminGroups=await loadGroupList()}catch(e){}
  toast('Password saved — you are signed in');render();
@@ -1594,7 +1684,7 @@ async function emailOrganiseGame(){
  const n=(($('#eu_gname')&&$('#eu_gname').value)||'').trim().slice(0,40);
  if(!n)return toast('Enter a name for the game');
  const code=randCode();
- // Add group to registry list and to user
+ pendingGroupMeta={by:'user',byName:(emailUser.name||'').trim()||emailUser.email,byEmail:emailUser.email};
  try{
   await registerGroup(code,n);
   await loadEmailUsers();
@@ -1603,7 +1693,7 @@ async function emailOrganiseGame(){
    if(!Array.isArray(u.groups))u.groups=[];
    if(!u.groups.includes(code))u.groups.push(code);
    await saveEmailUsers(emailUsers);
-   saveEmailSession({email:u.email,groups:u.groups});
+   saveEmailSession({email:u.email,name:u.name||emailUser.name||'',groups:u.groups});
   }
  }catch(e){console.error(e)}
  pendingOrgPass=null;pendingEditPw=null;
@@ -1831,7 +1921,26 @@ async function loadCreatePass(){
 }
 async function loadGroupList(strict){try{const d=await withTimeout(window.cloud.get(CFG,'grouplist'));if(d&&d.json&&d.json!=='null'){const a=JSON.parse(d.json);return Array.isArray(a)?a:[]}}catch(e){if(strict)throw e}return[]}
 async function saveGroupList(list){try{await withTimeout(window.cloud.put(CFG,'grouplist',JSON.stringify(list)))}catch(e){}}
-async function registerGroup(code,name){const list=await loadGroupList();const i=list.findIndex(x=>x.code===code);const row={code,name:(name||code.slice(0,8)).slice(0,40),at:Date.now()};if(i>=0)list[i]={...list[i],...row};else list.unshift(row);await saveGroupList(list.slice(0,50))}
+async function registerGroup(code,name){
+ const list=await loadGroupList();
+ const i=list.findIndex(x=>x.code===code);
+ const meta=pendingGroupMeta||{};
+ pendingGroupMeta=null;
+ const row={
+  code,
+  name:(name||code.slice(0,8)).slice(0,40),
+  at:Date.now(),
+  by:meta.by||(i>=0&&list[i].by)||'',
+  byName:meta.byName||(i>=0&&list[i].byName)||'',
+  byEmail:meta.byEmail||(i>=0&&list[i].byEmail)||''
+ };
+ // Preserve existing creator if re-registering without meta
+ if(i>=0){
+  if(!meta.by&&list[i].by){row.by=list[i].by;row.byName=list[i].byName||'';row.byEmail=list[i].byEmail||''}
+  list[i]={...list[i],...row};
+ }else list.unshift(row);
+ await saveGroupList(list.slice(0,80));
+}
 async function unregisterGroup(code){const list=(await loadGroupList()).filter(x=>x.code!==code);await saveGroupList(list)}
 function removeRecent(code){try{const r=getRecent().filter(x=>x.code!==code);localStorage.setItem('ptc_recent',JSON.stringify(r))}catch(e){}}
 async function deleteGroupFully(code){
@@ -2117,7 +2226,7 @@ async function checkAppUpdate(){
     return{updated:false,reason:hadWaiting?'activated':'latest'};
   }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
 }
-const CACHE_HINT='session-tracker-v59';
+const CACHE_HINT='session-tracker-v61';
 async function hardReloadApp(){
   try{
     if('caches' in window){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}
@@ -2156,6 +2265,31 @@ async function refreshGroup(forceHard){
       }
     }
   }catch(e){}
+  // Admin page: re-sync groups + email OTPs without leaving admin
+  if(adminOpen){
+    try{
+      await ensureCloud();
+      adminGroups=await loadGroupList();
+      await loadEmailUsers();
+      persistAdminSession(true);
+      render();
+      toast('Admin data synced (groups & OTPs)');
+    }catch(e){toast('Could not sync admin data')}
+    return;
+  }
+  // Email user home: refresh group list
+  if(emailUser&&emailUser.email&&!gid){
+    try{
+      await ensureCloud();
+      await loadEmailUsers();
+      const u=findEmailUser(emailUser.email);
+      if(u)saveEmailSession({email:u.email,name:u.name||emailUser.name||'',groups:u.groups||[]});
+      try{adminGroups=await loadGroupList()}catch(e){}
+      render();
+      toast('Your groups refreshed');
+    }catch(e){toast('Could not refresh')}
+    return;
+  }
   if(!gid){toast('App is up to date');try{await hardReloadApp()}catch(e){location.reload()};return}
   if(window.cloud&&cloud.stop)try{cloud.stop()}catch(e){}
   cloudOn=false;synced=false;cs='connecting';base=null;lastSent='';inflight=0;
