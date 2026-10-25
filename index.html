@@ -314,6 +314,20 @@ body.mode-news .topbar .tabs{display:none}
 .news-p{font:16px/1.7 Georgia,'Times New Roman',serif;margin:0 0 12px}
 .news-p:first-of-type::first-letter{float:left;font-size:46px;line-height:.9;font-weight:800;padding:4px 8px 0 0;color:var(--ac)}
 .pw button.on{background:linear-gradient(135deg,var(--g1),var(--g2));color:#fff;border-color:transparent}
+
+/* RSVP invite-only: no menu, no floating king, no group chrome */
+body.rsvp-focus #fab,
+body.rsvp-focus #drawer,
+body.rsvp-focus #scrim,
+body.rsvp-focus .ind,
+body.rsvp-focus .tabs,
+body.rsvp-focus .bills-nav,
+body.rsvp-focus .section-nav,
+body.rsvp-focus .back-hub{display:none!important}
+body.rsvp-focus.dopen{/* force closed */}
+body.rsvp-focus #drawer{transform:translateX(105%)!important;visibility:hidden!important;pointer-events:none!important}
+body.rsvp-focus .topbar .hd .ttl{font-size:16px}
+body.rsvp-focus main{padding-bottom:32px}
 </style></head><body><div id="welcome"><img src="icon-512.png" alt=""><h2>Welcome Folks! 👑</h2><button id="enterBtn" type="button">Enter</button></div><main>
 <div class="topbar">
 <div class="hd"><h1><img src="icon-192.png" alt="" style="height:1.15em;width:1.15em;border-radius:22%;vertical-align:-0.2em;margin-right:.3em"><span class="ttl" id="ttl"></span></h1><span id="ind" class="ind"></span><button id="gref" class="rbtn" title="Refresh live data · Shift+click for full app reload" aria-label="Refresh">↻</button></div>
@@ -418,8 +432,7 @@ function rsvpView(){
    return h;
   }
   if(!ev){
-   h+=`<div class="card"><p class="mut" style="margin:0">This event was removed or the link is outdated.</p>
-    <button type="button" id="rsvp_show_all" class="pri" style="width:100%;margin-top:10px">Open full RSVP list</button></div>`;
+   h+=`<div class="card"><p class="mut" style="margin:0">This event was removed or the link is outdated. Ask the host for a new invite.</p></div>`;
    return h;
   }
   h+=rsvpEventCard(ev,{focus:true});
@@ -1291,11 +1304,18 @@ function enhancePw(){document.querySelectorAll('input[type=password]').forEach(i
 let _epw=0;new MutationObserver(()=>{if(_epw)return;_epw=requestAnimationFrame(()=>{_epw=0;enhancePw()})}).observe(document.body,{childList:true,subtree:true});
 const closeDrawer=()=>document.body.classList.remove('dopen');
 document.addEventListener('click',e=>{const t=e.target;const eb=t.closest('[data-eye]');if(eb){const w=eb.closest('.pwwrap'),i=w&&w.querySelector('input');if(i){const show=i.type==='password';i.type=show?'text':'password';eb.textContent=show?'🙈':'👁';eb.setAttribute('aria-label',show?'Hide password':'Show password')}return}
-if(t.closest('#fab')){if(!gid){if(!adminOpen)adminLogin()}else document.body.classList.toggle('dopen')}else if(t.closest('#ind')&&gid){document.body.classList.add('dopen')}else if(t.closest('#scrim')){closeDrawer()}else if(t.closest('#drawer button')){setTimeout(closeDrawer,60)}});
+if(rsvpFocusId&&appMode==='rsvp'&&(t.closest('#fab')||t.closest('#ind')))return;
+if(t.closest('#fab')){if(!gid){if(!adminOpen)adminLogin()}else document.body.classList.toggle('dopen')}
+else if(t.closest('#ind')&&gid){document.body.classList.add('dopen')}
+else if(t.closest('#scrim')){closeDrawer()}
+else if(t.closest('#drawer button')){setTimeout(closeDrawer,60)}
+});
 window.addEventListener('resize',()=>{try{const tb=document.querySelector('.topbar');if(tb)document.documentElement.style.setProperty('--tbh',tb.offsetHeight+'px')}catch(e){}});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer();if(e.key==='Enter'){const id=e.target&&e.target.id;if(id==='gc_in'||id==='gp_in'){const b=$('#gjoin');if(b)b.click()}else if(id==='eu_email'||id==='eu_pass'){const b=$('#eu_login');if(b)b.click()}else if(id==='eu_otp'){const b=$('#eu_verify_otp');if(b)b.click()}else if(id==='eu_pass1'||id==='eu_pass2'){const b=$('#eu_setpass');if(b)b.click()}}});
 document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']');
- 
+ if(rsvpFocusId&&appMode==='rsvp'){
+  if(t.closest('.hub-card')||t.id=='rsvp_show_all'||g('data-gleave')||t.closest('[data-app]')){e.preventDefault();toast('This invite link is for RSVP only');return}
+ }
  if(t.id=='xgrp-load'){xgrpLoadList();return}
  if(t.id=='xgrp-fetch'){xgrpFetch();return}
  if(t.id=='xgrp-import'){xgrpImport();return}
@@ -2094,7 +2114,7 @@ function syncUploadBtn(){
   }catch(e){console.error('syncUploadBtn',e)}
 }
 function render(){try{
- document.body.classList.toggle('nogrp',!gid);document.body.classList.toggle('adminon',!!adminOpen);document.documentElement.classList.toggle('nogrp',!gid);
+ document.body.classList.toggle('nogrp',!gid);document.body.classList.toggle('adminon',!!adminOpen);if(!gid||appMode!=='rsvp'||!rsvpFocusId)document.body.classList.remove('rsvp-focus');document.documentElement.classList.toggle('nogrp',!gid);
  const vEl=$('#v');if(!vEl){console.error('Missing #v');return}
  if(!gid){vEl.innerHTML=joinScreen();return}
  if(!synced){$('#v').innerHTML=connectCard();setSync(cs);return}
@@ -2113,6 +2133,8 @@ function render(){try{
  document.body.classList.toggle('mode-poker',appMode==='poker');
  document.body.classList.toggle('mode-bills',appMode==='bills');
  document.body.classList.toggle('mode-rsvp',appMode==='rsvp');
+ document.body.classList.toggle('rsvp-focus',!!(appMode==='rsvp'&&rsvpFocusId));
+ if(appMode==='rsvp'&&rsvpFocusId){document.body.classList.remove('dopen')}
  document.body.classList.toggle('mode-chips',appMode==='chips');
  if(!appMode){
   $('#v').innerHTML=hubScreen();
@@ -2679,7 +2701,7 @@ async function checkAppUpdate(){
     return{updated:false,reason:hadWaiting?'activated':'latest'};
   }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
 }
-const CACHE_HINT='session-tracker-v72';
+const CACHE_HINT='session-tracker-v73';
 async function hardReloadApp(){
   try{
     if('caches' in window){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}
