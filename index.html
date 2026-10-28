@@ -807,6 +807,7 @@ function openCardsFromHub(){
  if(activeBoardId){
   stashCurrentBoard();
   activeBoardId='';
+  lastStd='';
   if(gameBoards&&gameBoards.__root)applyBoardSnap(gameBoards.__root);
  }
  appMode='poker';tab='hist';
@@ -817,6 +818,7 @@ function prepareOpenCustom(id){
  if(!id)return openCardsFromHub();
  if(activeBoardId===id){appMode='poker';tab='hist';render();return}
  stashCurrentBoard();
+ lastStd='';
  // If we still don't have a Cards snapshot, capture it once (only when leaving Cards)
  if(!gameBoards.__root&&!activeBoardId)gameBoards.__root=snapshotBoard();
  activeBoardId=id;
@@ -1206,7 +1208,7 @@ function sessionBuf(){const P=game.players,lr=loanRows(P),op=loans.filter(l=>!l.
  const lw=XLSX.utils.aoa_to_sheet([['Date','Borrower','Amount (+ borrowed / - repaid)','From (Bank or player)','Game','Status'],...op.map(l=>[iso2ser(l.date),l.who,l.amt,l.src||'Bank',iso2ser(l.g||game.date),'Open'])]);
  op.forEach((l,i)=>{['A','E'].forEach(c=>{const x=lw[c+(i+2)];if(x)x.z='dd-mmm-yyyy'})});lw['!cols']=[{wch:13},{wch:16},{wch:10},{wch:22},{wch:13},{wch:10}];
  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,sw,'Current Standing');XLSX.utils.book_append_sheet(wb,lw,'Loans');XLSX.utils.book_append_sheet(wb,exSheet(true),'Expenses');
- XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['File type','Current session'],['Game in progress',game.date,P.join(',')],['Initial loan',initLoan]]),'Info');
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['File type','Current session'],['Game in progress',game.date,P.join(',')],['Initial loan',initLoan],['Board',activeBoardId||'cards'],['Board name',activeGameLabel()]]),'Info');
  return XLSX.write(wb,{type:'array',bookType:'xlsx'})}
 async function loadSessionFile(file){
  const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}),ir=wb.Sheets.Info?XLSX.utils.sheet_to_json(wb.Sheets.Info,{header:1}):[],gr=ir.find(r=>/^game in progress/i.test(String(r[0])));
@@ -1246,7 +1248,7 @@ function xlsxBuf(){
  lr.forEach((r,i)=>{sw['F'+(i+2)].f=`B${i+2}+C${i+2}+D${i+2}+E${i+2}`});sw['!cols']=[{wch:16},{wch:12},{wch:12},{wch:20},{wch:16},{wch:14}];XLSX.utils.book_append_sheet(wb,sw,'Current Standing');
  const lw=XLSX.utils.aoa_to_sheet([['Date','Borrower','Amount (+ borrowed / - repaid)','From (Bank or player)','Game','Status'],...loans.map(l=>[iso2ser(l.date),l.who,l.amt,l.src||'Bank',l.g?iso2ser(l.g):null,l.done?'Settled':'Open'])]);
  loans.forEach((l,i)=>{const c=lw['A'+(i+2)];if(c)c.z='dd-mmm-yyyy';const e=lw['E'+(i+2)];if(e)e.z='dd-mmm-yyyy'});lw['!cols']=[{wch:13},{wch:16},{wch:10},{wch:22},{wch:13},{wch:10}];XLSX.utils.book_append_sheet(wb,lw,'Loans');
- XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Column order',hsort=='desc'?'newest first':'oldest first'],['Initial loan',initLoan],...(game?[['Game in progress',game.date,game.players.join(',')]]:[])]),'Info');
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Column order',hsort=='desc'?'newest first':'oldest first'],['Initial loan',initLoan],['Board',activeBoardId||'cards'],['Board name',activeGameLabel()],...(game?[['Game in progress',game.date,game.players.join(',')]]:[])]),'Info');
  return XLSX.write(wb,{type:'array',bookType:'xlsx'})}
 function pdfPie(d,items,cx,cy,r,x,y,sp){const T=items.reduce((a,b)=>a+b.v,0);if(!T){d.setFontSize(8).setTextColor(110).text('None',cx,cy,{align:'center'});return}
  const cc=it=>it.c||col(it.p);let a=-Math.PI/2;items.forEach(it=>{const th=it.v/T*2*Math.PI,n=Math.max(2,Math.ceil(th/.05));d.setFillColor(cc(it));d.setDrawColor(cc(it));
@@ -1442,11 +1444,15 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   window._hubAddBusy=true;window._hubAddOpen=false;
   if(!Array.isArray(extraGames))extraGames=[];
   if(!gameBoards||typeof gameBoards!=='object')gameBoards={};
-  try{stashCurrentBoard()}catch(e){}
+  try{
+    if(activeBoardId){stashCurrentBoard();activeBoardId='';if(gameBoards.__root)applyBoardSnap(gameBoards.__root)}
+    stashCurrentBoard(); // Cards → __root with its own rules intact
+  }catch(e){}
   const id=uid();
   gameBoards[id]={players:[],sessions:[],loans:[],expenses:[],game:null,initLoan:500,finals:{},plays:{},excl:{},gc:false,loanDraft:{},settle:null,rules:'',readme:null};
   extraGames.push({id,name,icon,at:Date.now(),by:(emailUser&&(emailUser.name||emailUser.email))||'organiser'});
   toast('Opening “'+name+'”…');
+  lastStd='';wantFull=true;
   try{prepareOpenCustom(id)}catch(e){console.error(e);toast('Could not open game')}
   queueMicrotask(()=>{try{persist()}catch(e){console.error(e)}window._hubAddBusy=false});
   return}
@@ -1618,7 +1624,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(t.id=='copyvcode'){if(navigator.clipboard)navigator.clipboard.writeText(lastViewCode).then(()=>toast('View code copied'));else prompt('Copy this view code',lastViewCode)}
  else if(t.id=='copycode'){if(navigator.clipboard)navigator.clipboard.writeText(lastCode).then(()=>toast('Code copied'));else prompt('Copy this code',lastCode)}
  else if(t.id=='orgrm'){removePass()}
- else if(t.id=='bkfull'){guard('restore a backup',()=>{if(bk.full&&confirm('Replace ALL shared data (sessions, loans, players and any game in progress) with this backup, for everyone?')){applyState(JSON.parse(bk.full.json));tab='hist';render();toast('Backup restored')}})}
+ else if(t.id=='bkfull'){guard('restore a backup',()=>{if(bk.full&&confirm('Replace data for “'+activeGameLabel()+'” only (sessions, loans, players)? Other games are not changed.')){const d=JSON.parse(bk.full.json);players=Array.isArray(d.players)?d.players:[];sessions=Array.isArray(d.sessions)?d.sessions:[];loans=Array.isArray(d.loans)?d.loans:[];expenses=Array.isArray(d.expenses)?d.expenses:[];game=d.game||null;initLoan=d.initLoan||500;if(typeof d.rules==='string'||d.rules==='')rules=d.rules;try{stashCurrentBoard()}catch(e){}tab='hist';render();toast('Backup restored for '+activeGameLabel());queueMicrotask(()=>{try{persist()}catch(e){}})}})}
  else if(t.id=='bkstd'){guard('restore the standing',()=>{if(bk.standing&&confirm('Replace the current game and its loans with this saved standing?')){const d=JSON.parse(bk.standing.json);loans=loans.filter(l=>l.done).concat(d.loans.map(l=>({...l})));expenses=expenses.filter(e=>e.done).concat((d.expenses||[]).map(e=>({...e,id:e.id||uid()})));game={date:d.game.date,players:[...d.game.players]};initLoan=d.initLoan;d.game.players.forEach(q=>{if(!players.includes(q))players.push(q)});gc=false;finals={};loanDraft={};tab='loans';render();toast('Standing restored')}})}
  else if(t.id=='gjoin'){const c=($('#gc_in').value||'').trim();if(!/^[A-Za-z0-9_-]{8,40}$/.test(c))return toast('Use 8 to 40 letters, numbers, - or _');const btn=$('#gjoin');if(btn){btn.disabled=true;btn.textContent='Connecting…'}toast('Connecting to group…');Promise.resolve(openExistingGroup(c,$('#gp_in')?$('#gp_in').value:'')).finally(()=>{const b=$('#gjoin');if(b){b.disabled=false;b.textContent='Join the table ✨'}})}
  else if(t.id=='gnew'){createNewGroup()}
@@ -1755,7 +1761,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(g('data-gleave')){if(confirm('Leave this group on this device? The shared data stays in the cloud.'))leaveGroup()}
  else if(g('data-gswitch')){if(confirm('Switch to another group? You can return later from Recent groups.'))switchGroupUI()}
  else if(g('data-gsw')){openExistingGroup(g('data-gsw').dataset.gsw)}
- else if(t.id=='sxl'){if(!game)return;if(!canEdit())return toast('View only: export is for editors');save(`Current_Session_${game.date}.xlsx`,sessionBuf())}
+ else if(t.id=='sxl'){if(!game)return;if(!canEdit())return toast('View only: export is for editors');save(`Current_Session_${activeGameFileTag()}_${game.date}.xlsx`,sessionBuf())}
  else if(t.id=='ginvite'){if(!game)return;const u=location.origin+location.pathname+'#g='+gid+'&game='+game.date;const msg='Join our session tracker game on '+game.date+': '+u;if(navigator.clipboard)navigator.clipboard.writeText(msg).then(()=>toast('Game invite copied — includes group + date')).catch(()=>prompt('Copy this game invite',msg));else prompt('Copy this game invite',msg)}
 
  else if(t.id=='gcb'){gc=!gc;render();if(gc){requestAnimationFrame(()=>{const el=document.getElementById('gcPanel');if(el)el.scrollIntoView({behavior:'smooth',block:'center'})})}}
@@ -1784,7 +1790,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   if(!sessions.length)return toast('No sessions to export');
   if(window._exportBusy)return;
   window._exportBusy=true;toast('Building Excel…');
-  try{save(`Session_Balances_${last()}.xlsx`,xlsxBuf());toast('Excel ready')}
+  try{save(`Session_Balances_${activeGameFileTag()}_${last()}.xlsx`,xlsxBuf());toast('Excel ready · '+activeGameLabel())}
   catch(e){toast('Excel failed: '+(e&&e.message||e))}
   finally{setTimeout(()=>{window._exportBusy=false},800)}
  }
@@ -1855,6 +1861,24 @@ let pendingEv=hashEv||'';
 // rsvpFocusId set above from hash
 const EMPTY=()=>({players:[],sessions:[],loans:[],expenses:[],settle:null,initLoan:500,game:null,readme:null,rules:null,groupName:'',bills:[],billSettle:null,feed:[],events:[],chipsBookings:[],extraGames:[],gameBoards:{}});
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
+
+function activeGameLabel(){
+  if(activeBoardId){
+    const g=(extraGames||[]).find(x=>x.id===activeBoardId);
+    return (g&&g.name)||'Game';
+  }
+  return 'Cards';
+}
+function activeGameFileTag(){
+  return String(activeGameLabel()).replace(/[^\w\-]+/g,'_').replace(/^_|_$/g,'').slice(0,40)||'game';
+}
+/** Cloud backup slot unique per game board (Cards vs each New game) */
+function backupSlot(kind){
+  // kind: 'full' | 'standing'
+  if(activeBoardId)return kind+'_b_'+activeBoardId;
+  return kind;
+}
+
 
 function readRsvpFocusFromHash(){
   try{
@@ -2264,7 +2288,7 @@ async function adminCreate(){
  pendingGroupMeta={by:'admin',byName:'Admin',byEmail:''};
  persistAdminSession(true);
  adminOpen=false;adminPw=null;
- setGroup(randCode(),(n||'').trim(),{register:true});toast('Group created');
+ setGroup(await uniqueGroupCode(),(n||'').trim(),{register:true});toast('Group created');
 }
 async function issueEmailOtp(email){
  const e=normEmail(email);
@@ -2344,7 +2368,7 @@ async function emailOrganiseGame(){
  if(!emailUser)return;
  const n=(($('#eu_gname')&&$('#eu_gname').value)||'').trim().slice(0,40);
  if(!n)return toast('Enter a name for the game');
- const code=randCode();
+ const code=await uniqueGroupCode();
  pendingGroupMeta={by:'user',byName:(emailUser.name||'').trim()||emailUser.email,byEmail:emailUser.email};
  try{
   await registerGroup(code,n);
@@ -2718,7 +2742,7 @@ async function createNewGroup(){
  if(a===null)return;if(a.length<4)return toast('Use at least 4 characters');
  if(hasGlobal){const h=await hashPass(a,info.salt,info.iter);if(h!==info.hash)return toast('Wrong admin password');pendingOrgPass=a;pendingSetGlobal=false}
  else{const b=await askPw('Type the admin password again to confirm',{title:'Admin password',ok:'Confirm'});if(b!==a)return toast('The two entries did not match');pendingOrgPass=a;pendingSetGlobal=true}
- setGroup(randCode(),(n||'').trim(),{register:true});toast('Group created. Tap Copy Group Code to share it.')}
+ setGroup(await uniqueGroupCode(),(n||'').trim(),{register:true});toast('Group created. Tap Copy Group Code to share it.')}
 const randHex=n=>[...crypto.getRandomValues(new Uint8Array(n))].map(b=>b.toString(16).padStart(2,'0')).join('');
 async function hashPass(pw,saltHex,iter){const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveBits']),bits=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:Uint8Array.from(saltHex.match(/../g).map(h=>parseInt(h,16))),iterations:iter},key,256);return[...new Uint8Array(bits)].map(b=>b.toString(16).padStart(2,'0')).join('')}
 async function loadOrg(){orgLoaded=false;try{const d=await withTimeout(cloud.get(gid,'organiser'));orgInfo=d?JSON.parse(d.json):null;orgLoaded=true;
@@ -2864,11 +2888,38 @@ function readExpenses(ws,openOnly){const out=[];XLSX.utils.sheet_to_json(ws,{hea
  if(!(p&&a>0&&d))return;if(openOnly&&!op)return;out.push({id:uid(),date:d,desc:typeof r[1]=='string'?r[1]:'Expense',paidBy:p,amt:a,split:(!sh||/^all$/i.test(sh))?null:sh.split(',').map(x=>x.trim()).filter(Boolean),g:num(r[5])?ser2iso(r[5]):'',done:!op})});return out}
 let bk={full:undefined,standing:undefined,busy:false,err:''},wantFull=false,lastStd='';
 async function saveBackups(){try{
- if(wantFull&&!base.game){await cloud.put(gid,'full',JSON.stringify(base));wantFull=false}
- if(base.game){const st=JSON.stringify({game:base.game,loans:base.loans.filter(l=>!l.done),expenses:base.expenses.filter(e=>!e.done),initLoan:base.initLoan}),c=canon(JSON.parse(st));if(c!==lastStd){await cloud.put(gid,'standing',st);lastStd=c}}
+ // Always snapshot the active board's live data into its own backup slots
+ const slotFull=backupSlot('full');
+ const slotStd=backupSlot('standing');
+ // Build board-local state for backup (what is on screen now)
+ const local={
+  players:[...players],sessions:sessions.map(x=>({...x,v:{...(x.v||{})}})),
+  loans:loans.map(l=>({...l})),expenses:expenses.map(e=>({...e})),
+  game:game?JSON.parse(JSON.stringify(game)):null,initLoan,settle:settle?JSON.parse(JSON.stringify(settle)):null,
+  rules:(typeof rules==='string')?rules:null,readme:(typeof readme==='string')?readme:null,
+  groupName,extraGames,gameBoards
+ };
+ if(wantFull&&!local.game){
+  await cloud.put(gid,slotFull,JSON.stringify(local));
+  wantFull=false;
+ }
+ if(local.game){
+  const st=JSON.stringify({game:local.game,loans:local.loans.filter(l=>!l.done),expenses:local.expenses.filter(e=>!e.done),initLoan:local.initLoan,board:activeBoardId||'cards',boardName:activeGameLabel()});
+  const c=canon(JSON.parse(st));
+  if(c!==lastStd){await cloud.put(gid,slotStd,st);lastStd=c}
+ }
 }catch(e){}}
 async function loadBackups(){if(!window.cloud||!gid)return;bk.busy=true;bk.err='';render();loadOrg();
- try{bk.full=await withTimeout(cloud.get(gid,'full'));bk.standing=await withTimeout(cloud.get(gid,'standing'))}catch(e){bk.err=(e&&e.code)||'error';if(bk.full===undefined)bk.full=null;if(bk.standing===undefined)bk.standing=null}bk.busy=false;render()}
+ try{
+  const sf=backupSlot('full'),ss=backupSlot('standing');
+  bk.full=await withTimeout(cloud.get(gid,sf));
+  bk.standing=await withTimeout(cloud.get(gid,ss));
+  // Cards only: fall back to legacy unscoped keys once
+  if(!activeBoardId){
+    if(!bk.full)bk.full=await withTimeout(cloud.get(gid,'full'));
+    if(!bk.standing)bk.standing=await withTimeout(cloud.get(gid,'standing'));
+  }
+ }catch(e){bk.err=(e&&e.code)||'error';if(bk.full===undefined)bk.full=null;if(bk.standing===undefined)bk.standing=null}bk.busy=false;render()}
 function backupTab(){const when=x=>new Date(x.savedAt).toLocaleString();
  if(bk.busy&&bk.full===undefined)return'<p class="mut">Loading backups…</p>';
  let a,b;
@@ -2876,11 +2927,12 @@ function backupTab(){const when=x=>new Date(x.savedAt).toLocaleString();
  else a='<div class="mut">No backup yet.</div>';
  if(bk.standing){const d=JSON.parse(bk.standing.json);b=`<div class="mut">Saved ${E(when(bk.standing))} · game of ${E(d.game.date)} · ${d.game.players.length} players · ${d.loans.length} loan entries</div><button class="pri" id="bkstd" style="margin-top:8px">Restore this standing</button>`}
  else b='<div class="mut">No standing saved yet.</div>';
- return`<div class="card"><b>Upload Excel</b><div class="mut" style="margin:4px 0 10px">Replace all shared poker history for everyone in this group.</div>
+ const gnm=E(activeGameLabel());
+ return`<div class="card"><b>Upload Excel · ${gnm}</b><div class="mut" style="margin:4px 0 10px">Applies only to <b>${gnm}</b> — other games keep their own files and data.</div>
   <label class="btn pri" id="uplbl" for="up" style="display:inline-flex;cursor:pointer">📤 Upload Excel</label>
   <input id="up" type="file" accept=".xlsx,.xls" style="position:absolute;width:1px;height:1px;opacity:0"></div>
- <div class="card"><b>Last completed game backup</b>${a}</div>
- <div class="card"><b>Current standing backup</b>${b}</div>
+ <div class="card"><b>Last completed game backup · ${gnm}</b>${a}</div>
+ <div class="card"><b>Current standing backup · ${gnm}</b>${b}</div>
  ${bk.err?`<p class="neg">Could not load backups (${E(bk.err)}). Tap ↻ Refresh at the top to try again.</p>`:''}`}
 function startCloud(){if(!gid)return;
  const gen=++connGen;
@@ -2962,7 +3014,7 @@ async function checkAppUpdate(){
     return{updated:false,reason:hadWaiting?'activated':'latest'};
   }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
 }
-const CACHE_HINT='session-tracker-v80';
+const CACHE_HINT='session-tracker-v81';
 async function hardReloadApp(){
   // Preserve group + mode in the URL so reload stays put
   try{
@@ -3044,7 +3096,16 @@ async function refreshGroup(forceHard){
 }
 function leaveGroup(){rsvpFocusId='';try{sessionStorage.removeItem('ptc_rsvp_focus')}catch(e){}window._glLoaded=false;connGen++;if(window._connTimer){clearTimeout(window._connTimer);window._connTimer=null}const keepAdmin=(()=>{try{return sessionStorage.getItem('ptc_admin_open')==='1'}catch(e){return false}})();if(keepAdmin){adminOpen=true;adminPw=adminPw||'session';adminSection=adminSection||'groups';loadGroupList().then(l=>{adminGroups=l;render()}).catch(()=>{})}else{adminOpen=false;adminPw=null}if(gid){saveRecent(gid,groupName||gid.slice(0,8));try{localStorage.removeItem(viewKey());localStorage.removeItem(editKey())}catch(e){}}if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;gid='';try{localStorage.removeItem('ptc_group');history.replaceState(null,'',location.pathname)}catch(e){}clearLocal();render()}
 function switchGroupUI(){tab='hist';leaveGroup()}
-function randCode(){const a='abcdefghjkmnpqrstuvwxyz23456789';let s='';crypto.getRandomValues(new Uint8Array(14)).forEach(x=>{s+=a[x%a.length]});return s}
+function randCode(){const a='abcdefghjkmnpqrstuvwxyz23456789';let s='';crypto.getRandomValues(new Uint8Array(18)).forEach(x=>{s+=a[x%a.length]});return s}
+async function uniqueGroupCode(){
+  let code=randCode(),tries=0;
+  try{
+    const list=await loadGroupList(true);
+    const used=new Set((list||[]).map(g=>g.code));
+    while(used.has(code)&&tries<8){code=randCode();tries++}
+  }catch(e){}
+  return code;
+}
 function copyLink(){const u=gid;if(navigator.clipboard)navigator.clipboard.writeText(u).then(()=>toast('Group code copied')).catch(()=>prompt('Copy this group code',u));else prompt('Copy this group code',u)}
 document.addEventListener('focusout',()=>{if(pendingRender)setTimeout(()=>{const a=document.activeElement;if(!(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName))){pendingRender=false;render()}},60)});
 window.addEventListener('hashchange',()=>{
