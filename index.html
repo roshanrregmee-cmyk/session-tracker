@@ -358,7 +358,7 @@ body.rsvp-focus main{padding-bottom:32px}
 <script>
 const $=s=>document.querySelector(s),E=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let adminPw=null,adminOpen=false,adminGroups=[],pendingEditPw=null,adminSection='groups',emailUsers=[],emailUser=null,emailAuthMode='',emailOtpPending=null,pendingGroupMeta=null,ownerEmail='';
-let aiFn,aiTips={},aiKey='',aiBusy=false,aiMsg='',excl={},game=null,gc=false,finals={},plays={},initLoan=500,loans=[],loanDraft={},ld=new Date().toLocaleDateString('en-CA'),hsort='desc',hpl='file',ALLP=[],PERIOD={a:0,b:-1,N:0},rf=0,rt=-1,players=[],sessions=[],draft={},tab='hist',dd=new Date().toLocaleDateString('en-CA'),appMode='',billTab='list',bills=[],billDraft={desc:'',amt:'',paid:'',shared:{}},billSettle=null,feed=[],events=[],chipsBookings=[],extraGames=[],gameBoards={},activeBoardId='',cardsMeta={name:'Cards',icon:'🃏'},xgrp={busy:false,err:'',list:[],picked:{},data:{},combined:null};
+let aiFn,aiTips={},aiKey='',aiBusy=false,aiMsg='',excl={},game=null,gc=false,finals={},plays={},initLoan=500,loans=[],loanDraft={},ld=new Date().toLocaleDateString('en-CA'),hsort='desc',hpl='file',ALLP=[],PERIOD={a:0,b:-1,N:0},rf=0,rt=-1,players=[],sessions=[],draft={},tab='hist',dd=new Date().toLocaleDateString('en-CA'),appMode='',billTab='list',bills=[],billDraft={desc:'',amt:'',paid:'',shared:{}},billSettle=null,feed=[],events=[],chipsBookings=[],extraGames=[],gameBoards={},activeBoardId='',cardsMeta={name:'Cards',icon:'🃏'},hubHidden={rsvp:false,news:false},xgrp={busy:false,err:'',list:[],picked:{},data:{},combined:null};
 const num=v=>typeof v==='number'&&isFinite(v),f=n=>num(n)?n.toLocaleString():'',cls=n=>n>0?'pos':n<0?'neg':'';
 const iso2ser=d=>Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10))/864e5+25569;
 const ser2iso=n=>new Date(Math.round((n-25569)*864e5)).toISOString().slice(0,10);
@@ -749,6 +749,7 @@ function newsView(){
 function hubScreen(){
  const canRm=!!((typeof canOrganise==='function'&&canOrganise())||(typeof isSessionAdmin==='function'&&isSessionAdmin()));
  const games=Array.isArray(extraGames)?extraGames:[];
+ const hid=hubHidden||{rsvp:false,news:false};
  const wrap=(id,cardHtml,label)=>{
   if(!canRm)return cardHtml;
   return `<div class="hub-swipe" data-swipe="${E(id)}"><div class="hub-swipe-track">
@@ -757,19 +758,21 @@ function hubScreen(){
   </div></div>`;
  };
  const cm=cardsMeta||{name:'Cards',icon:'🃏'};
- const cardsCard=`<button type="button" class="hub-card" data-mode="poker"><div class="hub-ico">${E(cm.icon||'🃏')}</div><b>${E(cm.name||'Cards')}</b><span>Sessions · loans · history</span></button>`;
+ const cardsCard=`<button type="button" class="hub-card" data-mode="poker"><div class="hub-ico">${E(cm.icon||'🃏')}</div><b>${E(cm.name||'Cards')}</b></button>`;
  const gameCards=games.map(g=>{
-  const card=`<button type="button" class="hub-card" data-board="${E(g.id)}"><div class="hub-ico">${E(g.icon||'🎲')}</div><b>${E(g.name||'Game')}</b><span>Sessions · loans · history</span></button>`;
+  const card=`<button type="button" class="hub-card" data-board="${E(g.id)}"><div class="hub-ico">${E(g.icon||'🎲')}</div><b>${E(g.name||'Game')}</b></button>`;
   return wrap(g.id,card,g.name||'Game');
  }).join('');
- const addCard=canRm?(window._hubAddOpen
-  ? (function(){
-      const icons=['🎲','🃏','♠️','♥️','♦️','♣️','🏆','🎯','🔥','⭐','👑','💰','🪙','🎰','🥳','🌙','☕','🍕','🍻','🎮'];
-      const sel=window._hubIcon||'🎲';
-      const grid=icons.map(ic=>`<button type="button" class="hub-ico-pick${ic===sel?' on':''}" data-hubico="${ic}" aria-label="Icon">${ic}</button>`).join('');
-      return `<div class="card" id="hub_add_panel" style="grid-column:1/-1;text-align:left">
+ // + menu: New game always; RSVP/Newsletter only if removed from hub
+ let addCard='';
+ if(canRm){
+  if(window._hubAddOpen==='form'){
+    const icons=['🎲','🃏','♠️','♥️','♦️','♣️','🏆','🎯','🔥','⭐','👑','💰','🪙','🎰','🥳','🌙','☕','🍕','🍻','🎮'];
+    const sel=window._hubIcon||'🎲';
+    const grid=icons.map(ic=>`<button type="button" class="hub-ico-pick${ic===sel?' on':''}" data-hubico="${ic}" aria-label="Icon">${ic}</button>`).join('');
+    addCard=`<div class="card" id="hub_add_panel" style="grid-column:1/-1;text-align:left">
       <b>New game</b>
-      <div class="mut" style="margin:4px 0 10px">Name it — starts empty. Cards stays as it is.</div>
+      <div class="mut" style="margin:4px 0 10px">Starts empty. Other games stay as they are.</div>
       <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Name</label>
       <input id="hub_gname" type="text" maxlength="40" placeholder="e.g. Friday night" style="width:100%;margin-bottom:10px" autocomplete="off">
       <label style="display:block;font-size:13px;font-weight:700;margin-bottom:6px">Icon</label>
@@ -777,20 +780,31 @@ function hubScreen(){
       <input type="hidden" id="hub_gicon" value="${E(sel)}">
       <div style="display:flex;gap:8px;margin-top:12px">
         <button type="button" class="pri" id="hub_add_go" style="flex:1">Create</button>
-        <button type="button" id="hub_add_cancel" style="flex:1">Cancel</button>
+        <button type="button" id="hub_add_cancel" style="flex:1">Back</button>
       </div>
     </div>`;
-    })()
-  : `<button type="button" class="hub-card hub-add" id="hub_add_game"><div class="hub-ico">＋</div><b>New game</b><span>Organiser / admin</span></button>`):'';
- const rsvpCard=`<button type="button" class="hub-card" data-mode="rsvp"><div class="hub-ico">📅</div><b>RSVP</b><span>Events · dates · responses</span></button>`;
- const newsCard=`<button type="button" class="hub-card" data-mode="news"><div class="hub-ico">📰</div><b>Newsletter</b><span>The story of your games</span></button>`;
- return`${canRm?`<p class="hub-hint-swipe">Organiser: swipe a tile left to remove</p>`:''}<div class="hub">
+  }else if(window._hubAddOpen==='menu'){
+    addCard=`<div class="card" id="hub_add_panel" style="grid-column:1/-1;text-align:left">
+      <b>Add to home</b>
+      <div class="mut" style="margin:4px 0 12px">Choose what to add</div>
+      <button type="button" class="pri" id="hub_opt_game" style="width:100%;margin-bottom:8px">＋ New game</button>
+      ${hid.rsvp?`<button type="button" id="hub_opt_rsvp" style="width:100%;margin-bottom:8px">📅 Restore RSVP</button>`:''}
+      ${hid.news?`<button type="button" id="hub_opt_news" style="width:100%;margin-bottom:8px">📰 Restore Newsletter</button>`:''}
+      <button type="button" id="hub_add_cancel" style="width:100%">Cancel</button>
+    </div>`;
+  }else{
+    addCard=`<button type="button" class="hub-card hub-add" id="hub_add_game"><div class="hub-ico">＋</div><b>Add</b></button>`;
+  }
+ }
+ const rsvpCard=`<button type="button" class="hub-card" data-mode="rsvp"><div class="hub-ico">📅</div><b>RSVP</b></button>`;
+ const newsCard=`<button type="button" class="hub-card" data-mode="news"><div class="hub-ico">📰</div><b>Newsletter</b></button>`;
+ return`${canRm?`<p class="hub-hint-swipe">Organiser: swipe left to remove</p>`:''}<div class="hub">
   ${wrap('cards',cardsCard,cm.name||'Cards')}
-  ${gameCards}${addCard}
-  ${wrap('rsvp',rsvpCard,'RSVP')}
-  ${wrap('news',newsCard,'Newsletter')}
- </div>
- <p class="mut" style="text-align:center;margin-top:8px">Choose a section for this group</p>`;
+  ${gameCards}
+  ${!hid.rsvp?wrap('rsvp',rsvpCard,'RSVP'):''}
+  ${!hid.news?wrap('news',newsCard,'Newsletter'):''}
+  ${addCard}
+ </div>`;
 }
 function snapshotBoard(){
  return{
@@ -1463,10 +1477,29 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  // Use closest() so taps on icon/text inside the button still count (mobile)
  if(t.closest('#hub_add_game')){
   e.preventDefault();e.stopPropagation();
-  if(!canOrganise())return toast('Only the organiser or admin can add a game');
-  window._hubAddOpen=true;if(!window._hubIcon)window._hubIcon='🎲';
+  if(!(canOrganise()||(typeof isSessionAdmin==='function'&&isSessionAdmin())))return toast('Only the organiser or admin can add');
+  window._hubAddOpen='menu';
   render();
-  queueMicrotask(()=>{try{const el=$('#hub_gname');if(el){el.focus();el.click()}}catch(e){}});
+  return}
+ if(t.closest('#hub_opt_game')){
+  e.preventDefault();
+  window._hubAddOpen='form';if(!window._hubIcon)window._hubIcon='🎲';
+  render();
+  queueMicrotask(()=>{try{const el=$('#hub_gname');if(el)el.focus()}catch(e){}});
+  return}
+ if(t.closest('#hub_opt_rsvp')){
+  e.preventDefault();
+  if(!hubHidden)hubHidden={rsvp:false,news:false};
+  hubHidden.rsvp=false;window._hubAddOpen=false;
+  render();toast('RSVP restored');
+  queueMicrotask(()=>{try{persist()}catch(e){}});
+  return}
+ if(t.closest('#hub_opt_news')){
+  e.preventDefault();
+  if(!hubHidden)hubHidden={rsvp:false,news:false};
+  hubHidden.news=false;window._hubAddOpen=false;
+  render();toast('Newsletter restored');
+  queueMicrotask(()=>{try{persist()}catch(e){}});
   return}
  if(t.closest('[data-hubico]')){
   e.preventDefault();e.stopPropagation();
@@ -1475,7 +1508,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   const hid=$('#hub_gicon');if(hid)hid.value=ic;
   document.querySelectorAll('.hub-ico-pick').forEach(b=>b.classList.toggle('on',b.getAttribute('data-hubico')===ic));
   return}
- if(t.closest('#hub_add_cancel')){e.preventDefault();window._hubAddOpen=false;window._hubIcon=null;render();return}
+ if(t.closest('#hub_add_cancel')){e.preventDefault();if(window._hubAddOpen==='form'){window._hubAddOpen='menu'}else{window._hubAddOpen=false;window._hubIcon=null}render();return}
  if(t.closest('#hub_add_go')){
   e.preventDefault();e.stopPropagation();
   if(window._hubAddBusy)return;
@@ -1517,14 +1550,19 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
     return;
   }
   if(id==='rsvp'){
-    if(!confirm('Clear all RSVP events for this group?\n\nThis cannot be undone.'))return;
-    events=[];
-    render();toast('RSVP events cleared');
-    queueMicrotask(()=>{try{persistEvents()}catch(e){try{persist()}catch(e2){}}});
+    if(!confirm('Remove RSVP from home?\n\nYou can add it back anytime with ＋.\nEvents are kept.'))return;
+    if(!hubHidden)hubHidden={rsvp:false,news:false};
+    hubHidden.rsvp=true;
+    render();toast('RSVP removed from home');
+    queueMicrotask(()=>{try{persist()}catch(e){}});
     return;
   }
   if(id==='news'){
-    if(!confirm('Newsletter has no stored data to delete.\n\nIt only reads game history. Nothing will be removed.'))return;
+    if(!confirm('Remove Newsletter from home?\n\nYou can add it back anytime with ＋.'))return;
+    if(!hubHidden)hubHidden={rsvp:false,news:false};
+    hubHidden.news=true;
+    render();toast('Newsletter removed from home');
+    queueMicrotask(()=>{try{persist()}catch(e){}});
     return;
   }
   const g0=(extraGames||[]).find(x=>x.id===id);
@@ -1949,7 +1987,7 @@ let rsvpFocusId=hashEv||(function(){try{return sessionStorage.getItem('ptc_rsvp_
 let pendingMode=hashMode||'';
 let pendingEv=hashEv||'';
 // rsvpFocusId set above from hash
-const EMPTY=()=>({players:[],sessions:[],loans:[],expenses:[],settle:null,initLoan:500,game:null,readme:null,rules:null,groupName:'',bills:[],billSettle:null,feed:[],events:[],chipsBookings:[],extraGames:[],gameBoards:{},cardsMeta:{name:'Cards',icon:'🃏'}});
+const EMPTY=()=>({players:[],sessions:[],loans:[],expenses:[],settle:null,initLoan:500,game:null,readme:null,rules:null,groupName:'',bills:[],billSettle:null,feed:[],events:[],chipsBookings:[],extraGames:[],gameBoards:{},cardsMeta:{name:'Cards',icon:'🃏'},hubHidden:{rsvp:false,news:false}});
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
 
 function activeGameLabel(){
@@ -1986,7 +2024,7 @@ function hashWithMode(code,mode,ev){
 }
 
 const canon=x=>JSON.stringify(x,(k,v)=>v&&typeof v=='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(q=>[q,v[q]])):v);
-const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],expenses:S.expenses||[],settle:S.settle||null,initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:null,groupName:typeof S.groupName=='string'?S.groupName:'',bills:(S.bills||[]),billSettle:S.billSettle||null,feed:Array.isArray(S.feed)?S.feed:[],events:Array.isArray(S.events)?S.events:[],chipsBookings:Array.isArray(S.chipsBookings)?S.chipsBookings:[],extraGames:Array.isArray(S.extraGames)?S.extraGames:[],gameBoards:(S.gameBoards&&typeof S.gameBoards==='object')?S.gameBoards:{},cardsMeta:(S.cardsMeta&&typeof S.cardsMeta==='object')?{name:S.cardsMeta.name||'Cards',icon:S.cardsMeta.icon||'🃏'}:{name:'Cards',icon:'🃏'}});
+const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],expenses:S.expenses||[],settle:S.settle||null,initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:null,groupName:typeof S.groupName=='string'?S.groupName:'',bills:(S.bills||[]),billSettle:S.billSettle||null,feed:Array.isArray(S.feed)?S.feed:[],events:Array.isArray(S.events)?S.events:[],chipsBookings:Array.isArray(S.chipsBookings)?S.chipsBookings:[],extraGames:Array.isArray(S.extraGames)?S.extraGames:[],gameBoards:(S.gameBoards&&typeof S.gameBoards==='object')?S.gameBoards:{},cardsMeta:(S.cardsMeta&&typeof S.cardsMeta==='object')?{name:S.cardsMeta.name||'Cards',icon:S.cardsMeta.icon||'🃏'}:{name:'Cards',icon:'🃏'},hubHidden:(S.hubHidden&&typeof S.hubHidden==='object')?{rsvp:!!S.hubHidden.rsvp,news:!!S.hubHidden.news}:{rsvp:false,news:false}});
 function getState(){if(!Array.isArray(sessions))sessions=[];if(!Array.isArray(loans))loans=[];if(!Array.isArray(expenses))expenses=[];if(!Array.isArray(bills))bills=[];if(!Array.isArray(feed))feed=[];if(!Array.isArray(events))events=[];if(!Array.isArray(chipsBookings))chipsBookings=[];if(!Array.isArray(players))players=[];sessions.forEach(x=>{if(!x.id)x.id=uid()});loans.forEach(l=>{if(!l.id)l.id=uid()});expenses.forEach(e=>{if(!e.id)e.id=uid()});
  // Keep Cards and custom boards separate: stash UI into the active board, then
  // always write root players/sessions/... from Cards (__root), never from a custom board.
@@ -2038,6 +2076,7 @@ function getState(){if(!Array.isArray(sessions))sessions=[];if(!Array.isArray(lo
  };
  return{
   cardsMeta:{name:(cardsMeta&&cardsMeta.name)||'Cards',icon:(cardsMeta&&cardsMeta.icon)||'🃏'},
+  hubHidden:{rsvp:!!(hubHidden&&hubHidden.rsvp),news:!!(hubHidden&&hubHidden.news)},
   extraGames:Array.isArray(extraGames)?extraGames.map(g=>({id:g.id,name:g.name||'',icon:g.icon||'🎲',at:g.at||0,by:g.by||''})):[],
   gameBoards:(function(){var o={},src=gameBoards&&typeof gameBoards==='object'?gameBoards:{};Object.keys(src).forEach(function(k){var b=src[k]||{};o[k]={players:Array.isArray(b.players)?b.players:[],sessions:Array.isArray(b.sessions)?b.sessions:[],loans:Array.isArray(b.loans)?b.loans:[],expenses:Array.isArray(b.expenses)?b.expenses:[],game:b.game||null,initLoan:b.initLoan||500,finals:b.finals||{},plays:b.plays||{},excl:b.excl||{},gc:!!b.gc,loanDraft:b.loanDraft||{},settle:b.settle||null,rules:typeof b.rules==='string'?b.rules:null,readme:typeof b.readme==='string'?b.readme:null}});return o})(),
   players:root.players,
@@ -2111,6 +2150,7 @@ function mergeState(b,l,r){const o=norm(JSON.parse(JSON.stringify(r)));b=norm(b)
   o.gameBoards=Object.assign({},o.gameBoards||{},l.gameBoards);
  }
  if(l.cardsMeta&&typeof l.cardsMeta==='object'&&canon(l.cardsMeta)!==canon(b.cardsMeta||{}))o.cardsMeta=l.cardsMeta;
+ if(l.hubHidden&&typeof l.hubHidden==='object'&&canon(l.hubHidden)!==canon(b.hubHidden||{}))o.hubHidden=l.hubHidden;
  return o}
 function getRecent(){try{return JSON.parse(localStorage.getItem('ptc_recent')||'[]')}catch(e){return[]}}
 function saveRecent(code,label){let r=getRecent().filter(x=>x.code!==code);r.unshift({code,label:label||code.slice(0,8),last:Date.now()});if(r.length>12)r=r.slice(0,12);try{localStorage.setItem('ptc_recent',JSON.stringify(r))}catch(e){}}
@@ -3059,7 +3099,7 @@ function startCloud(){if(!gid)return;
     if(pendingOrgPass){const pw=pendingOrgPass,setG=pendingSetGlobal,ep=pendingEditPw;pendingOrgPass=null;pendingSetGlobal=false;pendingEditPw=null;try{const salt=randHex(16),iter=150000,hash=await hashPass(pw,salt,iter);const payload=JSON.stringify({salt,iter,hash});await cloud.put(gid,'organiser',payload);if(ep){const s2=randHex(16),h2=await hashPass(ep,s2,150000);await cloud.put(gid,'access',JSON.stringify({salt:s2,iter:150000,hash:h2}));access={salt:s2,iter:150000,hash:h2};accessLoaded=true;lastCode=ep.slice(0,4)+'-'+ep.slice(4)}if(setG)await cloud.put(CFG,'createpass',payload);orgInfo={salt,iter,hash};orgLoaded=true;markOrganiser();await registerGroup(gid,groupName);if(gen===connGen)render()}catch(e){toast('Could not save admin password — set it on the Backups tab')}}
     else if(gen===connGen){render();queueMicrotask(()=>{try{persist()}catch(e){}})} })();return}
   if(inflight)return;reconcile(S)},e=>{if(gen!==connGen)return;cloudErr=((e&&e.code)||'error')+': '+((e&&e.message)||'');cs='error';synced=false;render()})}
-function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};bills=[];billSettle=null;billDraft={desc:'',amt:'',paid:'',shared:{}};feed=[];events=[];chipsBookings=[];extraGames=[];gameBoards={};activeBoardId='';cardsMeta={name:'Cards',icon:'🃏'};appMode='';billTab='list';xgrp={busy:false,err:'',list:[],picked:{},playerPicked:{},data:{},combined:null};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;ownerEmail='';players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
+function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};bills=[];billSettle=null;billDraft={desc:'',amt:'',paid:'',shared:{}};feed=[];events=[];chipsBookings=[];extraGames=[];gameBoards={};activeBoardId='';cardsMeta={name:'Cards',icon:'🃏'};hubHidden={rsvp:false,news:false};appMode='';billTab='list';xgrp={busy:false,err:'',list:[],picked:{},playerPicked:{},data:{},combined:null};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;ownerEmail='';players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
 function setGroup(code,name,opts){const nm=(name!=null?String(name):'').trim().slice(0,40);const doReg=opts&&opts.register;gid=code;saveRecent(code,nm||code.slice(0,8));
  const mode=pendingMode||hashMode||'';
  const evKeep=pendingEv||hashEv||rsvpFocusId||'';
@@ -3106,7 +3146,7 @@ async function checkAppUpdate(){
     return{updated:false,reason:hadWaiting?'activated':'latest'};
   }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
 }
-const CACHE_HINT='session-tracker-v87';
+const CACHE_HINT='session-tracker-v88';
 async function hardReloadApp(){
   // Preserve group + mode in the URL so reload stays put
   try{
