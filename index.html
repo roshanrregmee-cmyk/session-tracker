@@ -401,10 +401,10 @@ function rsvpEventCard(ev, opts){
      ${ev.by?`<div style="margin-top:4px;font-size:14px;font-weight:700">Host: ${E(ev.by)}</div>`:''}
      <div class="mut" style="margin-top:4px">${E(ev.date||'')}${timeStr?(' · '+E(timeStr)):''}${foodOn?' · 🍽 food':''}${groupName?(' · '+E(groupName)):''}</div>
     </div>
-    ${hideAdmin?'':`<div style="display:flex;gap:6px;flex-wrap:wrap">
-     <button type="button" data-evshare="${E(ev.id)}" style="padding:6px 10px;font-size:12px">Share</button>
-     ${canEdit()?`<button type="button" data-evdel="${E(ev.id)}" style="padding:6px 10px;font-size:12px">Delete</button>`:''}
-    </div>`}
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+     <button type="button" data-evshare="${E(ev.id)}" style="padding:6px 10px;font-size:12px">📤 Share status</button>
+     ${hideAdmin?'':(canEdit()?`<button type="button" data-evdel="${E(ev.id)}" style="padding:6px 10px;font-size:12px">Delete</button>`:'')}
+    </div>
    </div>
    <div style="display:flex;gap:10px;flex-wrap:wrap;margin:12px 0 8px;font-size:13px">
     <span style="background:#dcfce7;color:#166534;padding:4px 10px;border-radius:999px;font-weight:700">Yes ${yes.length}</span>
@@ -1627,26 +1627,48 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   const base=location.href.split('#')[0];
   const u=base+hashWithMode(gid,'rsvp',evId||'');
   const ev=(events||[]).find(x=>String(x.id)===String(evId));
-  const evTitle=(ev&&ev.msg)?String(ev.msg).slice(0,80):'group event';
-  const host=(ev&&ev.by)?String(ev.by).trim():'';
   const gnm=(groupName||'').trim();
-  // text has NO url (share sheets already attach url — avoids two links)
-  let textMsg='You’re invited';
-  if(host)textMsg+=' by '+host;
-  textMsg+=' to “'+evTitle+'”';
-  if(ev&&ev.date)textMsg+=' on '+ev.date;
-  if(gnm)textMsg+=' · '+gnm;
-  textMsg+='. Open the link to RSVP.';
-  if(!evId)textMsg='RSVP for '+(gnm||'our group')+'. Open the link.';
-  const title=host?('Invite from '+host):('RSVP: '+evTitle);
+  let title,textMsg;
+  if(ev){
+    const rsvps=Array.isArray(ev.rsvps)?ev.rsvps:[];
+    const yes=rsvps.filter(r=>r.status==='yes');
+    const maybe=rsvps.filter(r=>r.status==='maybe');
+    const no=rsvps.filter(r=>r.status==='no');
+    const nm=r=>((r&&r.name)||'Someone').trim()||'Someone';
+    const list=arr=>arr.length?arr.map(nm).join(', '):'—';
+    const evTitle=(ev.msg||'Event').slice(0,80);
+    const host=(ev.by||'').trim();
+    let timeStr='';
+    if(ev.timeFrom||ev.timeTo)timeStr=[ev.timeFrom,ev.timeTo].filter(Boolean).join('–');
+    title='RSVP status: '+evTitle;
+    textMsg='📋 RSVP status — '+evTitle;
+    if(host)textMsg+='\nHost: '+host;
+    if(ev.date)textMsg+='\nDate: '+ev.date+(timeStr?(' · '+timeStr):'');
+    if(gnm)textMsg+='\nGroup: '+gnm;
+    textMsg+='\n';
+    textMsg+='\n✅ Yes ('+yes.length+'): '+list(yes);
+    textMsg+='\n🤔 Maybe ('+maybe.length+'): '+list(maybe);
+    textMsg+='\n❌ No ('+no.length+'): '+list(no);
+    if(ev.food){
+      const veg=rsvps.filter(r=>r.foodPref==='veg').length;
+      const nv=rsvps.filter(r=>r.foodPref==='nonveg').length;
+      textMsg+='\n🍽 Food: Veg '+veg+' · Non-veg '+nv;
+    }
+    textMsg+='\n\nRespond here:';
+  }else{
+    title='RSVP'+(gnm?(' · '+gnm):'');
+    textMsg='RSVP for '+(gnm||'our group')+'. Open the link to see events and respond.';
+  }
+  const full=textMsg+(u?('\n'+u):'');
   const share=()=>{
    if(navigator.share){
-    navigator.share({title:title,text:textMsg,url:u}).catch(()=>{
-      if(navigator.clipboard)navigator.clipboard.writeText(u).then(()=>toast('RSVP link copied')).catch(()=>prompt('Copy this RSVP link',u));
-      else prompt('Copy this RSVP link',u);
+    // Prefer text-only with link inside message so status + link stay together (one message)
+    navigator.share({title:title,text:full}).catch(()=>{
+      if(navigator.clipboard)navigator.clipboard.writeText(full).then(()=>toast('RSVP status copied')).catch(()=>prompt('Copy RSVP status',full));
+      else prompt('Copy RSVP status',full);
     });
-   }else if(navigator.clipboard)navigator.clipboard.writeText(u).then(()=>toast('RSVP link copied')).catch(()=>prompt('Copy this RSVP link',u));
-   else prompt('Copy this RSVP link',u);
+   }else if(navigator.clipboard)navigator.clipboard.writeText(full).then(()=>toast('RSVP status copied')).catch(()=>prompt('Copy RSVP status',full));
+   else prompt('Copy RSVP status',full);
   };
   share();return}
  if(g('data-evdel')){
@@ -3169,7 +3191,7 @@ async function checkAppUpdate(){
     return{updated:false,reason:hadWaiting?'activated':'latest'};
   }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
 }
-const CACHE_HINT='session-tracker-v92';
+const CACHE_HINT='session-tracker-v93';
 async function hardReloadApp(){
   // Preserve group + mode in the URL so reload stays put
   try{
