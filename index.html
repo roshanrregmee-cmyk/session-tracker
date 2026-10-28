@@ -334,6 +334,11 @@ body.rsvp-focus main{padding-bottom:32px}
 .hub-card.hub-add:active{transform:scale(.97);opacity:.9}
 .hub-card .hub-ico,.hub-card>b,.hub-card>span{pointer-events:none}
 .hub-card .hub-del{position:absolute;top:8px;right:10px;width:28px;height:28px;border-radius:50%;border:1px solid var(--bd);background:var(--card);font-size:16px;line-height:26px;padding:0;z-index:2;cursor:pointer}
+
+.hub-ico-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:4px}
+.hub-ico-pick{font-size:28px;line-height:1;padding:12px 0;border:1px solid var(--bd);border-radius:14px;background:var(--card);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.hub-ico-pick.on{border-color:var(--g1);background:linear-gradient(135deg,rgba(255,61,129,.12),rgba(255,138,31,.12));box-shadow:0 0 0 2px rgba(255,61,129,.25)}
+.hub-ico-pick:active{transform:scale(.94)}
 </style></head><body><div id="welcome"><img src="icon-512.png" alt=""><h2>Welcome Folks! 👑</h2><button id="enterBtn" type="button">Enter</button></div><main>
 <div class="topbar">
 <div class="hd"><h1><img src="icon-192.png" alt="" style="height:1.15em;width:1.15em;border-radius:22%;vertical-align:-0.2em;margin-right:.3em"><span class="ttl" id="ttl"></span></h1><span id="ind" class="ind"></span><button id="gref" class="rbtn" title="Full refresh — reload app and clear cache" aria-label="Refresh">↻</button></div>
@@ -739,18 +744,24 @@ function hubScreen(){
   return `<button type="button" class="hub-card" data-board="${E(g.id)}"><div class="hub-ico">${E(g.icon||'🎲')}</div><b>${E(g.name||'Game')}</b><span>Sessions · loans · history</span>${canAdd?`<span class="hub-del" data-boarddel="${E(g.id)}" title="Remove">×</span>`:''}</button>`;
  }).join('');
  const addCard=canAdd?(window._hubAddOpen
-  ? `<div class="card" id="hub_add_panel" style="grid-column:1/-1;text-align:left">
+  ? (function(){
+      const icons=['🎲','🃏','♠️','♥️','♦️','♣️','🏆','🎯','🔥','⭐','👑','💰','🪙','🎰','🥳','🌙','☕','🍕','🍻','🎮'];
+      const sel=window._hubIcon||'🎲';
+      const grid=icons.map(ic=>`<button type="button" class="hub-ico-pick${ic===sel?' on':''}" data-hubico="${ic}" aria-label="Icon">${ic}</button>`).join('');
+      return `<div class="card" id="hub_add_panel" style="grid-column:1/-1;text-align:left">
       <b>New game</b>
       <div class="mut" style="margin:4px 0 10px">Name it — starts empty. Cards stays as it is.</div>
       <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Name</label>
       <input id="hub_gname" type="text" maxlength="40" placeholder="e.g. Friday night" style="width:100%;margin-bottom:10px" autocomplete="off">
-      <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Icon (optional)</label>
-      <input id="hub_gicon" type="text" maxlength="4" value="🎲" style="width:100%;margin-bottom:12px">
-      <div style="display:flex;gap:8px">
+      <label style="display:block;font-size:13px;font-weight:700;margin-bottom:6px">Icon</label>
+      <div class="hub-ico-grid">${grid}</div>
+      <input type="hidden" id="hub_gicon" value="${E(sel)}">
+      <div style="display:flex;gap:8px;margin-top:12px">
         <button type="button" class="pri" id="hub_add_go" style="flex:1">Create</button>
         <button type="button" id="hub_add_cancel" style="flex:1">Cancel</button>
       </div>
-    </div>`
+    </div>`;
+    })()
   : `<button type="button" class="hub-card hub-add" id="hub_add_game"><div class="hub-ico">＋</div><b>New game</b><span>Organiser / admin</span></button>`):'';
  return`<div class="hub">
   <button type="button" class="hub-card" data-mode="poker"><div class="hub-ico">🃏</div><b>Cards</b><span>Sessions, loans &amp; game expenses</span></button>
@@ -1432,11 +1443,18 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  if(t.closest('#hub_add_game')){
   e.preventDefault();e.stopPropagation();
   if(!canOrganise())return toast('Only the organiser or admin can add a game');
-  window._hubAddOpen=true;
+  window._hubAddOpen=true;if(!window._hubIcon)window._hubIcon='🎲';
   render();
   queueMicrotask(()=>{try{const el=$('#hub_gname');if(el){el.focus();el.click()}}catch(e){}});
   return}
- if(t.closest('#hub_add_cancel')){e.preventDefault();window._hubAddOpen=false;render();return}
+ if(t.closest('[data-hubico]')){
+  e.preventDefault();e.stopPropagation();
+  const ic=t.closest('[data-hubico]').getAttribute('data-hubico')||'🎲';
+  window._hubIcon=ic;
+  const hid=$('#hub_gicon');if(hid)hid.value=ic;
+  document.querySelectorAll('.hub-ico-pick').forEach(b=>b.classList.toggle('on',b.getAttribute('data-hubico')===ic));
+  return}
+ if(t.closest('#hub_add_cancel')){e.preventDefault();window._hubAddOpen=false;window._hubIcon=null;render();return}
  if(t.closest('#hub_add_go')){
   e.preventDefault();e.stopPropagation();
   if(window._hubAddBusy)return;
@@ -3038,7 +3056,7 @@ async function checkAppUpdate(){
     return{updated:false,reason:hadWaiting?'activated':'latest'};
   }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
 }
-const CACHE_HINT='session-tracker-v83';
+const CACHE_HINT='session-tracker-v84';
 async function hardReloadApp(){
   // Preserve group + mode in the URL so reload stays put
   try{
