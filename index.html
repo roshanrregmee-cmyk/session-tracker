@@ -333,7 +333,7 @@ body.rsvp-focus main{padding-bottom:32px}
 .hub-card .hub-del{position:absolute;top:8px;right:10px;width:28px;height:28px;border-radius:50%;border:1px solid var(--bd);background:var(--card);font-size:16px;line-height:26px;padding:0;z-index:2;cursor:pointer}
 </style></head><body><div id="welcome"><img src="icon-512.png" alt=""><h2>Welcome Folks! 👑</h2><button id="enterBtn" type="button">Enter</button></div><main>
 <div class="topbar">
-<div class="hd"><h1><img src="icon-192.png" alt="" style="height:1.15em;width:1.15em;border-radius:22%;vertical-align:-0.2em;margin-right:.3em"><span class="ttl" id="ttl"></span></h1><span id="ind" class="ind"></span><button id="gref" class="rbtn" title="Refresh live data · Shift+click for full app reload" aria-label="Refresh">↻</button></div>
+<div class="hd"><h1><img src="icon-192.png" alt="" style="height:1.15em;width:1.15em;border-radius:22%;vertical-align:-0.2em;margin-right:.3em"><span class="ttl" id="ttl"></span></h1><span id="ind" class="ind"></span><button id="gref" class="rbtn" title="Full refresh — reload app and clear cache" aria-label="Refresh">↻</button></div>
 <div class="intro mut">Add sessions, track loans and expenses.</div>
 <div class="tabs"><button data-t="hist">History</button><button data-t="add">New session</button><button data-t="loans">Loans</button><button data-t="expenses">Expenses</button><button data-t="dash">Dashboard</button><button data-t="backup">Backups</button><button data-t="rules">Rules</button></div>
 </div>
@@ -788,7 +788,11 @@ function stashCurrentBoard(){
  else gameBoards.__root=snapshotBoard();
 }
 function openCardsFromHub(){
- if(activeBoardId){stashCurrentBoard();if(gameBoards&&gameBoards.__root)applyBoardSnap(gameBoards.__root);activeBoardId='';}
+ if(activeBoardId){
+  stashCurrentBoard();
+  activeBoardId='';
+  if(gameBoards&&gameBoards.__root)applyBoardSnap(gameBoards.__root);
+ }
  appMode='poker';tab='hist';
  try{history.replaceState(null,'','#g='+gid+'&mode=poker')}catch(e){}
  render();
@@ -797,8 +801,10 @@ function prepareOpenCustom(id){
  if(!id)return openCardsFromHub();
  if(activeBoardId===id){appMode='poker';tab='hist';render();return}
  stashCurrentBoard();
+ // If we still don't have a Cards snapshot, capture it once (only when leaving Cards)
+ if(!gameBoards.__root&&!activeBoardId)gameBoards.__root=snapshotBoard();
  activeBoardId=id;
- if(!gameBoards[id])gameBoards[id]={players:[],sessions:[],loans:[],expenses:[],game:null,initLoan:500};
+ if(!gameBoards[id])gameBoards[id]={players:[],sessions:[],loans:[],expenses:[],game:null,initLoan:500,rules:null,readme:null};
  applyBoardSnap(gameBoards[id]);
  appMode='poker';tab='hist';
  try{history.replaceState(null,'','#g='+gid+'&mode=poker&board='+id)}catch(e){}
@@ -1410,15 +1416,15 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   if(!icon)icon='🎲';
   if(!Array.isArray(extraGames))extraGames=[];
   if(!gameBoards||typeof gameBoards!=='object')gameBoards={};
+  // Save Cards (or current board) BEFORE switching — never wipe Cards
+  stashCurrentBoard();
   const id=uid();
-  // Fresh board: empty players/sessions and clear Rules for this board
+  // New game only: empty data + empty Rules tab for THIS board (Cards rules stay in __root)
   gameBoards[id]={players:[],sessions:[],loans:[],expenses:[],game:null,initLoan:500,finals:{},plays:{},excl:{},gc:false,loanDraft:{},settle:null,rules:null,readme:null};
   extraGames.push({id,name,icon,at:Date.now(),by:(emailUser&&(emailUser.name||emailUser.email))||'organiser'});
-  // Clear group-level rules when starting a new game module
-  rules=null;notesDraft={};
   toast('Opening “'+name+'”…');
-  queueMicrotask(()=>{try{persist()}catch(e){console.error(e)}});
   prepareOpenCustom(id);
+  queueMicrotask(()=>{try{persist()}catch(e){console.error(e)}});
   return}
  if(g('data-boarddel')){
   e.preventDefault();e.stopPropagation();
@@ -1721,7 +1727,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
    toast(v?'Short link saved':'Short link cleared');render();
   }catch(e){toast('Could not save the link')}
  })();return}
- else if(t.id=='gref'||t.id=='gref2'||t.id=='gref-join'||t.id=='gref-page'){refreshGroup(!!e.shiftKey||t.id==='gref2');if(tab=='backup')setTimeout(loadBackups,1500)}
+ else if(t.id=='gref'||t.id=='gref2'||t.id=='gref-join'||t.id=='gref-page'){refreshGroup(true);if(tab=='backup')setTimeout(loadBackups,1500)}
  else if(g('data-gleave')){if(confirm('Leave this group on this device? The shared data stays in the cloud.'))leaveGroup()}
  else if(g('data-gswitch')){if(confirm('Switch to another group? You can return later from Recent groups.'))switchGroupUI()}
  else if(g('data-gsw')){openExistingGroup(g('data-gsw').dataset.gsw)}
@@ -1842,18 +1848,101 @@ function hashWithMode(code,mode,ev){
 const canon=x=>JSON.stringify(x,(k,v)=>v&&typeof v=='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(q=>[q,v[q]])):v);
 const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],expenses:S.expenses||[],settle:S.settle||null,initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:null,groupName:typeof S.groupName=='string'?S.groupName:'',bills:(S.bills||[]),billSettle:S.billSettle||null,feed:Array.isArray(S.feed)?S.feed:[],events:Array.isArray(S.events)?S.events:[],chipsBookings:Array.isArray(S.chipsBookings)?S.chipsBookings:[],extraGames:Array.isArray(S.extraGames)?S.extraGames:[],gameBoards:(S.gameBoards&&typeof S.gameBoards==='object')?S.gameBoards:{}});
 function getState(){if(!Array.isArray(sessions))sessions=[];if(!Array.isArray(loans))loans=[];if(!Array.isArray(expenses))expenses=[];if(!Array.isArray(bills))bills=[];if(!Array.isArray(feed))feed=[];if(!Array.isArray(events))events=[];if(!Array.isArray(chipsBookings))chipsBookings=[];if(!Array.isArray(players))players=[];sessions.forEach(x=>{if(!x.id)x.id=uid()});loans.forEach(l=>{if(!l.id)l.id=uid()});expenses.forEach(e=>{if(!e.id)e.id=uid()});
- try{if(!gameBoards||typeof gameBoards!=='object')gameBoards={};if(activeBoardId)gameBoards[activeBoardId]=snapshotBoard();else gameBoards.__root=snapshotBoard()}catch(e){}
- return{extraGames:Array.isArray(extraGames)?extraGames.map(g=>({id:g.id,name:g.name||'',icon:g.icon||'🎲',at:g.at||0,by:g.by||''})):[],gameBoards:(function(){var o={},src=gameBoards&&typeof gameBoards==='object'?gameBoards:{};Object.keys(src).forEach(function(k){var b=src[k]||{};o[k]={players:Array.isArray(b.players)?b.players:[],sessions:Array.isArray(b.sessions)?b.sessions:[],loans:Array.isArray(b.loans)?b.loans:[],expenses:Array.isArray(b.expenses)?b.expenses:[],game:b.game||null,initLoan:b.initLoan||500,finals:b.finals||{},plays:b.plays||{},excl:b.excl||{},gc:!!b.gc,loanDraft:b.loanDraft||{},settle:b.settle||null,rules:typeof b.rules==='string'?b.rules:null,readme:typeof b.readme==='string'?b.readme:null}});return o})(),players:[...players],sessions:sessions.map(x=>({id:x.id,date:(x.date||''),label:(x.label||''),v:(x.v&&typeof x.v==='object')?{...x.v}:{}})),loans:loans.map(l=>({id:l.id,date:l.date,who:l.who,amt:l.amt,src:l.src||null,g:l.g||'',done:!!l.done})),initLoan,game:game?{date:game.date,players:Array.isArray(game.players)?[...game.players]:[],exited:(game.exited&&typeof game.exited==='object')?{...game.exited}:{},settledPrior:(game.settledPrior&&typeof game.settledPrior==='object')?{...game.settledPrior}:{}}:null,readme,rules,groupName,expenses:expenses.map(e=>({id:e.id,date:e.date||'',desc:e.desc||'',paidBy:e.paidBy,amt:e.amt,split:e.split&&e.split.length?[...e.split]:null,g:e.g||'',done:!!e.done})),settle:settle?JSON.parse(JSON.stringify(settle)):null,bills:[],feed:(feed||[]).slice(0,40).map(x=>({id:x.id,at:x.at,text:x.text||''})),events:(events||[]).map(ev=>({id:ev.id,msg:ev.msg||'',date:ev.date||'',timeFrom:ev.timeFrom||'',timeTo:ev.timeTo||'',food:!!ev.food,at:ev.at||0,by:ev.by||'',rsvps:Array.isArray(ev.rsvps)?ev.rsvps.map(r=>({name:r.name||'',status:r.status||'yes',foodPref:r.foodPref||'',at:r.at||0})):[]})),chipsBookings:(chipsBookings||[]).map(b=>({id:b.id,who:b.who||'',from:b.from||'',to:b.to||'',note:b.note||'',at:b.at||0})),billSettle:billSettle?JSON.parse(JSON.stringify(billSettle)):null}}
+ // Keep Cards and custom boards separate: stash UI into the active board, then
+ // always write root players/sessions/... from Cards (__root), never from a custom board.
+ if(!gameBoards||typeof gameBoards!=='object')gameBoards={};
+ try{
+  if(activeBoardId)gameBoards[activeBoardId]=snapshotBoard();
+  else gameBoards.__root=snapshotBoard();
+ }catch(e){console.error(e)}
+ const root=(!activeBoardId)?{
+  players:[...players],
+  sessions:sessions.map(x=>({id:x.id,date:(x.date||''),label:(x.label||''),v:(x.v&&typeof x.v==='object')?{...x.v}:{}})),
+  loans:loans.map(l=>({id:l.id,date:l.date,who:l.who,amt:l.amt,src:l.src||null,g:l.g||'',done:!!l.done})),
+  expenses:expenses.map(e=>({id:e.id,date:e.date||'',desc:e.desc||'',paidBy:e.paidBy,amt:e.amt,split:e.split&&e.split.length?[...e.split]:null,g:e.g||'',done:!!e.done})),
+  initLoan:initLoan,
+  game:game?{date:game.date,players:Array.isArray(game.players)?[...game.players]:[],exited:(game.exited&&typeof game.exited==='object')?{...game.exited}:{},settledPrior:(game.settledPrior&&typeof game.settledPrior==='object')?{...game.settledPrior}:{}}:null,
+  settle:settle?JSON.parse(JSON.stringify(settle)):null,
+  rules:(typeof rules==='string')?rules:null,
+  readme:(typeof readme==='string')?readme:null
+ }:(function(){
+  const R=gameBoards.__root||{players:[],sessions:[],loans:[],expenses:[],initLoan:500,game:null,settle:null,rules:null,readme:null};
+  return{
+   players:Array.isArray(R.players)?[...R.players]:[],
+   sessions:(Array.isArray(R.sessions)?R.sessions:[]).map(x=>({id:x.id,date:(x.date||''),label:(x.label||''),v:(x.v&&typeof x.v==='object')?{...x.v}:{}})),
+   loans:(Array.isArray(R.loans)?R.loans:[]).map(l=>({id:l.id,date:l.date,who:l.who,amt:l.amt,src:l.src||null,g:l.g||'',done:!!l.done})),
+   expenses:(Array.isArray(R.expenses)?R.expenses:[]).map(e=>({id:e.id,date:e.date||'',desc:e.desc||'',paidBy:e.paidBy,amt:e.amt,split:e.split&&e.split.length?[...e.split]:null,g:e.g||'',done:!!e.done})),
+   initLoan:R.initLoan||500,
+   game:R.game?JSON.parse(JSON.stringify(R.game)):null,
+   settle:R.settle?JSON.parse(JSON.stringify(R.settle)):null,
+   rules:(typeof R.rules==='string')?R.rules:null,
+   readme:(typeof R.readme==='string')?R.readme:null
+  };
+ })();
+ // Always keep a fresh __root mirror of Cards for board switching
+ gameBoards.__root={
+  players:root.players,
+  sessions:root.sessions,
+  loans:root.loans,
+  expenses:root.expenses,
+  initLoan:root.initLoan,
+  game:root.game,
+  settle:root.settle,
+  rules:root.rules,
+  readme:root.readme,
+  finals:(!activeBoardId?{...finals}:(gameBoards.__root&&gameBoards.__root.finals)||{}),
+  plays:(!activeBoardId?{...plays}:(gameBoards.__root&&gameBoards.__root.plays)||{}),
+  excl:(!activeBoardId?{...excl}:(gameBoards.__root&&gameBoards.__root.excl)||{}),
+  gc:!activeBoardId?!!gc:!!(gameBoards.__root&&gameBoards.__root.gc),
+  loanDraft:!activeBoardId?JSON.parse(JSON.stringify(loanDraft||{})):(gameBoards.__root&&gameBoards.__root.loanDraft)||{}
+ };
+ return{
+  extraGames:Array.isArray(extraGames)?extraGames.map(g=>({id:g.id,name:g.name||'',icon:g.icon||'🎲',at:g.at||0,by:g.by||''})):[],
+  gameBoards:(function(){var o={},src=gameBoards&&typeof gameBoards==='object'?gameBoards:{};Object.keys(src).forEach(function(k){var b=src[k]||{};o[k]={players:Array.isArray(b.players)?b.players:[],sessions:Array.isArray(b.sessions)?b.sessions:[],loans:Array.isArray(b.loans)?b.loans:[],expenses:Array.isArray(b.expenses)?b.expenses:[],game:b.game||null,initLoan:b.initLoan||500,finals:b.finals||{},plays:b.plays||{},excl:b.excl||{},gc:!!b.gc,loanDraft:b.loanDraft||{},settle:b.settle||null,rules:typeof b.rules==='string'?b.rules:null,readme:typeof b.readme==='string'?b.readme:null}});return o})(),
+  players:root.players,
+  sessions:root.sessions,
+  loans:root.loans,
+  initLoan:root.initLoan,
+  game:root.game,
+  readme:root.readme,
+  rules:root.rules,
+  groupName:groupName,
+  expenses:root.expenses,
+  settle:root.settle,
+  bills:[],
+  feed:(feed||[]).slice(0,40).map(x=>({id:x.id,at:x.at,text:x.text||''})),
+  events:(events||[]).map(ev=>({id:ev.id,msg:ev.msg||'',date:ev.date||'',timeFrom:ev.timeFrom||'',timeTo:ev.timeTo||'',food:!!ev.food,at:ev.at||0,by:ev.by||'',rsvps:Array.isArray(ev.rsvps)?ev.rsvps.map(r=>({name:r.name||'',status:r.status||'yes',foodPref:r.foodPref||'',at:r.at||0})):[]})),
+  chipsBookings:(chipsBookings||[]).map(b=>({id:b.id,who:b.who||'',from:b.from||'',to:b.to||'',note:b.note||'',at:b.at||0})),
+  billSettle:billSettle?JSON.parse(JSON.stringify(billSettle)):null
+ }
+}
 function applyState(S){S=norm(S);players=Array.isArray(S.players)?[...S.players]:[];
  sessions=(Array.isArray(S.sessions)?S.sessions:[]).map(x=>{const v=(x&&x.v&&typeof x.v==='object')?{...x.v}:{};return{...(x||{}),v}});
  loans=(Array.isArray(S.loans)?S.loans:[]).map(l=>({...(l||{})}));
  initLoan=num(S.initLoan)?S.initLoan:500;
  if(S.game&&typeof S.game==='object'){const gp=Array.isArray(S.game.players)?[...S.game.players]:[];game={date:S.game.date||'',players:gp,exited:(S.game.exited&&typeof S.game.exited==='object')?{...S.game.exited}:{},settledPrior:(S.game.settledPrior&&typeof S.game.settledPrior==='object')?{...S.game.settledPrior}:{}};}
  else game=null;
- readme=S.readme;rules=S.rules;groupName=S.groupName||'';
+ groupName=S.groupName||'';
  extraGames=Array.isArray(S.extraGames)?S.extraGames.map(function(g){return{id:g.id,name:g.name||'',icon:g.icon||'🎲',at:g.at||0,by:g.by||''}}):[];
  gameBoards=(S.gameBoards&&typeof S.gameBoards==='object')?JSON.parse(JSON.stringify(S.gameBoards)):{};
- if(activeBoardId&&gameBoards[activeBoardId]){try{applyBoardSnap(gameBoards[activeBoardId])}catch(e){}}
+ // Root fields from cloud ARE Cards — always mirror into __root so switching never loses them
+ if(!gameBoards||typeof gameBoards!=='object')gameBoards={};
+ gameBoards.__root={
+  players:Array.isArray(S.players)?[...S.players]:[],
+  sessions:(Array.isArray(S.sessions)?S.sessions:[]).map(x=>({...(x||{}),v:(x&&x.v&&typeof x.v==='object')?{...x.v}:{}})),
+  loans:(Array.isArray(S.loans)?S.loans:[]).map(l=>({...(l||{})})),
+  expenses:(Array.isArray(S.expenses)?S.expenses:[]).map(e=>({...(e||{})})),
+  game:S.game?JSON.parse(JSON.stringify(S.game)):null,
+  initLoan:num(S.initLoan)?S.initLoan:500,
+  settle:S.settle?JSON.parse(JSON.stringify(S.settle)):null,
+  rules:typeof S.rules==='string'?S.rules:null,
+  readme:typeof S.readme==='string'?S.readme:null
+ };
+ if(activeBoardId&&gameBoards[activeBoardId]){
+  try{applyBoardSnap(gameBoards[activeBoardId])}catch(e){}
+ }else{
+  readme=S.readme;rules=S.rules;
+ }
  expenses=(Array.isArray(S.expenses)?S.expenses:[]).map(e=>({...(e||{})}));settle=S.settle||null;
  bills=(Array.isArray(S.bills)?S.bills:[]).map(e=>({...(e||{})}));billSettle=S.billSettle||null;
  // One-time migrate old independent bills into expenses
@@ -2847,7 +2936,7 @@ async function checkAppUpdate(){
     return{updated:false,reason:hadWaiting?'activated':'latest'};
   }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
 }
-const CACHE_HINT='session-tracker-v76';
+const CACHE_HINT='session-tracker-v78';
 async function hardReloadApp(){
   try{
     if('caches' in window){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}
@@ -2863,11 +2952,13 @@ async function hardReloadApp(){
   location.replace(u.toString());
 }
 async function refreshGroup(forceHard){
-  toast(forceHard?'Refreshing app…':'Checking for app update…');
-  if(forceHard){
+  // Mobile: ↻ always does a full app reload (clear cache + new version)
+  if(forceHard!==false){
+    toast('Refreshing app…');
     try{await hardReloadApp()}catch(e){location.reload()}
     return;
   }
+  toast('Checking for app update…');
   let upd={updated:false};
   try{upd=await checkAppUpdate()}catch(e){}
   if(upd&&upd.updated){toast('Updating app…');return}
@@ -2914,7 +3005,7 @@ async function refreshGroup(forceHard){
   if(!gid){toast('App is up to date');try{await hardReloadApp()}catch(e){location.reload()};return}
   if(window.cloud&&cloud.stop)try{cloud.stop()}catch(e){}
   cloudOn=false;synced=false;cs='connecting';base=null;lastSent='';inflight=0;
-  startCloud();render();toast('Live data refreshed · Shift+click top ↻ for full app reload')
+  startCloud();render();toast('Live data refreshed')
 }
 function leaveGroup(){rsvpFocusId='';try{sessionStorage.removeItem('ptc_rsvp_focus')}catch(e){}window._glLoaded=false;connGen++;if(window._connTimer){clearTimeout(window._connTimer);window._connTimer=null}const keepAdmin=(()=>{try{return sessionStorage.getItem('ptc_admin_open')==='1'}catch(e){return false}})();if(keepAdmin){adminOpen=true;adminPw=adminPw||'session';adminSection=adminSection||'groups';loadGroupList().then(l=>{adminGroups=l;render()}).catch(()=>{})}else{adminOpen=false;adminPw=null}if(gid){saveRecent(gid,groupName||gid.slice(0,8));try{localStorage.removeItem(viewKey());localStorage.removeItem(editKey())}catch(e){}}if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;gid='';try{localStorage.removeItem('ptc_group');history.replaceState(null,'',location.pathname)}catch(e){}clearLocal();render()}
 function switchGroupUI(){tab='hist';leaveGroup()}
