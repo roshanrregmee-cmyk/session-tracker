@@ -239,7 +239,8 @@ body.dopen #scrim{opacity:1;pointer-events:auto}
 #drawer #gbar{display:flex;flex-direction:column;gap:10px;font-size:15px}
 #drawer #gbar button{width:100%;font-size:15px;padding:12px 16px;text-align:left}
 .nogrp #drawer,.nogrp #scrim,.nogrp .ind{display:none}
-body.adminon #fab{display:none}
+body.adminon.nogrp #fab{display:none}
+body:not(.nogrp):not(.rsvp-focus) #fab{display:block!important;visibility:visible!important}
 @media(prefers-reduced-motion:reduce){#drawer,#scrim,main{transition:none;animation:none}}
 #v{/* transitions disabled for stability */}
 #v.v-show{opacity:1;transform:none}
@@ -331,6 +332,7 @@ body.rsvp-focus main{padding-bottom:32px}
 
 .hub-card.hub-add{border-style:dashed;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 .hub-card.hub-add:active{transform:scale(.97);opacity:.9}
+.hub-card .hub-ico,.hub-card>b,.hub-card>span{pointer-events:none}
 .hub-card .hub-del{position:absolute;top:8px;right:10px;width:28px;height:28px;border-radius:50%;border:1px solid var(--bd);background:var(--card);font-size:16px;line-height:26px;padding:0;z-index:2;cursor:pointer}
 </style></head><body><div id="welcome"><img src="icon-512.png" alt=""><h2>Welcome Folks! 👑</h2><button id="enterBtn" type="button">Enter</button></div><main>
 <div class="topbar">
@@ -731,7 +733,7 @@ function newsView(){
  return sectionNav('<button type="button" data-ncopy>📤 Share</button>')+mast+ctl+body}
 
 function hubScreen(){
- const canAdd=!!(typeof canOrganise==='function'&&canOrganise());
+ const canAdd=!!((typeof canOrganise==='function'&&canOrganise())||(typeof isSessionAdmin==='function'&&isSessionAdmin()));
  const games=Array.isArray(extraGames)?extraGames:[];
  const gameCards=games.map(g=>{
   return `<button type="button" class="hub-card" data-board="${E(g.id)}"><div class="hub-ico">${E(g.icon||'🎲')}</div><b>${E(g.name||'Game')}</b><span>Sessions · loans · history</span>${canAdd?`<span class="hub-del" data-boarddel="${E(g.id)}" title="Remove">×</span>`:''}</button>`;
@@ -1426,14 +1428,16 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  if(t.id=='xgrp-load'){xgrpLoadList();return}
  if(t.id=='xgrp-fetch'){xgrpFetch();return}
  if(t.id=='xgrp-import'){xgrpImport();return}
- if(t.id=='hub_add_game'){
+ // Use closest() so taps on icon/text inside the button still count (mobile)
+ if(t.closest('#hub_add_game')){
   e.preventDefault();e.stopPropagation();
   if(!canOrganise())return toast('Only the organiser or admin can add a game');
-  window._hubAddOpen=true;render();
-  queueMicrotask(()=>{try{const el=$('#hub_gname');if(el)el.focus()}catch(e){}});
+  window._hubAddOpen=true;
+  render();
+  queueMicrotask(()=>{try{const el=$('#hub_gname');if(el){el.focus();el.click()}}catch(e){}});
   return}
- if(t.id=='hub_add_cancel'){window._hubAddOpen=false;render();return}
- if(t.id=='hub_add_go'){
+ if(t.closest('#hub_add_cancel')){e.preventDefault();window._hubAddOpen=false;render();return}
+ if(t.closest('#hub_add_go')){
   e.preventDefault();e.stopPropagation();
   if(window._hubAddBusy)return;
   if(!canOrganise())return toast('Only the organiser or admin can add a game');
@@ -1446,7 +1450,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   if(!gameBoards||typeof gameBoards!=='object')gameBoards={};
   try{
     if(activeBoardId){stashCurrentBoard();activeBoardId='';if(gameBoards.__root)applyBoardSnap(gameBoards.__root)}
-    stashCurrentBoard(); // Cards → __root with its own rules intact
+    stashCurrentBoard();
   }catch(e){}
   const id=uid();
   gameBoards[id]={players:[],sessions:[],loans:[],expenses:[],game:null,initLoan:500,finals:{},plays:{},excl:{},gc:false,loanDraft:{},settle:null,rules:'',readme:null};
@@ -1592,9 +1596,29 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   game={date:dd,players:ps};gc=false;finals={};loanDraft={};ld=dd;tab='loans';render();toast('Game started — add fresh loans, then tap Game completion')}
  else if(t.id=='gdisc'){if(confirm('Discard this game and its loans?')){loans=loans.filter(l=>l.done);game=null;gc=false;finals={};loanDraft={};render()}}
  else if(g('data-nedit')){const k=g('data-nedit').dataset.nedit;editing[k]=true;notesDraft[k]=k=='readme'?(readme===null?README_DEFAULT:readme):(rules===null?RULES_DEFAULT:rules);render()}
- else if(g('data-nsave')){const k=g('data-nsave').dataset.nsave,v=notesDraft[k]===undefined?(k=='readme'?(readme===null?README_DEFAULT:readme):(rules===null?RULES_DEFAULT:rules)):notesDraft[k];if(k=='readme')readme=v.trim()===README_DEFAULT.trim()?null:v;else{rules=v.trim()===RULES_DEFAULT.trim()?null:v;if(activeBoardId&&gameBoards&&gameBoards[activeBoardId])gameBoards[activeBoardId].rules=rules}editing[k]=false;delete notesDraft[k];render();toast('Saved');queueMicrotask(()=>{try{persist()}catch(e){}})}
+ else if(g('data-nsave')){
+  const k=g('data-nsave').dataset.nsave;
+  const v=notesDraft[k]===undefined?(k=='readme'?(readme===null?README_DEFAULT:readme):(rules===null?RULES_DEFAULT:rules)):notesDraft[k];
+  if(k=='readme'){
+    readme=v.trim()===README_DEFAULT.trim()?null:v;
+  }else{
+    // Keep custom text; null only means "use built-in default"
+    rules=(v.trim()===RULES_DEFAULT.trim())?null:v;
+    if(!gameBoards||typeof gameBoards!=='object')gameBoards={};
+    if(activeBoardId){
+      if(!gameBoards[activeBoardId])gameBoards[activeBoardId]={players:[],sessions:[],loans:[],expenses:[],game:null,initLoan:500};
+      gameBoards[activeBoardId].rules=(rules===null?'':rules);
+      gameBoards[activeBoardId].readme=(typeof readme==='string')?readme:null;
+    }else{
+      try{gameBoards.__root=snapshotBoard();gameBoards.__root.rules=rules;gameBoards.__root.readme=readme}catch(e){}
+    }
+  }
+  editing[k]=false;delete notesDraft[k];
+  render();toast(k==='rules'?'Rules saved for this game':'Saved');
+  queueMicrotask(()=>{try{persist()}catch(e){console.error(e)}});
+ }
  else if(g('data-ncancel')){const k=g('data-ncancel').dataset.ncancel;editing[k]=false;delete notesDraft[k];render()}
- else if(g('data-nreset')){const k=g('data-nreset').dataset.nreset;if(confirm('Replace the '+k+' with the original text?')){if(k=='readme'){readme=null;editing.readme=false;delete notesDraft.readme}else{rules=null;editing.rules=false;delete notesDraft.rules}render()}}
+ else if(g('data-nreset')){const k=g('data-nreset').dataset.nreset;if(confirm('Replace the '+k+' with the original text?')){if(k=='readme'){readme=null;editing.readme=false;delete notesDraft.readme}else{rules=null;editing.rules=false;delete notesDraft.rules;if(!gameBoards||typeof gameBoards!=='object')gameBoards={};if(activeBoardId){if(!gameBoards[activeBoardId])gameBoards[activeBoardId]={};gameBoards[activeBoardId].rules=''}else if(gameBoards.__root)gameBoards.__root.rules=null}editing[k]=false;delete notesDraft[k];render();toast(k==='rules'?'Rules restored to default':'Reset');queueMicrotask(()=>{try{persist()}catch(e){}})}}
  else if(t.id=='exadd'){const cand=game?game.players:players,amt=parseFloat(exDraft.amt),paid=exDraft.paid&&players.includes(exDraft.paid)?exDraft.paid:cand[0],sh=cand.filter(p=>exDraft.shared[p]!==false);
   if(!(amt>0))return toast('Enter an amount greater than 0');if(!sh.length)return toast('Choose who shares it');
   const _ed=(exDraft.desc||'').trim()||'Expense';expenses.push({id:uid(),date:new Date().toLocaleDateString('en-CA'),desc:_ed,paidBy:paid,amt,split:sh.length==cand.length?null:sh,g:game?game.date:'',done:false});logFeed(_ed+' · paid by '+paid);exDraft={desc:'',amt:'',paid:'',shared:{}};render();toast('Expense added')}
@@ -3014,7 +3038,7 @@ async function checkAppUpdate(){
     return{updated:false,reason:hadWaiting?'activated':'latest'};
   }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
 }
-const CACHE_HINT='session-tracker-v81';
+const CACHE_HINT='session-tracker-v83';
 async function hardReloadApp(){
   // Preserve group + mode in the URL so reload stays put
   try{
