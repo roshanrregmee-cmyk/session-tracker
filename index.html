@@ -342,10 +342,9 @@ body.rsvp-focus main{padding-bottom:32px}
 
 /* Swipe-to-remove on hub tiles (organiser / admin only) */
 .hub-swipe{position:relative;overflow:hidden;border-radius:22px;touch-action:pan-y;background:#fecaca}
-.hub-swipe-track{display:flex;width:100%;transition:transform .22s cubic-bezier(.2,.8,.2,1);will-change:transform}
-.hub-swipe-track.open{transition:transform .22s cubic-bezier(.2,.8,.2,1)}
-.hub-swipe .hub-card{flex:0 0 100%;width:100%;margin:0;border-radius:22px;box-shadow:var(--sh)}
-.hub-swipe-del{flex:0 0 88px;width:88px;border:0;border-radius:0 22px 22px 0;background:#dc2626;color:#fff;font-weight:800;font-size:14px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.hub-swipe-track{display:flex;flex-wrap:nowrap;width:100%;transition:transform .22s cubic-bezier(.2,.8,.2,1);will-change:transform}
+.hub-swipe .hub-card{flex:0 0 100%;width:100%;min-width:100%;margin:0;border-radius:22px;box-shadow:var(--sh);position:relative;z-index:1}
+.hub-swipe-del{flex:0 0 96px;width:96px;min-width:96px;border:0;border-radius:0 22px 22px 0;background:#dc2626;color:#fff;font-weight:800;font-size:14px;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;z-index:2}
 .hub-swipe-del:active{background:#b91c1c}
 .hub-hint-swipe{font-size:12px;text-align:center;color:var(--mut);margin:0 0 8px}
 </style></head><body><div id="welcome"><img src="icon-512.png" alt=""><h2>Welcome Folks! 👑</h2><button id="enterBtn" type="button">Enter</button></div><main>
@@ -358,7 +357,7 @@ body.rsvp-focus main{padding-bottom:32px}
 <script>
 const $=s=>document.querySelector(s),E=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let adminPw=null,adminOpen=false,adminGroups=[],pendingEditPw=null,adminSection='groups',emailUsers=[],emailUser=null,emailAuthMode='',emailOtpPending=null,pendingGroupMeta=null,ownerEmail='';
-let aiFn,aiTips={},aiKey='',aiBusy=false,aiMsg='',excl={},game=null,gc=false,finals={},plays={},initLoan=500,loans=[],loanDraft={},ld=new Date().toLocaleDateString('en-CA'),hsort='desc',hpl='file',ALLP=[],PERIOD={a:0,b:-1,N:0},rf=0,rt=-1,players=[],sessions=[],draft={},tab='hist',dd=new Date().toLocaleDateString('en-CA'),appMode='',billTab='list',bills=[],billDraft={desc:'',amt:'',paid:'',shared:{}},billSettle=null,feed=[],events=[],chipsBookings=[],extraGames=[],gameBoards={},activeBoardId='',cardsMeta={name:'Cards',icon:'🃏'},hubHidden={cards:false,rsvp:false,news:false},xgrp={busy:false,err:'',list:[],picked:{},data:{},combined:null};
+let aiFn,aiTips={},aiKey='',aiBusy=false,aiMsg='',excl={},game=null,gc=false,finals={},plays={},initLoan=500,loans=[],loanDraft={},ld=new Date().toLocaleDateString('en-CA'),hsort='desc',hpl='file',ALLP=[],PERIOD={a:0,b:-1,N:0},rf=0,rt=-1,players=[],sessions=[],draft={},tab='hist',dd=new Date().toLocaleDateString('en-CA'),appMode='',billTab='list',bills=[],billDraft={desc:'',amt:'',paid:'',shared:{}},billSettle=null,feed=[],events=[],chipsBookings=[],extraGames=[],gameBoards={},activeBoardId='',cardsMeta={name:'Cards',icon:'🃏'},hubHidden={cards:false,rsvp:false,news:false,noGames:false},xgrp={busy:false,err:'',list:[],picked:{},data:{},combined:null};
 const num=v=>typeof v==='number'&&isFinite(v),f=n=>num(n)?n.toLocaleString():'',cls=n=>n>0?'pos':n<0?'neg':'';
 const iso2ser=d=>Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10))/864e5+25569;
 const ser2iso=n=>new Date(Math.round((n-25569)*864e5)).toISOString().slice(0,10);
@@ -750,18 +749,25 @@ function newsView(){
 function ensureDefaultGames(){
   if(!Array.isArray(extraGames))extraGames=[];
   if(!gameBoards||typeof gameBoards!=='object')gameBoards={};
-  // Migrate legacy root/__root into a normal "Cards" game if nothing listed yet
-  if(!extraGames.length){
-    const snap=(gameBoards.__root&&(gameBoards.__root.players||gameBoards.__root.sessions))?gameBoards.__root:null;
-    const hasRoot=players.length||sessions.length||loans.length||(game?1:0);
-    const board=snap||(hasRoot?snapshotBoard():{players:[],sessions:[],loans:[],expenses:[],game:null,initLoan:500,rules:null,readme:null});
-    gameBoards.cards=board;
-    extraGames.push({id:'cards',name:(cardsMeta&&cardsMeta.name)||'Cards',icon:(cardsMeta&&cardsMeta.icon)||'🃏',at:Date.now(),by:'system'});
-  }else if(!extraGames.some(g=>g.id==='cards')&&gameBoards.__root){
-    // keep __root data available if cards was never in list
+  // Already have games — never auto-add Cards back after user deletes
+  if(extraGames.length)return;
+  // User explicitly cleared all games this session / group
+  if(hubHidden&&hubHidden.noGames)return;
+  if(window._gamesInitialized)return;
+  // One-time migration: legacy root data → a normal "Cards" game
+  const snap=(gameBoards.__root&&(gameBoards.__root.players||gameBoards.__root.sessions||gameBoards.__root.loans))?gameBoards.__root:null;
+  const hasRoot=players.length||sessions.length||loans.length||!!game;
+  if(!snap&&!hasRoot){
+    // Brand-new group: still seed one default game so home isn't empty
+    gameBoards.cards={players:[],sessions:[],loans:[],expenses:[],game:null,initLoan:500,rules:'',readme:null};
+    extraGames.push({id:'cards',name:'Cards',icon:'🃏',at:Date.now(),by:'system'});
+    window._gamesInitialized=true;
+    return;
   }
-  // Drop hubHidden.cards — Cards is a real game now
-  if(hubHidden&&hubHidden.cards){hubHidden.cards=false}
+  const board=snap||snapshotBoard();
+  gameBoards.cards=board;
+  extraGames.push({id:'cards',name:(cardsMeta&&cardsMeta.name)||'Cards',icon:(cardsMeta&&cardsMeta.icon)||'🃏',at:Date.now(),by:'system'});
+  window._gamesInitialized=true;
 }
 
 function hubScreen(){
@@ -1503,14 +1509,14 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   return}
  if(t.closest('#hub_opt_rsvp')){
   e.preventDefault();
-  if(!hubHidden)hubHidden={cards:false,rsvp:false,news:false};
+  if(!hubHidden)hubHidden={cards:false,rsvp:false,news:false,noGames:false};
   hubHidden.rsvp=false;window._hubAddOpen=false;
   render();toast('RSVP restored');
   queueMicrotask(()=>{try{persist()}catch(e){}});
   return}
  if(t.closest('#hub_opt_news')){
   e.preventDefault();
-  if(!hubHidden)hubHidden={cards:false,rsvp:false,news:false};
+  if(!hubHidden)hubHidden={cards:false,rsvp:false,news:false,noGames:false};
   hubHidden.news=false;window._hubAddOpen=false;
   render();toast('Newsletter restored');
   queueMicrotask(()=>{try{persist()}catch(e){}});
@@ -1541,6 +1547,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   const id=uid();
   gameBoards[id]={players:[],sessions:[],loans:[],expenses:[],game:null,initLoan:500,finals:{},plays:{},excl:{},gc:false,loanDraft:{},settle:null,rules:'',readme:null};
   extraGames.push({id,name,icon,at:Date.now(),by:(emailUser&&(emailUser.name||emailUser.email))||'organiser'});
+  if(hubHidden)hubHidden.noGames=false;
   toast('Opening “'+name+'”…');
   lastStd='';wantFull=true;
   try{prepareOpenCustom(id)}catch(e){console.error(e);toast('Could not open game')}
@@ -1555,7 +1562,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
 
   if(id==='rsvp'){
     if(!confirm('Remove RSVP from home?\n\nYou can add it back anytime with ＋.\nEvents are kept.'))return;
-    if(!hubHidden)hubHidden={cards:false,rsvp:false,news:false};
+    if(!hubHidden)hubHidden={cards:false,rsvp:false,news:false,noGames:false};
     hubHidden.rsvp=true;
     render();toast('RSVP removed from home');
     queueMicrotask(()=>{try{persist()}catch(e){}});
@@ -1563,7 +1570,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   }
   if(id==='news'){
     if(!confirm('Remove Newsletter from home?\n\nYou can add it back anytime with ＋.'))return;
-    if(!hubHidden)hubHidden={cards:false,rsvp:false,news:false};
+    if(!hubHidden)hubHidden={cards:false,rsvp:false,news:false,noGames:false};
     hubHidden.news=true;
     render();toast('Newsletter removed from home');
     queueMicrotask(()=>{try{persist()}catch(e){}});
@@ -1573,12 +1580,17 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   const nm=(g0&&g0.name)||'this game';
   if(!confirm('Delete “'+nm+'"?\n\nAll sessions, loans and data for this game will be removed permanently.\n\nThis cannot be undone.'))return;
   extraGames=(extraGames||[]).filter(x=>x.id!==id);
-  if(gameBoards){delete gameBoards[id];if(id==='cards')delete gameBoards.__root}
+  if(gameBoards){delete gameBoards[id];if(id==='cards')try{delete gameBoards.__root}catch(e){}}
   if(activeBoardId===id){
     activeBoardId='';
     const next=(extraGames||[])[0];
     if(next&&gameBoards[next.id]){applyBoardSnap(gameBoards[next.id]);activeBoardId=next.id}
     else{players=[];sessions=[];loans=[];expenses=[];game=null;settle=null;rules=null}
+  }
+  if(!(extraGames&&extraGames.length)){
+    if(!hubHidden)hubHidden={rsvp:false,news:false,noGames:true};
+    hubHidden.noGames=true;
+    window._gamesInitialized=true;
   }
   appMode='';
   render();toast('“'+nm+'” deleted');
@@ -1997,7 +2009,7 @@ let rsvpFocusId=hashEv||(function(){try{return sessionStorage.getItem('ptc_rsvp_
 let pendingMode=hashMode||'';
 let pendingEv=hashEv||'';
 // rsvpFocusId set above from hash
-const EMPTY=()=>({players:[],sessions:[],loans:[],expenses:[],settle:null,initLoan:500,game:null,readme:null,rules:null,groupName:'',bills:[],billSettle:null,feed:[],events:[],chipsBookings:[],extraGames:[],gameBoards:{},cardsMeta:{name:'Cards',icon:'🃏'},hubHidden:{cards:false,rsvp:false,news:false}});
+const EMPTY=()=>({players:[],sessions:[],loans:[],expenses:[],settle:null,initLoan:500,game:null,readme:null,rules:null,groupName:'',bills:[],billSettle:null,feed:[],events:[],chipsBookings:[],extraGames:[],gameBoards:{},cardsMeta:{name:'Cards',icon:'🃏'},hubHidden:{cards:false,rsvp:false,news:false,noGames:false}});
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
 
 function activeGameLabel(){
@@ -2034,7 +2046,7 @@ function hashWithMode(code,mode,ev){
 }
 
 const canon=x=>JSON.stringify(x,(k,v)=>v&&typeof v=='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(q=>[q,v[q]])):v);
-const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],expenses:S.expenses||[],settle:S.settle||null,initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:null,groupName:typeof S.groupName=='string'?S.groupName:'',bills:(S.bills||[]),billSettle:S.billSettle||null,feed:Array.isArray(S.feed)?S.feed:[],events:Array.isArray(S.events)?S.events:[],chipsBookings:Array.isArray(S.chipsBookings)?S.chipsBookings:[],extraGames:Array.isArray(S.extraGames)?S.extraGames:[],gameBoards:(S.gameBoards&&typeof S.gameBoards==='object')?S.gameBoards:{},cardsMeta:(S.cardsMeta&&typeof S.cardsMeta==='object')?{name:S.cardsMeta.name||'Cards',icon:S.cardsMeta.icon||'🃏'}:{name:'Cards',icon:'🃏'},hubHidden:(S.hubHidden&&typeof S.hubHidden==='object')?{cards:!!S.hubHidden.cards,rsvp:!!S.hubHidden.rsvp,news:!!S.hubHidden.news}:{rsvp:false,news:false}});
+const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],expenses:S.expenses||[],settle:S.settle||null,initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:null,groupName:typeof S.groupName=='string'?S.groupName:'',bills:(S.bills||[]),billSettle:S.billSettle||null,feed:Array.isArray(S.feed)?S.feed:[],events:Array.isArray(S.events)?S.events:[],chipsBookings:Array.isArray(S.chipsBookings)?S.chipsBookings:[],extraGames:Array.isArray(S.extraGames)?S.extraGames:[],gameBoards:(S.gameBoards&&typeof S.gameBoards==='object')?S.gameBoards:{},cardsMeta:(S.cardsMeta&&typeof S.cardsMeta==='object')?{name:S.cardsMeta.name||'Cards',icon:S.cardsMeta.icon||'🃏'}:{name:'Cards',icon:'🃏'},hubHidden:(S.hubHidden&&typeof S.hubHidden==='object')?{cards:!!S.hubHidden.cards,rsvp:!!S.hubHidden.rsvp,news:!!S.hubHidden.news,noGames:!!S.hubHidden.noGames}:{rsvp:false,news:false}});
 function getState(){if(!Array.isArray(sessions))sessions=[];if(!Array.isArray(loans))loans=[];if(!Array.isArray(expenses))expenses=[];if(!Array.isArray(bills))bills=[];if(!Array.isArray(feed))feed=[];if(!Array.isArray(events))events=[];if(!Array.isArray(chipsBookings))chipsBookings=[];if(!Array.isArray(players))players=[];sessions.forEach(x=>{if(!x.id)x.id=uid()});loans.forEach(l=>{if(!l.id)l.id=uid()});expenses.forEach(e=>{if(!e.id)e.id=uid()});
  // Keep Cards and custom boards separate: stash UI into the active board, then
  // always write root players/sessions/... from Cards (__root), never from a custom board.
@@ -2086,7 +2098,7 @@ function getState(){if(!Array.isArray(sessions))sessions=[];if(!Array.isArray(lo
  };
  return{
   cardsMeta:{name:(cardsMeta&&cardsMeta.name)||'Cards',icon:(cardsMeta&&cardsMeta.icon)||'🃏'},
-  hubHidden:{cards:!!(hubHidden&&hubHidden.cards),rsvp:!!(hubHidden&&hubHidden.rsvp),news:!!(hubHidden&&hubHidden.news)},
+  hubHidden:{cards:!!(hubHidden&&hubHidden.cards),rsvp:!!(hubHidden&&hubHidden.rsvp),news:!!(hubHidden&&hubHidden.news),noGames:!!(hubHidden&&hubHidden.noGames)},
   extraGames:Array.isArray(extraGames)?extraGames.map(g=>({id:g.id,name:g.name||'',icon:g.icon||'🎲',at:g.at||0,by:g.by||''})):[],
   gameBoards:(function(){var o={},src=gameBoards&&typeof gameBoards==='object'?gameBoards:{};Object.keys(src).forEach(function(k){var b=src[k]||{};o[k]={players:Array.isArray(b.players)?b.players:[],sessions:Array.isArray(b.sessions)?b.sessions:[],loans:Array.isArray(b.loans)?b.loans:[],expenses:Array.isArray(b.expenses)?b.expenses:[],game:b.game||null,initLoan:b.initLoan||500,finals:b.finals||{},plays:b.plays||{},excl:b.excl||{},gc:!!b.gc,loanDraft:b.loanDraft||{},settle:b.settle||null,rules:typeof b.rules==='string'?b.rules:null,readme:typeof b.readme==='string'?b.readme:null}});return o})(),
   players:root.players,
@@ -3109,7 +3121,7 @@ function startCloud(){if(!gid)return;
     if(pendingOrgPass){const pw=pendingOrgPass,setG=pendingSetGlobal,ep=pendingEditPw;pendingOrgPass=null;pendingSetGlobal=false;pendingEditPw=null;try{const salt=randHex(16),iter=150000,hash=await hashPass(pw,salt,iter);const payload=JSON.stringify({salt,iter,hash});await cloud.put(gid,'organiser',payload);if(ep){const s2=randHex(16),h2=await hashPass(ep,s2,150000);await cloud.put(gid,'access',JSON.stringify({salt:s2,iter:150000,hash:h2}));access={salt:s2,iter:150000,hash:h2};accessLoaded=true;lastCode=ep.slice(0,4)+'-'+ep.slice(4)}if(setG)await cloud.put(CFG,'createpass',payload);orgInfo={salt,iter,hash};orgLoaded=true;markOrganiser();await registerGroup(gid,groupName);if(gen===connGen)render()}catch(e){toast('Could not save admin password — set it on the Backups tab')}}
     else if(gen===connGen){render();queueMicrotask(()=>{try{persist()}catch(e){}})} })();return}
   if(inflight)return;reconcile(S)},e=>{if(gen!==connGen)return;cloudErr=((e&&e.code)||'error')+': '+((e&&e.message)||'');cs='error';synced=false;render()})}
-function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};bills=[];billSettle=null;billDraft={desc:'',amt:'',paid:'',shared:{}};feed=[];events=[];chipsBookings=[];extraGames=[];gameBoards={};activeBoardId='';cardsMeta={name:'Cards',icon:'🃏'};hubHidden={cards:false,rsvp:false,news:false};appMode='';billTab='list';xgrp={busy:false,err:'',list:[],picked:{},playerPicked:{},data:{},combined:null};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;ownerEmail='';players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
+function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};bills=[];billSettle=null;billDraft={desc:'',amt:'',paid:'',shared:{}};feed=[];events=[];chipsBookings=[];extraGames=[];gameBoards={};activeBoardId='';cardsMeta={name:'Cards',icon:'🃏'};hubHidden={cards:false,rsvp:false,news:false,noGames:false};appMode='';billTab='list';xgrp={busy:false,err:'',list:[],picked:{},playerPicked:{},data:{},combined:null};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;ownerEmail='';players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
 function setGroup(code,name,opts){const nm=(name!=null?String(name):'').trim().slice(0,40);const doReg=opts&&opts.register;gid=code;saveRecent(code,nm||code.slice(0,8));
  const mode=pendingMode||hashMode||'';
  const evKeep=pendingEv||hashEv||rsvpFocusId||'';
@@ -3156,7 +3168,7 @@ async function checkAppUpdate(){
     return{updated:false,reason:hadWaiting?'activated':'latest'};
   }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
 }
-const CACHE_HINT='session-tracker-v90';
+const CACHE_HINT='session-tracker-v91';
 async function hardReloadApp(){
   // Preserve group + mode in the URL so reload stays put
   try{
@@ -3261,6 +3273,47 @@ window.addEventListener('hashchange',()=>{
   }catch(e){console.error(e)}
 });
 window.addEventListener('online',()=>{if(cloudOn){setSync('live');persist()}});window.addEventListener('offline',()=>setSync('offline'));
+
+
+// Long-press hub game tile to remove (organiser/admin) — reliable when swipe is awkward
+(function(){
+  let timer=null,startEl=null;
+  function canRm(){return (typeof canOrganise==='function'&&canOrganise())||(typeof isSessionAdmin==='function'&&isSessionAdmin())}
+  function clear(){if(timer){clearTimeout(timer);timer=null}startEl=null}
+  document.addEventListener('touchstart',function(e){
+    if(!canRm())return;
+    const card=e.target.closest&&e.target.closest('.hub-card[data-board]');
+    if(!card||e.target.closest('[data-hubrm]'))return;
+    startEl=card;
+    timer=setTimeout(function(){
+      timer=null;
+      const id=startEl&&startEl.getAttribute('data-board');
+      startEl=null;
+      if(!id)return;
+      const g0=(extraGames||[]).find(x=>x.id===id);
+      const nm=(g0&&g0.name)||'this game';
+      if(!confirm('Delete “'+nm+'”?\n\nAll sessions, loans and data for this game will be removed permanently.\n\nThis cannot be undone.'))return;
+      extraGames=(extraGames||[]).filter(x=>x.id!==id);
+      if(gameBoards){delete gameBoards[id];if(id==='cards')try{delete gameBoards.__root}catch(err){}}
+      if(activeBoardId===id){
+        activeBoardId='';
+        const next=(extraGames||[])[0];
+        if(next&&gameBoards[next.id]){applyBoardSnap(gameBoards[next.id]);activeBoardId=next.id}
+        else{players=[];sessions=[];loans=[];expenses=[];game=null;settle=null;rules=null}
+      }
+      if(!(extraGames&&extraGames.length)){
+        if(!hubHidden)hubHidden={rsvp:false,news:false,noGames:true};
+        hubHidden.noGames=true;window._gamesInitialized=true;
+      }
+      appMode='';
+      render();toast('“'+nm+'” deleted');
+      queueMicrotask(function(){try{persist()}catch(err){}});
+    },550);
+  },{passive:true});
+  document.addEventListener('touchend',clear,{passive:true});
+  document.addEventListener('touchmove',clear,{passive:true});
+  document.addEventListener('touchcancel',clear,{passive:true});
+})();
 
 // Hub swipe-to-remove (organiser / admin)
 (function(){
