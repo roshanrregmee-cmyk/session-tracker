@@ -733,9 +733,9 @@ function hubScreen(){
  const canAdd=!!(typeof canOrganise==='function'&&canOrganise());
  const games=Array.isArray(extraGames)?extraGames:[];
  const gameCards=games.map(g=>{
-  return `<button type="button" class="hub-card" data-board="${E(g.id)}"><div class="hub-ico">${E(g.icon||'🎲')}</div><b>${E(g.name||'Game')}</b><span>Same format as Cards</span>${canAdd?`<span class="hub-del" data-boarddel="${E(g.id)}" title="Remove">×</span>`:''}</button>`;
+  return `<button type="button" class="hub-card" data-board="${E(g.id)}"><div class="hub-ico">${E(g.icon||'🎲')}</div><b>${E(g.name||'Game')}</b><span>Sessions · loans · history</span>${canAdd?`<span class="hub-del" data-boarddel="${E(g.id)}" title="Remove">×</span>`:''}</button>`;
  }).join('');
- const addCard=canAdd?`<button type="button" class="hub-card hub-add" id="hub_add_game"><div class="hub-ico">＋</div><b>New game</b><span>Organiser / admin · same layout as Cards</span></button>`:'';
+ const addCard=canAdd?`<button type="button" class="hub-card hub-add" id="hub_add_game"><div class="hub-ico">＋</div><b>New game</b><span>Organiser / admin only</span></button>`:'';
  return`<div class="hub">
   <button type="button" class="hub-card" data-mode="poker"><div class="hub-ico">🃏</div><b>Cards</b><span>Sessions, loans &amp; game expenses</span></button>
   ${gameCards}${addCard}
@@ -757,7 +757,9 @@ function snapshotBoard(){
   excl:{...excl},
   gc:!!gc,
   loanDraft:JSON.parse(JSON.stringify(loanDraft||{})),
-  settle:settle?JSON.parse(JSON.stringify(settle)):null
+  settle:settle?JSON.parse(JSON.stringify(settle)):null,
+  rules:(typeof rules==='string')?rules:null,
+  readme:(typeof readme==='string')?readme:null
  };
 }
 function applyBoardSnap(S){
@@ -774,6 +776,10 @@ function applyBoardSnap(S){
  gc=!!S.gc;
  loanDraft=(S.loanDraft&&typeof S.loanDraft==='object')?JSON.parse(JSON.stringify(S.loanDraft)):{};
  settle=S.settle?JSON.parse(JSON.stringify(S.settle)):null;
+ // Each board has its own rules text (cleared for brand-new games)
+ rules=(typeof S.rules==='string')?S.rules:null;
+ readme=(typeof S.readme==='string')?S.readme:null;
+ notesDraft={};
  tab='hist';
 }
 function stashCurrentBoard(){
@@ -1398,16 +1404,22 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  if(t.id=='xgrp-import'){xgrpImport();return}
  if(t.id=='hub_add_game'){
   if(!canOrganise())return toast('Only the organiser or admin can add a game');
-  const name=(prompt('Name this game (same format as Cards):')||'').trim().slice(0,40);
+  const name=(prompt('Name for the new game:')||'').trim().slice(0,40);
   if(!name)return;
   let icon=(prompt('Emoji icon (optional):','🎲')||'🎲').trim().slice(0,4);
   if(!icon)icon='🎲';
   if(!Array.isArray(extraGames))extraGames=[];
   if(!gameBoards||typeof gameBoards!=='object')gameBoards={};
   const id=uid();
+  // Fresh board: empty players/sessions and clear Rules for this board
+  gameBoards[id]={players:[],sessions:[],loans:[],expenses:[],game:null,initLoan:500,finals:{},plays:{},excl:{},gc:false,loanDraft:{},settle:null,rules:null,readme:null};
   extraGames.push({id,name,icon,at:Date.now(),by:(emailUser&&(emailUser.name||emailUser.email))||'organiser'});
-  gameBoards[id]={players:[],sessions:[],loans:[],expenses:[],game:null,initLoan:500};
-  render();toast('Game "'+name+'" added');queueMicrotask(()=>{try{persist()}catch(e){}});return}
+  // Clear group-level rules when starting a new game module
+  rules=null;notesDraft={};
+  toast('Opening “'+name+'”…');
+  queueMicrotask(()=>{try{persist()}catch(e){console.error(e)}});
+  prepareOpenCustom(id);
+  return}
  if(g('data-boarddel')){
   e.preventDefault();e.stopPropagation();
   if(!canOrganise())return toast('Only the organiser or admin can remove a game');
@@ -1809,7 +1821,7 @@ let rsvpFocusId=hashEv||(function(){try{return sessionStorage.getItem('ptc_rsvp_
 let pendingMode=hashMode||'';
 let pendingEv=hashEv||'';
 // rsvpFocusId set above from hash
-const EMPTY=()=>({players:[],sessions:[],loans:[],expenses:[],settle:null,initLoan:500,game:null,readme:null,rules:null,groupName:'',bills:[],billSettle:null,feed:[],events:[],chipsBookings:[]});
+const EMPTY=()=>({players:[],sessions:[],loans:[],expenses:[],settle:null,initLoan:500,game:null,readme:null,rules:null,groupName:'',bills:[],billSettle:null,feed:[],events:[],chipsBookings:[],extraGames:[],gameBoards:{}});
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
 
 function readRsvpFocusFromHash(){
@@ -1828,10 +1840,10 @@ function hashWithMode(code,mode,ev){
 }
 
 const canon=x=>JSON.stringify(x,(k,v)=>v&&typeof v=='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(q=>[q,v[q]])):v);
-const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],expenses:S.expenses||[],settle:S.settle||null,initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:null,groupName:typeof S.groupName=='string'?S.groupName:'',bills:(S.bills||[]),billSettle:S.billSettle||null,feed:Array.isArray(S.feed)?S.feed:[],events:Array.isArray(S.events)?S.events:[],chipsBookings:Array.isArray(S.chipsBookings)?S.chipsBookings:[]});
+const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],expenses:S.expenses||[],settle:S.settle||null,initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:null,groupName:typeof S.groupName=='string'?S.groupName:'',bills:(S.bills||[]),billSettle:S.billSettle||null,feed:Array.isArray(S.feed)?S.feed:[],events:Array.isArray(S.events)?S.events:[],chipsBookings:Array.isArray(S.chipsBookings)?S.chipsBookings:[],extraGames:Array.isArray(S.extraGames)?S.extraGames:[],gameBoards:(S.gameBoards&&typeof S.gameBoards==='object')?S.gameBoards:{}});
 function getState(){if(!Array.isArray(sessions))sessions=[];if(!Array.isArray(loans))loans=[];if(!Array.isArray(expenses))expenses=[];if(!Array.isArray(bills))bills=[];if(!Array.isArray(feed))feed=[];if(!Array.isArray(events))events=[];if(!Array.isArray(chipsBookings))chipsBookings=[];if(!Array.isArray(players))players=[];sessions.forEach(x=>{if(!x.id)x.id=uid()});loans.forEach(l=>{if(!l.id)l.id=uid()});expenses.forEach(e=>{if(!e.id)e.id=uid()});
  try{if(!gameBoards||typeof gameBoards!=='object')gameBoards={};if(activeBoardId)gameBoards[activeBoardId]=snapshotBoard();else gameBoards.__root=snapshotBoard()}catch(e){}
- return{extraGames:Array.isArray(extraGames)?extraGames.map(g=>({id:g.id,name:g.name||'',icon:g.icon||'🎲',at:g.at||0,by:g.by||''})):[],gameBoards:(function(){var o={},src=gameBoards&&typeof gameBoards==='object'?gameBoards:{};Object.keys(src).forEach(function(k){var b=src[k]||{};o[k]={players:Array.isArray(b.players)?b.players:[],sessions:Array.isArray(b.sessions)?b.sessions:[],loans:Array.isArray(b.loans)?b.loans:[],expenses:Array.isArray(b.expenses)?b.expenses:[],game:b.game||null,initLoan:b.initLoan||500,finals:b.finals||{},plays:b.plays||{},excl:b.excl||{},gc:!!b.gc,loanDraft:b.loanDraft||{},settle:b.settle||null}});return o})(),players:[...players],sessions:sessions.map(x=>({id:x.id,date:(x.date||''),label:(x.label||''),v:(x.v&&typeof x.v==='object')?{...x.v}:{}})),loans:loans.map(l=>({id:l.id,date:l.date,who:l.who,amt:l.amt,src:l.src||null,g:l.g||'',done:!!l.done})),initLoan,game:game?{date:game.date,players:Array.isArray(game.players)?[...game.players]:[],exited:(game.exited&&typeof game.exited==='object')?{...game.exited}:{},settledPrior:(game.settledPrior&&typeof game.settledPrior==='object')?{...game.settledPrior}:{}}:null,readme,rules,groupName,expenses:expenses.map(e=>({id:e.id,date:e.date||'',desc:e.desc||'',paidBy:e.paidBy,amt:e.amt,split:e.split&&e.split.length?[...e.split]:null,g:e.g||'',done:!!e.done})),settle:settle?JSON.parse(JSON.stringify(settle)):null,bills:[],feed:(feed||[]).slice(0,40).map(x=>({id:x.id,at:x.at,text:x.text||''})),events:(events||[]).map(ev=>({id:ev.id,msg:ev.msg||'',date:ev.date||'',timeFrom:ev.timeFrom||'',timeTo:ev.timeTo||'',food:!!ev.food,at:ev.at||0,by:ev.by||'',rsvps:Array.isArray(ev.rsvps)?ev.rsvps.map(r=>({name:r.name||'',status:r.status||'yes',foodPref:r.foodPref||'',at:r.at||0})):[]})),chipsBookings:(chipsBookings||[]).map(b=>({id:b.id,who:b.who||'',from:b.from||'',to:b.to||'',note:b.note||'',at:b.at||0})),billSettle:billSettle?JSON.parse(JSON.stringify(billSettle)):null}}
+ return{extraGames:Array.isArray(extraGames)?extraGames.map(g=>({id:g.id,name:g.name||'',icon:g.icon||'🎲',at:g.at||0,by:g.by||''})):[],gameBoards:(function(){var o={},src=gameBoards&&typeof gameBoards==='object'?gameBoards:{};Object.keys(src).forEach(function(k){var b=src[k]||{};o[k]={players:Array.isArray(b.players)?b.players:[],sessions:Array.isArray(b.sessions)?b.sessions:[],loans:Array.isArray(b.loans)?b.loans:[],expenses:Array.isArray(b.expenses)?b.expenses:[],game:b.game||null,initLoan:b.initLoan||500,finals:b.finals||{},plays:b.plays||{},excl:b.excl||{},gc:!!b.gc,loanDraft:b.loanDraft||{},settle:b.settle||null,rules:typeof b.rules==='string'?b.rules:null,readme:typeof b.readme==='string'?b.readme:null}});return o})(),players:[...players],sessions:sessions.map(x=>({id:x.id,date:(x.date||''),label:(x.label||''),v:(x.v&&typeof x.v==='object')?{...x.v}:{}})),loans:loans.map(l=>({id:l.id,date:l.date,who:l.who,amt:l.amt,src:l.src||null,g:l.g||'',done:!!l.done})),initLoan,game:game?{date:game.date,players:Array.isArray(game.players)?[...game.players]:[],exited:(game.exited&&typeof game.exited==='object')?{...game.exited}:{},settledPrior:(game.settledPrior&&typeof game.settledPrior==='object')?{...game.settledPrior}:{}}:null,readme,rules,groupName,expenses:expenses.map(e=>({id:e.id,date:e.date||'',desc:e.desc||'',paidBy:e.paidBy,amt:e.amt,split:e.split&&e.split.length?[...e.split]:null,g:e.g||'',done:!!e.done})),settle:settle?JSON.parse(JSON.stringify(settle)):null,bills:[],feed:(feed||[]).slice(0,40).map(x=>({id:x.id,at:x.at,text:x.text||''})),events:(events||[]).map(ev=>({id:ev.id,msg:ev.msg||'',date:ev.date||'',timeFrom:ev.timeFrom||'',timeTo:ev.timeTo||'',food:!!ev.food,at:ev.at||0,by:ev.by||'',rsvps:Array.isArray(ev.rsvps)?ev.rsvps.map(r=>({name:r.name||'',status:r.status||'yes',foodPref:r.foodPref||'',at:r.at||0})):[]})),chipsBookings:(chipsBookings||[]).map(b=>({id:b.id,who:b.who||'',from:b.from||'',to:b.to||'',note:b.note||'',at:b.at||0})),billSettle:billSettle?JSON.parse(JSON.stringify(billSettle)):null}}
 function applyState(S){S=norm(S);players=Array.isArray(S.players)?[...S.players]:[];
  sessions=(Array.isArray(S.sessions)?S.sessions:[]).map(x=>{const v=(x&&x.v&&typeof x.v==='object')?{...x.v}:{};return{...(x||{}),v}});
  loans=(Array.isArray(S.loans)?S.loans:[]).map(l=>({...(l||{})}));
@@ -1841,6 +1853,7 @@ function applyState(S){S=norm(S);players=Array.isArray(S.players)?[...S.players]
  readme=S.readme;rules=S.rules;groupName=S.groupName||'';
  extraGames=Array.isArray(S.extraGames)?S.extraGames.map(function(g){return{id:g.id,name:g.name||'',icon:g.icon||'🎲',at:g.at||0,by:g.by||''}}):[];
  gameBoards=(S.gameBoards&&typeof S.gameBoards==='object')?JSON.parse(JSON.stringify(S.gameBoards)):{};
+ if(activeBoardId&&gameBoards[activeBoardId]){try{applyBoardSnap(gameBoards[activeBoardId])}catch(e){}}
  expenses=(Array.isArray(S.expenses)?S.expenses:[]).map(e=>({...(e||{})}));settle=S.settle||null;
  bills=(Array.isArray(S.bills)?S.bills:[]).map(e=>({...(e||{})}));billSettle=S.billSettle||null;
  // One-time migrate old independent bills into expenses
@@ -1855,7 +1868,19 @@ function mergeState(b,l,r){const o=norm(JSON.parse(JSON.stringify(r)));b=norm(b)
  ['sessions','loans','expenses','bills','events','chipsBookings'].forEach(k=>{const bm=new Map(b[k].map(x=>[x.id,canon(x)])),lm=new Set(l[k].map(x=>x.id));
   l[k].forEach(x=>{const i=o[k].findIndex(y=>y.id===x.id),was=bm.get(x.id);if(was===undefined){if(i<0)o[k].push(x)}else if(was!==canon(x)){if(i>=0)o[k][i]=x;else o[k].push(x)}});
   b[k].forEach(x=>{if(!lm.has(x.id)){const i=o[k].findIndex(y=>y.id===x.id);if(i>=0)o[k].splice(i,1)}})});
- if(l.initLoan!==b.initLoan)o.initLoan=l.initLoan;if(canon(l.settle)!==canon(b.settle))o.settle=l.settle;if(l.readme!==b.readme)o.readme=l.readme;if(l.rules!==b.rules)o.rules=l.rules;if(l.groupName!==b.groupName)o.groupName=l.groupName;if(canon(l.game)!==canon(b.game))o.game=l.game;if(canon(l.billSettle)!==canon(b.billSettle))o.billSettle=l.billSettle;return o}
+ if(l.initLoan!==b.initLoan)o.initLoan=l.initLoan;if(canon(l.settle)!==canon(b.settle))o.settle=l.settle;if(l.readme!==b.readme)o.readme=l.readme;if(l.rules!==b.rules)o.rules=l.rules;if(l.groupName!==b.groupName)o.groupName=l.groupName;if(canon(l.game)!==canon(b.game))o.game=l.game;if(canon(l.billSettle)!==canon(b.billSettle))o.billSettle=l.billSettle;
+ // Custom game boards: prefer local list of games; merge board data by id
+ if(Array.isArray(l.extraGames)){
+  const byId=new Map();
+  (o.extraGames||[]).forEach(g=>{if(g&&g.id)byId.set(g.id,g)});
+  (b.extraGames||[]).forEach(g=>{if(g&&g.id&&!(l.extraGames||[]).some(x=>x.id===g.id))byId.delete(g.id)});
+  (l.extraGames||[]).forEach(g=>{if(g&&g.id)byId.set(g.id,g)});
+  o.extraGames=[...byId.values()];
+ }
+ if(l.gameBoards&&typeof l.gameBoards==='object'){
+  o.gameBoards=Object.assign({},o.gameBoards||{},l.gameBoards);
+ }
+ return o}
 function getRecent(){try{return JSON.parse(localStorage.getItem('ptc_recent')||'[]')}catch(e){return[]}}
 function saveRecent(code,label){let r=getRecent().filter(x=>x.code!==code);r.unshift({code,label:label||code.slice(0,8),last:Date.now()});if(r.length>12)r=r.slice(0,12);try{localStorage.setItem('ptc_recent',JSON.stringify(r))}catch(e){}}
 function indHtml(){if(!gid)return'';const m={live:['#15803d','Live'],saving:['#d97706','Saving'],connecting:['#d97706','Connecting'],offline:['#dc2626','Offline'],error:['#dc2626','Error']}[cs]||['#6b7686',''];
@@ -2822,7 +2847,7 @@ async function checkAppUpdate(){
     return{updated:false,reason:hadWaiting?'activated':'latest'};
   }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
 }
-const CACHE_HINT='session-tracker-v75';
+const CACHE_HINT='session-tracker-v76';
 async function hardReloadApp(){
   try{
     if('caches' in window){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}
