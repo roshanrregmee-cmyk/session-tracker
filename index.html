@@ -328,6 +328,9 @@ body.rsvp-focus.dopen{/* force closed */}
 body.rsvp-focus #drawer{transform:translateX(105%)!important;visibility:hidden!important;pointer-events:none!important}
 body.rsvp-focus .topbar .hd .ttl{font-size:16px}
 body.rsvp-focus main{padding-bottom:32px}
+
+.hub-card.hub-add{border-style:dashed}
+.hub-card .hub-del{position:absolute;top:8px;right:10px;width:28px;height:28px;border-radius:50%;border:1px solid var(--bd);background:var(--card);font-size:16px;line-height:26px;padding:0;z-index:2;cursor:pointer}
 </style></head><body><div id="welcome"><img src="icon-512.png" alt=""><h2>Welcome Folks! 👑</h2><button id="enterBtn" type="button">Enter</button></div><main>
 <div class="topbar">
 <div class="hd"><h1><img src="icon-192.png" alt="" style="height:1.15em;width:1.15em;border-radius:22%;vertical-align:-0.2em;margin-right:.3em"><span class="ttl" id="ttl"></span></h1><span id="ind" class="ind"></span><button id="gref" class="rbtn" title="Refresh live data · Shift+click for full app reload" aria-label="Refresh">↻</button></div>
@@ -338,7 +341,7 @@ body.rsvp-focus main{padding-bottom:32px}
 <script>
 const $=s=>document.querySelector(s),E=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let adminPw=null,adminOpen=false,adminGroups=[],pendingEditPw=null,adminSection='groups',emailUsers=[],emailUser=null,emailAuthMode='',emailOtpPending=null,pendingGroupMeta=null,ownerEmail='';
-let aiFn,aiTips={},aiKey='',aiBusy=false,aiMsg='',excl={},game=null,gc=false,finals={},plays={},initLoan=500,loans=[],loanDraft={},ld=new Date().toLocaleDateString('en-CA'),hsort='desc',hpl='file',ALLP=[],PERIOD={a:0,b:-1,N:0},rf=0,rt=-1,players=[],sessions=[],draft={},tab='hist',dd=new Date().toLocaleDateString('en-CA'),appMode='',billTab='list',bills=[],billDraft={desc:'',amt:'',paid:'',shared:{}},billSettle=null,feed=[],events=[],chipsBookings=[],xgrp={busy:false,err:'',list:[],picked:{},data:{},combined:null};
+let aiFn,aiTips={},aiKey='',aiBusy=false,aiMsg='',excl={},game=null,gc=false,finals={},plays={},initLoan=500,loans=[],loanDraft={},ld=new Date().toLocaleDateString('en-CA'),hsort='desc',hpl='file',ALLP=[],PERIOD={a:0,b:-1,N:0},rf=0,rt=-1,players=[],sessions=[],draft={},tab='hist',dd=new Date().toLocaleDateString('en-CA'),appMode='',billTab='list',bills=[],billDraft={desc:'',amt:'',paid:'',shared:{}},billSettle=null,feed=[],events=[],chipsBookings=[],extraGames=[],gameBoards={},activeBoardId='',xgrp={busy:false,err:'',list:[],picked:{},data:{},combined:null};
 const num=v=>typeof v==='number'&&isFinite(v),f=n=>num(n)?n.toLocaleString():'',cls=n=>n>0?'pos':n<0?'neg':'';
 const iso2ser=d=>Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10))/864e5+25569;
 const ser2iso=n=>new Date(Math.round((n-25569)*864e5)).toISOString().slice(0,10);
@@ -727,16 +730,79 @@ function newsView(){
  return sectionNav('<button type="button" data-ncopy>📤 Share</button>')+mast+ctl+body}
 
 function hubScreen(){
+ const canAdd=!!(typeof canOrganise==='function'&&canOrganise());
+ const games=Array.isArray(extraGames)?extraGames:[];
+ const gameCards=games.map(g=>{
+  return `<button type="button" class="hub-card" data-board="${E(g.id)}"><div class="hub-ico">${E(g.icon||'🎲')}</div><b>${E(g.name||'Game')}</b><span>Same format as Cards</span>${canAdd?`<span class="hub-del" data-boarddel="${E(g.id)}" title="Remove">×</span>`:''}</button>`;
+ }).join('');
+ const addCard=canAdd?`<button type="button" class="hub-card hub-add" id="hub_add_game"><div class="hub-ico">＋</div><b>New game</b><span>Organiser / admin · same layout as Cards</span></button>`:'';
  return`<div class="hub">
   <button type="button" class="hub-card" data-mode="poker"><div class="hub-ico">🃏</div><b>Cards</b><span>Sessions, loans &amp; game expenses</span></button>
+  ${gameCards}${addCard}
   <button type="button" class="hub-card" data-mode="rsvp"><div class="hub-ico">📅</div><b>RSVP</b><span>Events · dates · responses</span></button>
   <button type="button" class="hub-card" data-mode="news"><div class="hub-ico">📰</div><b>Newsletter</b><span>The story of your games</span></button>
  </div>
  <p class="mut" style="text-align:center;margin-top:8px">Choose a section for this group</p>`;
 }
+function snapshotBoard(){
+ return{
+  players:[...players],
+  sessions:sessions.map(x=>({id:x.id,date:x.date||'',label:x.label||'',v:(x.v&&typeof x.v==='object')?{...x.v}:{}})),
+  loans:loans.map(l=>({...l})),
+  expenses:expenses.map(e=>({...e})),
+  game:game?JSON.parse(JSON.stringify(game)):null,
+  initLoan:initLoan,
+  finals:{...finals},
+  plays:{...plays},
+  excl:{...excl},
+  gc:!!gc,
+  loanDraft:JSON.parse(JSON.stringify(loanDraft||{})),
+  settle:settle?JSON.parse(JSON.stringify(settle)):null
+ };
+}
+function applyBoardSnap(S){
+ S=S||{};
+ players=Array.isArray(S.players)?[...S.players]:[];
+ sessions=(Array.isArray(S.sessions)?S.sessions:[]).map(x=>({...(x||{}),v:(x&&x.v&&typeof x.v==='object')?{...x.v}:{}}));
+ loans=(Array.isArray(S.loans)?S.loans:[]).map(l=>({...(l||{})}));
+ expenses=(Array.isArray(S.expenses)?S.expenses:[]).map(e=>({...(e||{})}));
+ game=S.game&&typeof S.game==='object'?JSON.parse(JSON.stringify(S.game)):null;
+ initLoan=(typeof S.initLoan==='number'&&isFinite(S.initLoan))?S.initLoan:500;
+ finals=(S.finals&&typeof S.finals==='object')?{...S.finals}:{};
+ plays=(S.plays&&typeof S.plays==='object')?{...S.plays}:{};
+ excl=(S.excl&&typeof S.excl==='object')?{...S.excl}:{};
+ gc=!!S.gc;
+ loanDraft=(S.loanDraft&&typeof S.loanDraft==='object')?JSON.parse(JSON.stringify(S.loanDraft)):{};
+ settle=S.settle?JSON.parse(JSON.stringify(S.settle)):null;
+ tab='hist';
+}
+function stashCurrentBoard(){
+ if(!gameBoards||typeof gameBoards!=='object')gameBoards={};
+ if(activeBoardId)gameBoards[activeBoardId]=snapshotBoard();
+ else gameBoards.__root=snapshotBoard();
+}
+function openCardsFromHub(){
+ if(activeBoardId){stashCurrentBoard();if(gameBoards&&gameBoards.__root)applyBoardSnap(gameBoards.__root);activeBoardId='';}
+ appMode='poker';tab='hist';
+ try{history.replaceState(null,'','#g='+gid+'&mode=poker')}catch(e){}
+ render();
+}
+function prepareOpenCustom(id){
+ if(!id)return openCardsFromHub();
+ if(activeBoardId===id){appMode='poker';tab='hist';render();return}
+ stashCurrentBoard();
+ activeBoardId=id;
+ if(!gameBoards[id])gameBoards[id]={players:[],sessions:[],loans:[],expenses:[],game:null,initLoan:500};
+ applyBoardSnap(gameBoards[id]);
+ appMode='poker';tab='hist';
+ try{history.replaceState(null,'','#g='+gid+'&mode=poker&board='+id)}catch(e){}
+ render();
+}
 function sectionNav(extra){
+ const boardLabel=activeBoardId?(((extraGames||[]).find(function(g){return g.id===activeBoardId})||{}).name||'Game'):'Cards';
  return`<div class="bills-nav">
   <button type="button" class="back-hub" data-mode="hub">← Home</button>
+  ${appMode==='poker'?`<span class="mut" style="font-weight:700">${E(boardLabel)}</span>`:''}
   ${extra||''}
   </div>`;
 }
@@ -1330,7 +1396,37 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  if(t.id=='xgrp-load'){xgrpLoadList();return}
  if(t.id=='xgrp-fetch'){xgrpFetch();return}
  if(t.id=='xgrp-import'){xgrpImport();return}
- if(g('data-mode')&&g('data-mode').tagName!=='SELECT'&&['hub','poker','rsvp','news'].includes(g('data-mode').dataset.mode)){appMode=g('data-mode').dataset.mode==='hub'?'':g('data-mode').dataset.mode;if(appMode==='poker')tab='hist';if(appMode==='bills')billTab='list';try{if(gid){const m=appMode?('&mode='+appMode):'';history.replaceState(null,'','#g='+gid+m)}}catch(e){}render();return}
+ if(t.id=='hub_add_game'){
+  if(!canOrganise())return toast('Only the organiser or admin can add a game');
+  const name=(prompt('Name this game (same format as Cards):')||'').trim().slice(0,40);
+  if(!name)return;
+  let icon=(prompt('Emoji icon (optional):','🎲')||'🎲').trim().slice(0,4);
+  if(!icon)icon='🎲';
+  if(!Array.isArray(extraGames))extraGames=[];
+  if(!gameBoards||typeof gameBoards!=='object')gameBoards={};
+  const id=uid();
+  extraGames.push({id,name,icon,at:Date.now(),by:(emailUser&&(emailUser.name||emailUser.email))||'organiser'});
+  gameBoards[id]={players:[],sessions:[],loans:[],expenses:[],game:null,initLoan:500};
+  render();toast('Game "'+name+'" added');queueMicrotask(()=>{try{persist()}catch(e){}});return}
+ if(g('data-boarddel')){
+  e.preventDefault();e.stopPropagation();
+  if(!canOrganise())return toast('Only the organiser or admin can remove a game');
+  const id=g('data-boarddel').dataset.boarddel;
+  const g0=(extraGames||[]).find(x=>x.id===id);
+  if(!confirm('Remove game "'+(g0&&g0.name||id)+'" and all its data?'))return;
+  extraGames=(extraGames||[]).filter(x=>x.id!==id);
+  if(gameBoards)delete gameBoards[id];
+  if(activeBoardId===id){activeBoardId='';if(gameBoards&&gameBoards.__root)applyBoardSnap(gameBoards.__root)}
+  render();toast('Game removed');queueMicrotask(()=>{try{persist()}catch(e){}});return}
+ if(g('data-board')){prepareOpenCustom(g('data-board').dataset.board);return}
+ if(g('data-mode')&&g('data-mode').tagName!=='SELECT'&&['hub','poker','rsvp','news'].includes(g('data-mode').dataset.mode)){
+  const md=g('data-mode').dataset.mode;
+  if(md==='poker'){openCardsFromHub();return}
+  if(md==='hub'){if(activeBoardId){stashCurrentBoard();if(gameBoards&&gameBoards.__root)applyBoardSnap(gameBoards.__root);activeBoardId=''}appMode=''}
+  else appMode=md;
+  if(appMode==='poker')tab='hist';
+  try{if(gid){const mm=appMode?('&mode='+appMode):'';history.replaceState(null,'','#g='+gid+mm)}}catch(e){}
+  render();return}
  if(t.id=='ev_add'){
   const by=(($('#ev_by')&&$('#ev_by').value)||'').trim().slice(0,40);
   const msg=(($('#ev_msg')&&$('#ev_msg').value)||'').trim().slice(0,120);
@@ -1734,7 +1830,8 @@ function hashWithMode(code,mode,ev){
 const canon=x=>JSON.stringify(x,(k,v)=>v&&typeof v=='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(q=>[q,v[q]])):v);
 const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],expenses:S.expenses||[],settle:S.settle||null,initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:null,groupName:typeof S.groupName=='string'?S.groupName:'',bills:(S.bills||[]),billSettle:S.billSettle||null,feed:Array.isArray(S.feed)?S.feed:[],events:Array.isArray(S.events)?S.events:[],chipsBookings:Array.isArray(S.chipsBookings)?S.chipsBookings:[]});
 function getState(){if(!Array.isArray(sessions))sessions=[];if(!Array.isArray(loans))loans=[];if(!Array.isArray(expenses))expenses=[];if(!Array.isArray(bills))bills=[];if(!Array.isArray(feed))feed=[];if(!Array.isArray(events))events=[];if(!Array.isArray(chipsBookings))chipsBookings=[];if(!Array.isArray(players))players=[];sessions.forEach(x=>{if(!x.id)x.id=uid()});loans.forEach(l=>{if(!l.id)l.id=uid()});expenses.forEach(e=>{if(!e.id)e.id=uid()});
- return{players:[...players],sessions:sessions.map(x=>({id:x.id,date:(x.date||''),label:(x.label||''),v:(x.v&&typeof x.v==='object')?{...x.v}:{}})),loans:loans.map(l=>({id:l.id,date:l.date,who:l.who,amt:l.amt,src:l.src||null,g:l.g||'',done:!!l.done})),initLoan,game:game?{date:game.date,players:Array.isArray(game.players)?[...game.players]:[],exited:(game.exited&&typeof game.exited==='object')?{...game.exited}:{},settledPrior:(game.settledPrior&&typeof game.settledPrior==='object')?{...game.settledPrior}:{}}:null,readme,rules,groupName,expenses:expenses.map(e=>({id:e.id,date:e.date||'',desc:e.desc||'',paidBy:e.paidBy,amt:e.amt,split:e.split&&e.split.length?[...e.split]:null,g:e.g||'',done:!!e.done})),settle:settle?JSON.parse(JSON.stringify(settle)):null,bills:[],feed:(feed||[]).slice(0,40).map(x=>({id:x.id,at:x.at,text:x.text||''})),events:(events||[]).map(ev=>({id:ev.id,msg:ev.msg||'',date:ev.date||'',timeFrom:ev.timeFrom||'',timeTo:ev.timeTo||'',food:!!ev.food,at:ev.at||0,by:ev.by||'',rsvps:Array.isArray(ev.rsvps)?ev.rsvps.map(r=>({name:r.name||'',status:r.status||'yes',foodPref:r.foodPref||'',at:r.at||0})):[]})),chipsBookings:(chipsBookings||[]).map(b=>({id:b.id,who:b.who||'',from:b.from||'',to:b.to||'',note:b.note||'',at:b.at||0})),billSettle:billSettle?JSON.parse(JSON.stringify(billSettle)):null}}
+ try{if(!gameBoards||typeof gameBoards!=='object')gameBoards={};if(activeBoardId)gameBoards[activeBoardId]=snapshotBoard();else gameBoards.__root=snapshotBoard()}catch(e){}
+ return{extraGames:Array.isArray(extraGames)?extraGames.map(g=>({id:g.id,name:g.name||'',icon:g.icon||'🎲',at:g.at||0,by:g.by||''})):[],gameBoards:(function(){var o={},src=gameBoards&&typeof gameBoards==='object'?gameBoards:{};Object.keys(src).forEach(function(k){var b=src[k]||{};o[k]={players:Array.isArray(b.players)?b.players:[],sessions:Array.isArray(b.sessions)?b.sessions:[],loans:Array.isArray(b.loans)?b.loans:[],expenses:Array.isArray(b.expenses)?b.expenses:[],game:b.game||null,initLoan:b.initLoan||500,finals:b.finals||{},plays:b.plays||{},excl:b.excl||{},gc:!!b.gc,loanDraft:b.loanDraft||{},settle:b.settle||null}});return o})(),players:[...players],sessions:sessions.map(x=>({id:x.id,date:(x.date||''),label:(x.label||''),v:(x.v&&typeof x.v==='object')?{...x.v}:{}})),loans:loans.map(l=>({id:l.id,date:l.date,who:l.who,amt:l.amt,src:l.src||null,g:l.g||'',done:!!l.done})),initLoan,game:game?{date:game.date,players:Array.isArray(game.players)?[...game.players]:[],exited:(game.exited&&typeof game.exited==='object')?{...game.exited}:{},settledPrior:(game.settledPrior&&typeof game.settledPrior==='object')?{...game.settledPrior}:{}}:null,readme,rules,groupName,expenses:expenses.map(e=>({id:e.id,date:e.date||'',desc:e.desc||'',paidBy:e.paidBy,amt:e.amt,split:e.split&&e.split.length?[...e.split]:null,g:e.g||'',done:!!e.done})),settle:settle?JSON.parse(JSON.stringify(settle)):null,bills:[],feed:(feed||[]).slice(0,40).map(x=>({id:x.id,at:x.at,text:x.text||''})),events:(events||[]).map(ev=>({id:ev.id,msg:ev.msg||'',date:ev.date||'',timeFrom:ev.timeFrom||'',timeTo:ev.timeTo||'',food:!!ev.food,at:ev.at||0,by:ev.by||'',rsvps:Array.isArray(ev.rsvps)?ev.rsvps.map(r=>({name:r.name||'',status:r.status||'yes',foodPref:r.foodPref||'',at:r.at||0})):[]})),chipsBookings:(chipsBookings||[]).map(b=>({id:b.id,who:b.who||'',from:b.from||'',to:b.to||'',note:b.note||'',at:b.at||0})),billSettle:billSettle?JSON.parse(JSON.stringify(billSettle)):null}}
 function applyState(S){S=norm(S);players=Array.isArray(S.players)?[...S.players]:[];
  sessions=(Array.isArray(S.sessions)?S.sessions:[]).map(x=>{const v=(x&&x.v&&typeof x.v==='object')?{...x.v}:{};return{...(x||{}),v}});
  loans=(Array.isArray(S.loans)?S.loans:[]).map(l=>({...(l||{})}));
@@ -1742,6 +1839,8 @@ function applyState(S){S=norm(S);players=Array.isArray(S.players)?[...S.players]
  if(S.game&&typeof S.game==='object'){const gp=Array.isArray(S.game.players)?[...S.game.players]:[];game={date:S.game.date||'',players:gp,exited:(S.game.exited&&typeof S.game.exited==='object')?{...S.game.exited}:{},settledPrior:(S.game.settledPrior&&typeof S.game.settledPrior==='object')?{...S.game.settledPrior}:{}};}
  else game=null;
  readme=S.readme;rules=S.rules;groupName=S.groupName||'';
+ extraGames=Array.isArray(S.extraGames)?S.extraGames.map(function(g){return{id:g.id,name:g.name||'',icon:g.icon||'🎲',at:g.at||0,by:g.by||''}}):[];
+ gameBoards=(S.gameBoards&&typeof S.gameBoards==='object')?JSON.parse(JSON.stringify(S.gameBoards)):{};
  expenses=(Array.isArray(S.expenses)?S.expenses:[]).map(e=>({...(e||{})}));settle=S.settle||null;
  bills=(Array.isArray(S.bills)?S.bills:[]).map(e=>({...(e||{})}));billSettle=S.billSettle||null;
  // One-time migrate old independent bills into expenses
@@ -2676,7 +2775,7 @@ function startCloud(){if(!gid)return;
     if(pendingOrgPass){const pw=pendingOrgPass,setG=pendingSetGlobal,ep=pendingEditPw;pendingOrgPass=null;pendingSetGlobal=false;pendingEditPw=null;try{const salt=randHex(16),iter=150000,hash=await hashPass(pw,salt,iter);const payload=JSON.stringify({salt,iter,hash});await cloud.put(gid,'organiser',payload);if(ep){const s2=randHex(16),h2=await hashPass(ep,s2,150000);await cloud.put(gid,'access',JSON.stringify({salt:s2,iter:150000,hash:h2}));access={salt:s2,iter:150000,hash:h2};accessLoaded=true;lastCode=ep.slice(0,4)+'-'+ep.slice(4)}if(setG)await cloud.put(CFG,'createpass',payload);orgInfo={salt,iter,hash};orgLoaded=true;markOrganiser();await registerGroup(gid,groupName);if(gen===connGen)render()}catch(e){toast('Could not save admin password — set it on the Backups tab')}}
     else if(gen===connGen){render();queueMicrotask(()=>{try{persist()}catch(e){}})} })();return}
   if(inflight)return;reconcile(S)},e=>{if(gen!==connGen)return;cloudErr=((e&&e.code)||'error')+': '+((e&&e.message)||'');cs='error';synced=false;render()})}
-function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};bills=[];billSettle=null;billDraft={desc:'',amt:'',paid:'',shared:{}};feed=[];events=[];chipsBookings=[];appMode='';billTab='list';xgrp={busy:false,err:'',list:[],picked:{},playerPicked:{},data:{},combined:null};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;ownerEmail='';players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
+function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};bills=[];billSettle=null;billDraft={desc:'',amt:'',paid:'',shared:{}};feed=[];events=[];chipsBookings=[];extraGames=[];gameBoards={};activeBoardId='';appMode='';billTab='list';xgrp={busy:false,err:'',list:[],picked:{},playerPicked:{},data:{},combined:null};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;ownerEmail='';players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
 function setGroup(code,name,opts){const nm=(name!=null?String(name):'').trim().slice(0,40);const doReg=opts&&opts.register;gid=code;saveRecent(code,nm||code.slice(0,8));
  const mode=pendingMode||hashMode||'';
  const evKeep=pendingEv||hashEv||rsvpFocusId||'';
@@ -2723,7 +2822,7 @@ async function checkAppUpdate(){
     return{updated:false,reason:hadWaiting?'activated':'latest'};
   }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
 }
-const CACHE_HINT='session-tracker-v74';
+const CACHE_HINT='session-tracker-v75';
 async function hardReloadApp(){
   try{
     if('caches' in window){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}
