@@ -332,13 +332,22 @@ body.rsvp-focus main{padding-bottom:32px}
 
 .hub-card.hub-add{border-style:dashed;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 .hub-card.hub-add:active{transform:scale(.97);opacity:.9}
-.hub-card .hub-ico,.hub-card>b,.hub-card>span{pointer-events:none}
-.hub-card .hub-del{position:absolute;top:8px;right:10px;width:28px;height:28px;border-radius:50%;border:1px solid var(--bd);background:var(--card);font-size:16px;line-height:26px;padding:0;z-index:2;cursor:pointer}
+.hub-card .hub-ico,.hub-card>b,.hub-card>span:not(.hub-del){pointer-events:none}
+.hub-card .hub-del{position:absolute;top:8px;right:10px;width:32px;height:32px;border-radius:50%;border:1px solid var(--bd);background:var(--card);font-size:18px;line-height:30px;padding:0;z-index:5;cursor:pointer;pointer-events:auto!important;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 
 .hub-ico-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:4px}
 .hub-ico-pick{font-size:28px;line-height:1;padding:12px 0;border:1px solid var(--bd);border-radius:14px;background:var(--card);cursor:pointer;-webkit-tap-highlight-color:transparent}
 .hub-ico-pick.on{border-color:var(--g1);background:linear-gradient(135deg,rgba(255,61,129,.12),rgba(255,138,31,.12));box-shadow:0 0 0 2px rgba(255,61,129,.25)}
 .hub-ico-pick:active{transform:scale(.94)}
+
+/* Swipe-to-remove on hub tiles (organiser / admin only) */
+.hub-swipe{position:relative;overflow:hidden;border-radius:22px;touch-action:pan-y;background:#fecaca}
+.hub-swipe-track{display:flex;width:100%;transition:transform .22s cubic-bezier(.2,.8,.2,1);will-change:transform}
+.hub-swipe-track.open{transition:transform .22s cubic-bezier(.2,.8,.2,1)}
+.hub-swipe .hub-card{flex:0 0 100%;width:100%;margin:0;border-radius:22px;box-shadow:var(--sh)}
+.hub-swipe-del{flex:0 0 88px;width:88px;border:0;border-radius:0 22px 22px 0;background:#dc2626;color:#fff;font-weight:800;font-size:14px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.hub-swipe-del:active{background:#b91c1c}
+.hub-hint-swipe{font-size:12px;text-align:center;color:var(--mut);margin:0 0 8px}
 </style></head><body><div id="welcome"><img src="icon-512.png" alt=""><h2>Welcome Folks! 👑</h2><button id="enterBtn" type="button">Enter</button></div><main>
 <div class="topbar">
 <div class="hd"><h1><img src="icon-192.png" alt="" style="height:1.15em;width:1.15em;border-radius:22%;vertical-align:-0.2em;margin-right:.3em"><span class="ttl" id="ttl"></span></h1><span id="ind" class="ind"></span><button id="gref" class="rbtn" title="Full refresh — reload app and clear cache" aria-label="Refresh">↻</button></div>
@@ -349,7 +358,7 @@ body.rsvp-focus main{padding-bottom:32px}
 <script>
 const $=s=>document.querySelector(s),E=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let adminPw=null,adminOpen=false,adminGroups=[],pendingEditPw=null,adminSection='groups',emailUsers=[],emailUser=null,emailAuthMode='',emailOtpPending=null,pendingGroupMeta=null,ownerEmail='';
-let aiFn,aiTips={},aiKey='',aiBusy=false,aiMsg='',excl={},game=null,gc=false,finals={},plays={},initLoan=500,loans=[],loanDraft={},ld=new Date().toLocaleDateString('en-CA'),hsort='desc',hpl='file',ALLP=[],PERIOD={a:0,b:-1,N:0},rf=0,rt=-1,players=[],sessions=[],draft={},tab='hist',dd=new Date().toLocaleDateString('en-CA'),appMode='',billTab='list',bills=[],billDraft={desc:'',amt:'',paid:'',shared:{}},billSettle=null,feed=[],events=[],chipsBookings=[],extraGames=[],gameBoards={},activeBoardId='',xgrp={busy:false,err:'',list:[],picked:{},data:{},combined:null};
+let aiFn,aiTips={},aiKey='',aiBusy=false,aiMsg='',excl={},game=null,gc=false,finals={},plays={},initLoan=500,loans=[],loanDraft={},ld=new Date().toLocaleDateString('en-CA'),hsort='desc',hpl='file',ALLP=[],PERIOD={a:0,b:-1,N:0},rf=0,rt=-1,players=[],sessions=[],draft={},tab='hist',dd=new Date().toLocaleDateString('en-CA'),appMode='',billTab='list',bills=[],billDraft={desc:'',amt:'',paid:'',shared:{}},billSettle=null,feed=[],events=[],chipsBookings=[],extraGames=[],gameBoards={},activeBoardId='',cardsMeta={name:'Cards',icon:'🃏'},xgrp={busy:false,err:'',list:[],picked:{},data:{},combined:null};
 const num=v=>typeof v==='number'&&isFinite(v),f=n=>num(n)?n.toLocaleString():'',cls=n=>n>0?'pos':n<0?'neg':'';
 const iso2ser=d=>Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10))/864e5+25569;
 const ser2iso=n=>new Date(Math.round((n-25569)*864e5)).toISOString().slice(0,10);
@@ -738,12 +747,22 @@ function newsView(){
  return sectionNav('<button type="button" data-ncopy>📤 Share</button>')+mast+ctl+body}
 
 function hubScreen(){
- const canAdd=!!((typeof canOrganise==='function'&&canOrganise())||(typeof isSessionAdmin==='function'&&isSessionAdmin()));
+ const canRm=!!((typeof canOrganise==='function'&&canOrganise())||(typeof isSessionAdmin==='function'&&isSessionAdmin()));
  const games=Array.isArray(extraGames)?extraGames:[];
+ const wrap=(id,cardHtml,label)=>{
+  if(!canRm)return cardHtml;
+  return `<div class="hub-swipe" data-swipe="${E(id)}"><div class="hub-swipe-track">
+    ${cardHtml}
+    <button type="button" class="hub-swipe-del" data-hubrm="${E(id)}" aria-label="Remove ${E(label)}">Remove</button>
+  </div></div>`;
+ };
+ const cm=cardsMeta||{name:'Cards',icon:'🃏'};
+ const cardsCard=`<button type="button" class="hub-card" data-mode="poker"><div class="hub-ico">${E(cm.icon||'🃏')}</div><b>${E(cm.name||'Cards')}</b><span>Sessions · loans · history</span></button>`;
  const gameCards=games.map(g=>{
-  return `<button type="button" class="hub-card" data-board="${E(g.id)}"><div class="hub-ico">${E(g.icon||'🎲')}</div><b>${E(g.name||'Game')}</b><span>Sessions · loans · history</span>${canAdd?`<span class="hub-del" data-boarddel="${E(g.id)}" title="Remove">×</span>`:''}</button>`;
+  const card=`<button type="button" class="hub-card" data-board="${E(g.id)}"><div class="hub-ico">${E(g.icon||'🎲')}</div><b>${E(g.name||'Game')}</b><span>Sessions · loans · history</span></button>`;
+  return wrap(g.id,card,g.name||'Game');
  }).join('');
- const addCard=canAdd?(window._hubAddOpen
+ const addCard=canRm?(window._hubAddOpen
   ? (function(){
       const icons=['🎲','🃏','♠️','♥️','♦️','♣️','🏆','🎯','🔥','⭐','👑','💰','🪙','🎰','🥳','🌙','☕','🍕','🍻','🎮'];
       const sel=window._hubIcon||'🎲';
@@ -763,11 +782,13 @@ function hubScreen(){
     </div>`;
     })()
   : `<button type="button" class="hub-card hub-add" id="hub_add_game"><div class="hub-ico">＋</div><b>New game</b><span>Organiser / admin</span></button>`):'';
- return`<div class="hub">
-  <button type="button" class="hub-card" data-mode="poker"><div class="hub-ico">🃏</div><b>Cards</b><span>Sessions, loans &amp; game expenses</span></button>
+ const rsvpCard=`<button type="button" class="hub-card" data-mode="rsvp"><div class="hub-ico">📅</div><b>RSVP</b><span>Events · dates · responses</span></button>`;
+ const newsCard=`<button type="button" class="hub-card" data-mode="news"><div class="hub-ico">📰</div><b>Newsletter</b><span>The story of your games</span></button>`;
+ return`${canRm?`<p class="hub-hint-swipe">Organiser: swipe a tile left to remove</p>`:''}<div class="hub">
+  ${wrap('cards',cardsCard,cm.name||'Cards')}
   ${gameCards}${addCard}
-  <button type="button" class="hub-card" data-mode="rsvp"><div class="hub-ico">📅</div><b>RSVP</b><span>Events · dates · responses</span></button>
-  <button type="button" class="hub-card" data-mode="news"><div class="hub-ico">📰</div><b>Newsletter</b><span>The story of your games</span></button>
+  ${wrap('rsvp',rsvpCard,'RSVP')}
+  ${wrap('news',newsCard,'Newsletter')}
  </div>
  <p class="mut" style="text-align:center;margin-top:8px">Choose a section for this group</p>`;
 }
@@ -1478,17 +1499,44 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   try{prepareOpenCustom(id)}catch(e){console.error(e);toast('Could not open game')}
   queueMicrotask(()=>{try{persist()}catch(e){console.error(e)}window._hubAddBusy=false});
   return}
- if(g('data-boarddel')){
+ if(t.closest('[data-hubrm]')){
   e.preventDefault();e.stopPropagation();
-  if(!canOrganise())return toast('Only the organiser or admin can remove a game');
-  const id=g('data-boarddel').dataset.boarddel;
+  if(e.stopImmediatePropagation)try{e.stopImmediatePropagation()}catch(err){}
+  if(!(canOrganise()||(typeof isSessionAdmin==='function'&&isSessionAdmin())))return toast('Only the organiser or admin can remove');
+  const id=t.closest('[data-hubrm]').getAttribute('data-hubrm')||'';
+  if(!id)return;
+  if(id==='cards'){
+    const nm=(cardsMeta&&cardsMeta.name)||'Cards';
+    if(!confirm('Clear all data in “'+nm+'"?\n\nDeletes sessions, loans, expenses and the current game for “'+nm+'” only.\nOther games are not affected.\n\nThis cannot be undone.'))return;
+    players=[];sessions=[];loans=[];expenses=[];game=null;settle=null;initLoan=500;finals={};plays={};excl={};gc=false;loanDraft={};rules=null;readme=null;
+    if(!gameBoards||typeof gameBoards!=='object')gameBoards={};
+    gameBoards.__root={players:[],sessions:[],loans:[],expenses:[],game:null,initLoan:500,rules:null,readme:null};
+    activeBoardId='';
+    render();toast('“'+nm+'” cleared');
+    queueMicrotask(()=>{try{persist()}catch(e){console.error(e)}});
+    return;
+  }
+  if(id==='rsvp'){
+    if(!confirm('Clear all RSVP events for this group?\n\nThis cannot be undone.'))return;
+    events=[];
+    render();toast('RSVP events cleared');
+    queueMicrotask(()=>{try{persistEvents()}catch(e){try{persist()}catch(e2){}}});
+    return;
+  }
+  if(id==='news'){
+    if(!confirm('Newsletter has no stored data to delete.\n\nIt only reads game history. Nothing will be removed.'))return;
+    return;
+  }
   const g0=(extraGames||[]).find(x=>x.id===id);
-  if(!confirm('Remove game "'+(g0&&g0.name||id)+'" and all its data?'))return;
+  const nm=(g0&&g0.name)||'this game';
+  if(!confirm('Delete “'+nm+'"?\n\nAll sessions, loans and data for this game will be removed permanently.\n\nThis cannot be undone.'))return;
   extraGames=(extraGames||[]).filter(x=>x.id!==id);
   if(gameBoards)delete gameBoards[id];
   if(activeBoardId===id){activeBoardId='';if(gameBoards&&gameBoards.__root)applyBoardSnap(gameBoards.__root)}
-  render();toast('Game removed');queueMicrotask(()=>{try{persist()}catch(e){}});return}
- if(g('data-board')){prepareOpenCustom(g('data-board').dataset.board);return}
+  render();toast('“'+nm+'” deleted');
+  queueMicrotask(()=>{try{persist()}catch(e){console.error(e)}});
+  return}
+ if(g('data-board')&&!t.closest('[data-hubrm]')){prepareOpenCustom(g('data-board').dataset.board);return}
  if(g('data-mode')&&g('data-mode').tagName!=='SELECT'&&['hub','poker','rsvp','news'].includes(g('data-mode').dataset.mode)){
   const md=g('data-mode').dataset.mode;
   if(md==='poker'){openCardsFromHub();return}
@@ -1901,7 +1949,7 @@ let rsvpFocusId=hashEv||(function(){try{return sessionStorage.getItem('ptc_rsvp_
 let pendingMode=hashMode||'';
 let pendingEv=hashEv||'';
 // rsvpFocusId set above from hash
-const EMPTY=()=>({players:[],sessions:[],loans:[],expenses:[],settle:null,initLoan:500,game:null,readme:null,rules:null,groupName:'',bills:[],billSettle:null,feed:[],events:[],chipsBookings:[],extraGames:[],gameBoards:{}});
+const EMPTY=()=>({players:[],sessions:[],loans:[],expenses:[],settle:null,initLoan:500,game:null,readme:null,rules:null,groupName:'',bills:[],billSettle:null,feed:[],events:[],chipsBookings:[],extraGames:[],gameBoards:{},cardsMeta:{name:'Cards',icon:'🃏'}});
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
 
 function activeGameLabel(){
@@ -1909,7 +1957,7 @@ function activeGameLabel(){
     const g=(extraGames||[]).find(x=>x.id===activeBoardId);
     return (g&&g.name)||'Game';
   }
-  return 'Cards';
+  return (cardsMeta&&cardsMeta.name)||'Cards';
 }
 function activeGameFileTag(){
   return String(activeGameLabel()).replace(/[^\w\-]+/g,'_').replace(/^_|_$/g,'').slice(0,40)||'game';
@@ -1938,7 +1986,7 @@ function hashWithMode(code,mode,ev){
 }
 
 const canon=x=>JSON.stringify(x,(k,v)=>v&&typeof v=='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(q=>[q,v[q]])):v);
-const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],expenses:S.expenses||[],settle:S.settle||null,initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:null,groupName:typeof S.groupName=='string'?S.groupName:'',bills:(S.bills||[]),billSettle:S.billSettle||null,feed:Array.isArray(S.feed)?S.feed:[],events:Array.isArray(S.events)?S.events:[],chipsBookings:Array.isArray(S.chipsBookings)?S.chipsBookings:[],extraGames:Array.isArray(S.extraGames)?S.extraGames:[],gameBoards:(S.gameBoards&&typeof S.gameBoards==='object')?S.gameBoards:{}});
+const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],expenses:S.expenses||[],settle:S.settle||null,initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:null,groupName:typeof S.groupName=='string'?S.groupName:'',bills:(S.bills||[]),billSettle:S.billSettle||null,feed:Array.isArray(S.feed)?S.feed:[],events:Array.isArray(S.events)?S.events:[],chipsBookings:Array.isArray(S.chipsBookings)?S.chipsBookings:[],extraGames:Array.isArray(S.extraGames)?S.extraGames:[],gameBoards:(S.gameBoards&&typeof S.gameBoards==='object')?S.gameBoards:{},cardsMeta:(S.cardsMeta&&typeof S.cardsMeta==='object')?{name:S.cardsMeta.name||'Cards',icon:S.cardsMeta.icon||'🃏'}:{name:'Cards',icon:'🃏'}});
 function getState(){if(!Array.isArray(sessions))sessions=[];if(!Array.isArray(loans))loans=[];if(!Array.isArray(expenses))expenses=[];if(!Array.isArray(bills))bills=[];if(!Array.isArray(feed))feed=[];if(!Array.isArray(events))events=[];if(!Array.isArray(chipsBookings))chipsBookings=[];if(!Array.isArray(players))players=[];sessions.forEach(x=>{if(!x.id)x.id=uid()});loans.forEach(l=>{if(!l.id)l.id=uid()});expenses.forEach(e=>{if(!e.id)e.id=uid()});
  // Keep Cards and custom boards separate: stash UI into the active board, then
  // always write root players/sessions/... from Cards (__root), never from a custom board.
@@ -1989,6 +2037,7 @@ function getState(){if(!Array.isArray(sessions))sessions=[];if(!Array.isArray(lo
   loanDraft:!activeBoardId?JSON.parse(JSON.stringify(loanDraft||{})):(gameBoards.__root&&gameBoards.__root.loanDraft)||{}
  };
  return{
+  cardsMeta:{name:(cardsMeta&&cardsMeta.name)||'Cards',icon:(cardsMeta&&cardsMeta.icon)||'🃏'},
   extraGames:Array.isArray(extraGames)?extraGames.map(g=>({id:g.id,name:g.name||'',icon:g.icon||'🎲',at:g.at||0,by:g.by||''})):[],
   gameBoards:(function(){var o={},src=gameBoards&&typeof gameBoards==='object'?gameBoards:{};Object.keys(src).forEach(function(k){var b=src[k]||{};o[k]={players:Array.isArray(b.players)?b.players:[],sessions:Array.isArray(b.sessions)?b.sessions:[],loans:Array.isArray(b.loans)?b.loans:[],expenses:Array.isArray(b.expenses)?b.expenses:[],game:b.game||null,initLoan:b.initLoan||500,finals:b.finals||{},plays:b.plays||{},excl:b.excl||{},gc:!!b.gc,loanDraft:b.loanDraft||{},settle:b.settle||null,rules:typeof b.rules==='string'?b.rules:null,readme:typeof b.readme==='string'?b.readme:null}});return o})(),
   players:root.players,
@@ -2061,6 +2110,7 @@ function mergeState(b,l,r){const o=norm(JSON.parse(JSON.stringify(r)));b=norm(b)
  if(l.gameBoards&&typeof l.gameBoards==='object'){
   o.gameBoards=Object.assign({},o.gameBoards||{},l.gameBoards);
  }
+ if(l.cardsMeta&&typeof l.cardsMeta==='object'&&canon(l.cardsMeta)!==canon(b.cardsMeta||{}))o.cardsMeta=l.cardsMeta;
  return o}
 function getRecent(){try{return JSON.parse(localStorage.getItem('ptc_recent')||'[]')}catch(e){return[]}}
 function saveRecent(code,label){let r=getRecent().filter(x=>x.code!==code);r.unshift({code,label:label||code.slice(0,8),last:Date.now()});if(r.length>12)r=r.slice(0,12);try{localStorage.setItem('ptc_recent',JSON.stringify(r))}catch(e){}}
@@ -3009,7 +3059,7 @@ function startCloud(){if(!gid)return;
     if(pendingOrgPass){const pw=pendingOrgPass,setG=pendingSetGlobal,ep=pendingEditPw;pendingOrgPass=null;pendingSetGlobal=false;pendingEditPw=null;try{const salt=randHex(16),iter=150000,hash=await hashPass(pw,salt,iter);const payload=JSON.stringify({salt,iter,hash});await cloud.put(gid,'organiser',payload);if(ep){const s2=randHex(16),h2=await hashPass(ep,s2,150000);await cloud.put(gid,'access',JSON.stringify({salt:s2,iter:150000,hash:h2}));access={salt:s2,iter:150000,hash:h2};accessLoaded=true;lastCode=ep.slice(0,4)+'-'+ep.slice(4)}if(setG)await cloud.put(CFG,'createpass',payload);orgInfo={salt,iter,hash};orgLoaded=true;markOrganiser();await registerGroup(gid,groupName);if(gen===connGen)render()}catch(e){toast('Could not save admin password — set it on the Backups tab')}}
     else if(gen===connGen){render();queueMicrotask(()=>{try{persist()}catch(e){}})} })();return}
   if(inflight)return;reconcile(S)},e=>{if(gen!==connGen)return;cloudErr=((e&&e.code)||'error')+': '+((e&&e.message)||'');cs='error';synced=false;render()})}
-function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};bills=[];billSettle=null;billDraft={desc:'',amt:'',paid:'',shared:{}};feed=[];events=[];chipsBookings=[];extraGames=[];gameBoards={};activeBoardId='';appMode='';billTab='list';xgrp={busy:false,err:'',list:[],picked:{},playerPicked:{},data:{},combined:null};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;ownerEmail='';players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
+function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};bills=[];billSettle=null;billDraft={desc:'',amt:'',paid:'',shared:{}};feed=[];events=[];chipsBookings=[];extraGames=[];gameBoards={};activeBoardId='';cardsMeta={name:'Cards',icon:'🃏'};appMode='';billTab='list';xgrp={busy:false,err:'',list:[],picked:{},playerPicked:{},data:{},combined:null};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;ownerEmail='';players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
 function setGroup(code,name,opts){const nm=(name!=null?String(name):'').trim().slice(0,40);const doReg=opts&&opts.register;gid=code;saveRecent(code,nm||code.slice(0,8));
  const mode=pendingMode||hashMode||'';
  const evKeep=pendingEv||hashEv||rsvpFocusId||'';
@@ -3056,7 +3106,7 @@ async function checkAppUpdate(){
     return{updated:false,reason:hadWaiting?'activated':'latest'};
   }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
 }
-const CACHE_HINT='session-tracker-v84';
+const CACHE_HINT='session-tracker-v87';
 async function hardReloadApp(){
   // Preserve group + mode in the URL so reload stays put
   try{
@@ -3161,6 +3211,53 @@ window.addEventListener('hashchange',()=>{
   }catch(e){console.error(e)}
 });
 window.addEventListener('online',()=>{if(cloudOn){setSync('live');persist()}});window.addEventListener('offline',()=>setSync('offline'));
+
+// Hub swipe-to-remove (organiser / admin)
+(function(){
+  let startX=0,startY=0,dx=0,active=null,openEl=null;
+  const THRESH=56, MAX=88;
+  function trackOf(el){return el&&el.querySelector('.hub-swipe-track')}
+  function closeOpen(){
+    if(openEl){const tr=trackOf(openEl);if(tr){tr.style.transform='';tr.classList.remove('open')}openEl=null}
+  }
+  function onStart(e){
+    const sw=e.target.closest&&e.target.closest('.hub-swipe');
+    if(!sw)return;
+    if(!(typeof canOrganise==='function'&&canOrganise())&&!(typeof isSessionAdmin==='function'&&isSessionAdmin()))return;
+    if(openEl&&openEl!==sw)closeOpen();
+    const t=e.touches?e.touches[0]:e;
+    startX=t.clientX;startY=t.clientY;dx=0;active=sw;
+    const tr=trackOf(sw);if(tr)tr.style.transition='none';
+  }
+  function onMove(e){
+    if(!active)return;
+    const t=e.touches?e.touches[0]:e;
+    const x=t.clientX-startX,y=t.clientY-startY;
+    if(Math.abs(y)>Math.abs(x)&&Math.abs(y)>12){active=null;return}
+    if(x>0){dx=0;const tr=trackOf(active);if(tr)tr.style.transform='translateX(0px)';return}
+    dx=Math.max(-MAX,x);
+    const tr=trackOf(active);if(tr)tr.style.transform='translateX('+dx+'px)';
+    if(Math.abs(x)>10)try{e.preventDefault()}catch(err){}
+  }
+  function onEnd(){
+    if(!active)return;
+    const sw=active;active=null;
+    const tr=trackOf(sw);if(!tr)return;
+    tr.style.transition='';
+    if(dx<-THRESH){tr.style.transform='translateX(-'+MAX+'px)';tr.classList.add('open');openEl=sw}
+    else{tr.style.transform='';tr.classList.remove('open');if(openEl===sw)openEl=null}
+    dx=0;
+  }
+  document.addEventListener('touchstart',onStart,{passive:true});
+  document.addEventListener('touchmove',onMove,{passive:false});
+  document.addEventListener('touchend',onEnd,{passive:true});
+  document.addEventListener('touchcancel',onEnd,{passive:true});
+  // close swipe when tapping elsewhere
+  document.addEventListener('click',function(e){
+    if(openEl&&!e.target.closest('.hub-swipe'))closeOpen();
+  },true);
+})();
+
 ;(function bootApp(){
   const bootGid=gid;
   if(bootGid)gid='';
@@ -3200,12 +3297,25 @@ if ('serviceWorker' in navigator) {
       .then(reg => {
         console.log('Service Worker registered', reg.scope);
         setInterval(() => { try { reg.update(); } catch (e) {} }, 60 * 60 * 1000);
+        // Silent update check a few seconds after open
+        setTimeout(function(){ try{ if(typeof checkAppUpdate==='function') checkAppUpdate(); }catch(e){} }, 2500);
       })
       .catch(err => console.log('Service Worker registration failed', err));
   });
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    // New SW took over after SKIP_WAITING — optional soft flag
     try { sessionStorage.setItem('sw_updated', '1'); } catch (e) {}
+    // Auto-reload once when a new worker takes control (app update)
+    try {
+      if (!sessionStorage.getItem('sw_reloaded')) {
+        sessionStorage.setItem('sw_reloaded', '1');
+        location.reload();
+      }
+    } catch (e) {}
+  });
+  // When user returns to the app, probe for a new version in the background
+  document.addEventListener('visibilitychange', function(){
+    if(document.hidden) return;
+    try{ if(typeof checkAppUpdate==='function') checkAppUpdate(); }catch(e){}
   });
 }
 </script>
