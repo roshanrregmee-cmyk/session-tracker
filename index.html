@@ -358,7 +358,7 @@ body.rsvp-focus main{padding-bottom:32px}
 <script>
 const $=s=>document.querySelector(s),E=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let adminPw=null,adminOpen=false,adminGroups=[],pendingEditPw=null,adminSection='groups',emailUsers=[],emailUser=null,emailAuthMode='',emailOtpPending=null,pendingGroupMeta=null,ownerEmail='';
-let aiFn,aiTips={},aiKey='',aiBusy=false,aiMsg='',excl={},game=null,gc=false,finals={},plays={},initLoan=500,loans=[],loanDraft={},ld=new Date().toLocaleDateString('en-CA'),hsort='desc',hpl='file',ALLP=[],PERIOD={a:0,b:-1,N:0},rf=0,rt=-1,players=[],sessions=[],draft={},tab='hist',dd=new Date().toLocaleDateString('en-CA'),appMode='',billTab='list',bills=[],billDraft={desc:'',amt:'',paid:'',shared:{}},billSettle=null,feed=[],events=[],chipsBookings=[],extraGames=[],gameBoards={},activeBoardId='',cardsMeta={name:'Cards',icon:'🃏'},hubHidden={rsvp:false,news:false},xgrp={busy:false,err:'',list:[],picked:{},data:{},combined:null};
+let aiFn,aiTips={},aiKey='',aiBusy=false,aiMsg='',excl={},game=null,gc=false,finals={},plays={},initLoan=500,loans=[],loanDraft={},ld=new Date().toLocaleDateString('en-CA'),hsort='desc',hpl='file',ALLP=[],PERIOD={a:0,b:-1,N:0},rf=0,rt=-1,players=[],sessions=[],draft={},tab='hist',dd=new Date().toLocaleDateString('en-CA'),appMode='',billTab='list',bills=[],billDraft={desc:'',amt:'',paid:'',shared:{}},billSettle=null,feed=[],events=[],chipsBookings=[],extraGames=[],gameBoards={},activeBoardId='',cardsMeta={name:'Cards',icon:'🃏'},hubHidden={cards:false,rsvp:false,news:false},xgrp={busy:false,err:'',list:[],picked:{},data:{},combined:null};
 const num=v=>typeof v==='number'&&isFinite(v),f=n=>num(n)?n.toLocaleString():'',cls=n=>n>0?'pos':n<0?'neg':'';
 const iso2ser=d=>Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10))/864e5+25569;
 const ser2iso=n=>new Date(Math.round((n-25569)*864e5)).toISOString().slice(0,10);
@@ -746,7 +746,26 @@ function newsView(){
  const body=secs.length?secs.map(s=>`<div class="card news-sec"><div class="news-k">${E(s.kicker)}</div><h3 class="news-h">${E(s.head)}</h3><div class="news-sub">${E(s.sub)}</div>${s.p.map(t=>`<p class="news-p">${E(t)}</p>`).join('')}</div>`).join(''):`<div class="card news-sec"><h3 class="news-h">The presses are idle</h3><p class="news-p">No games have been recorded yet. Once a game is completed and saved to History, its story will be written here.</p></div>`;
  return sectionNav('<button type="button" data-ncopy>📤 Share</button>')+mast+ctl+body}
 
+
+function ensureDefaultGames(){
+  if(!Array.isArray(extraGames))extraGames=[];
+  if(!gameBoards||typeof gameBoards!=='object')gameBoards={};
+  // Migrate legacy root/__root into a normal "Cards" game if nothing listed yet
+  if(!extraGames.length){
+    const snap=(gameBoards.__root&&(gameBoards.__root.players||gameBoards.__root.sessions))?gameBoards.__root:null;
+    const hasRoot=players.length||sessions.length||loans.length||(game?1:0);
+    const board=snap||(hasRoot?snapshotBoard():{players:[],sessions:[],loans:[],expenses:[],game:null,initLoan:500,rules:null,readme:null});
+    gameBoards.cards=board;
+    extraGames.push({id:'cards',name:(cardsMeta&&cardsMeta.name)||'Cards',icon:(cardsMeta&&cardsMeta.icon)||'🃏',at:Date.now(),by:'system'});
+  }else if(!extraGames.some(g=>g.id==='cards')&&gameBoards.__root){
+    // keep __root data available if cards was never in list
+  }
+  // Drop hubHidden.cards — Cards is a real game now
+  if(hubHidden&&hubHidden.cards){hubHidden.cards=false}
+}
+
 function hubScreen(){
+ ensureDefaultGames();
  const canRm=!!((typeof canOrganise==='function'&&canOrganise())||(typeof isSessionAdmin==='function'&&isSessionAdmin()));
  const games=Array.isArray(extraGames)?extraGames:[];
  const hid=hubHidden||{rsvp:false,news:false};
@@ -757,13 +776,10 @@ function hubScreen(){
     <button type="button" class="hub-swipe-del" data-hubrm="${E(id)}" aria-label="Remove ${E(label)}">Remove</button>
   </div></div>`;
  };
- const cm=cardsMeta||{name:'Cards',icon:'🃏'};
- const cardsCard=`<button type="button" class="hub-card" data-mode="poker"><div class="hub-ico">${E(cm.icon||'🃏')}</div><b>${E(cm.name||'Cards')}</b></button>`;
  const gameCards=games.map(g=>{
   const card=`<button type="button" class="hub-card" data-board="${E(g.id)}"><div class="hub-ico">${E(g.icon||'🎲')}</div><b>${E(g.name||'Game')}</b></button>`;
   return wrap(g.id,card,g.name||'Game');
  }).join('');
- // + menu: New game always; RSVP/Newsletter only if removed from hub
  let addCard='';
  if(canRm){
   if(window._hubAddOpen==='form'){
@@ -772,7 +788,7 @@ function hubScreen(){
     const grid=icons.map(ic=>`<button type="button" class="hub-ico-pick${ic===sel?' on':''}" data-hubico="${ic}" aria-label="Icon">${ic}</button>`).join('');
     addCard=`<div class="card" id="hub_add_panel" style="grid-column:1/-1;text-align:left">
       <b>New game</b>
-      <div class="mut" style="margin:4px 0 10px">Starts empty. Other games stay as they are.</div>
+      <div class="mut" style="margin:4px 0 10px">Same format as every other game. Starts empty.</div>
       <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Name</label>
       <input id="hub_gname" type="text" maxlength="40" placeholder="e.g. Friday night" style="width:100%;margin-bottom:10px" autocomplete="off">
       <label style="display:block;font-size:13px;font-weight:700;margin-bottom:6px">Icon</label>
@@ -799,7 +815,6 @@ function hubScreen(){
  const rsvpCard=`<button type="button" class="hub-card" data-mode="rsvp"><div class="hub-ico">📅</div><b>RSVP</b></button>`;
  const newsCard=`<button type="button" class="hub-card" data-mode="news"><div class="hub-ico">📰</div><b>Newsletter</b></button>`;
  return`${canRm?`<p class="hub-hint-swipe">Organiser: swipe left to remove</p>`:''}<div class="hub">
-  ${wrap('cards',cardsCard,cm.name||'Cards')}
   ${gameCards}
   ${!hid.rsvp?wrap('rsvp',rsvpCard,'RSVP'):''}
   ${!hid.news?wrap('news',newsCard,'Newsletter'):''}
@@ -852,12 +867,11 @@ function stashCurrentBoard(){
  else gameBoards.__root=snapshotBoard();
 }
 function openCardsFromHub(){
- if(activeBoardId){
-  stashCurrentBoard();
-  activeBoardId='';
-  lastStd='';
-  if(gameBoards&&gameBoards.__root)applyBoardSnap(gameBoards.__root);
- }
+ ensureDefaultGames();
+ const g0=(extraGames||[]).find(x=>x.id==='cards')||(extraGames||[])[0];
+ if(g0){prepareOpenCustom(g0.id);return}
+ appMode='';tab='hist';render();return;
+ // legacy fallback
  appMode='poker';tab='hist';
  try{history.replaceState(null,'','#g='+gid+'&mode=poker')}catch(e){}
  render();
@@ -1489,14 +1503,14 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   return}
  if(t.closest('#hub_opt_rsvp')){
   e.preventDefault();
-  if(!hubHidden)hubHidden={rsvp:false,news:false};
+  if(!hubHidden)hubHidden={cards:false,rsvp:false,news:false};
   hubHidden.rsvp=false;window._hubAddOpen=false;
   render();toast('RSVP restored');
   queueMicrotask(()=>{try{persist()}catch(e){}});
   return}
  if(t.closest('#hub_opt_news')){
   e.preventDefault();
-  if(!hubHidden)hubHidden={rsvp:false,news:false};
+  if(!hubHidden)hubHidden={cards:false,rsvp:false,news:false};
   hubHidden.news=false;window._hubAddOpen=false;
   render();toast('Newsletter restored');
   queueMicrotask(()=>{try{persist()}catch(e){}});
@@ -1538,20 +1552,10 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   if(!(canOrganise()||(typeof isSessionAdmin==='function'&&isSessionAdmin())))return toast('Only the organiser or admin can remove');
   const id=t.closest('[data-hubrm]').getAttribute('data-hubrm')||'';
   if(!id)return;
-  if(id==='cards'){
-    const nm=(cardsMeta&&cardsMeta.name)||'Cards';
-    if(!confirm('Clear all data in “'+nm+'"?\n\nDeletes sessions, loans, expenses and the current game for “'+nm+'” only.\nOther games are not affected.\n\nThis cannot be undone.'))return;
-    players=[];sessions=[];loans=[];expenses=[];game=null;settle=null;initLoan=500;finals={};plays={};excl={};gc=false;loanDraft={};rules=null;readme=null;
-    if(!gameBoards||typeof gameBoards!=='object')gameBoards={};
-    gameBoards.__root={players:[],sessions:[],loans:[],expenses:[],game:null,initLoan:500,rules:null,readme:null};
-    activeBoardId='';
-    render();toast('“'+nm+'” cleared');
-    queueMicrotask(()=>{try{persist()}catch(e){console.error(e)}});
-    return;
-  }
+
   if(id==='rsvp'){
     if(!confirm('Remove RSVP from home?\n\nYou can add it back anytime with ＋.\nEvents are kept.'))return;
-    if(!hubHidden)hubHidden={rsvp:false,news:false};
+    if(!hubHidden)hubHidden={cards:false,rsvp:false,news:false};
     hubHidden.rsvp=true;
     render();toast('RSVP removed from home');
     queueMicrotask(()=>{try{persist()}catch(e){}});
@@ -1559,7 +1563,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   }
   if(id==='news'){
     if(!confirm('Remove Newsletter from home?\n\nYou can add it back anytime with ＋.'))return;
-    if(!hubHidden)hubHidden={rsvp:false,news:false};
+    if(!hubHidden)hubHidden={cards:false,rsvp:false,news:false};
     hubHidden.news=true;
     render();toast('Newsletter removed from home');
     queueMicrotask(()=>{try{persist()}catch(e){}});
@@ -1569,8 +1573,14 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   const nm=(g0&&g0.name)||'this game';
   if(!confirm('Delete “'+nm+'"?\n\nAll sessions, loans and data for this game will be removed permanently.\n\nThis cannot be undone.'))return;
   extraGames=(extraGames||[]).filter(x=>x.id!==id);
-  if(gameBoards)delete gameBoards[id];
-  if(activeBoardId===id){activeBoardId='';if(gameBoards&&gameBoards.__root)applyBoardSnap(gameBoards.__root)}
+  if(gameBoards){delete gameBoards[id];if(id==='cards')delete gameBoards.__root}
+  if(activeBoardId===id){
+    activeBoardId='';
+    const next=(extraGames||[])[0];
+    if(next&&gameBoards[next.id]){applyBoardSnap(gameBoards[next.id]);activeBoardId=next.id}
+    else{players=[];sessions=[];loans=[];expenses=[];game=null;settle=null;rules=null}
+  }
+  appMode='';
   render();toast('“'+nm+'” deleted');
   queueMicrotask(()=>{try{persist()}catch(e){console.error(e)}});
   return}
@@ -1987,7 +1997,7 @@ let rsvpFocusId=hashEv||(function(){try{return sessionStorage.getItem('ptc_rsvp_
 let pendingMode=hashMode||'';
 let pendingEv=hashEv||'';
 // rsvpFocusId set above from hash
-const EMPTY=()=>({players:[],sessions:[],loans:[],expenses:[],settle:null,initLoan:500,game:null,readme:null,rules:null,groupName:'',bills:[],billSettle:null,feed:[],events:[],chipsBookings:[],extraGames:[],gameBoards:{},cardsMeta:{name:'Cards',icon:'🃏'},hubHidden:{rsvp:false,news:false}});
+const EMPTY=()=>({players:[],sessions:[],loans:[],expenses:[],settle:null,initLoan:500,game:null,readme:null,rules:null,groupName:'',bills:[],billSettle:null,feed:[],events:[],chipsBookings:[],extraGames:[],gameBoards:{},cardsMeta:{name:'Cards',icon:'🃏'},hubHidden:{cards:false,rsvp:false,news:false}});
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
 
 function activeGameLabel(){
@@ -2024,7 +2034,7 @@ function hashWithMode(code,mode,ev){
 }
 
 const canon=x=>JSON.stringify(x,(k,v)=>v&&typeof v=='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(q=>[q,v[q]])):v);
-const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],expenses:S.expenses||[],settle:S.settle||null,initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:null,groupName:typeof S.groupName=='string'?S.groupName:'',bills:(S.bills||[]),billSettle:S.billSettle||null,feed:Array.isArray(S.feed)?S.feed:[],events:Array.isArray(S.events)?S.events:[],chipsBookings:Array.isArray(S.chipsBookings)?S.chipsBookings:[],extraGames:Array.isArray(S.extraGames)?S.extraGames:[],gameBoards:(S.gameBoards&&typeof S.gameBoards==='object')?S.gameBoards:{},cardsMeta:(S.cardsMeta&&typeof S.cardsMeta==='object')?{name:S.cardsMeta.name||'Cards',icon:S.cardsMeta.icon||'🃏'}:{name:'Cards',icon:'🃏'},hubHidden:(S.hubHidden&&typeof S.hubHidden==='object')?{rsvp:!!S.hubHidden.rsvp,news:!!S.hubHidden.news}:{rsvp:false,news:false}});
+const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],expenses:S.expenses||[],settle:S.settle||null,initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:null,groupName:typeof S.groupName=='string'?S.groupName:'',bills:(S.bills||[]),billSettle:S.billSettle||null,feed:Array.isArray(S.feed)?S.feed:[],events:Array.isArray(S.events)?S.events:[],chipsBookings:Array.isArray(S.chipsBookings)?S.chipsBookings:[],extraGames:Array.isArray(S.extraGames)?S.extraGames:[],gameBoards:(S.gameBoards&&typeof S.gameBoards==='object')?S.gameBoards:{},cardsMeta:(S.cardsMeta&&typeof S.cardsMeta==='object')?{name:S.cardsMeta.name||'Cards',icon:S.cardsMeta.icon||'🃏'}:{name:'Cards',icon:'🃏'},hubHidden:(S.hubHidden&&typeof S.hubHidden==='object')?{cards:!!S.hubHidden.cards,rsvp:!!S.hubHidden.rsvp,news:!!S.hubHidden.news}:{rsvp:false,news:false}});
 function getState(){if(!Array.isArray(sessions))sessions=[];if(!Array.isArray(loans))loans=[];if(!Array.isArray(expenses))expenses=[];if(!Array.isArray(bills))bills=[];if(!Array.isArray(feed))feed=[];if(!Array.isArray(events))events=[];if(!Array.isArray(chipsBookings))chipsBookings=[];if(!Array.isArray(players))players=[];sessions.forEach(x=>{if(!x.id)x.id=uid()});loans.forEach(l=>{if(!l.id)l.id=uid()});expenses.forEach(e=>{if(!e.id)e.id=uid()});
  // Keep Cards and custom boards separate: stash UI into the active board, then
  // always write root players/sessions/... from Cards (__root), never from a custom board.
@@ -2076,7 +2086,7 @@ function getState(){if(!Array.isArray(sessions))sessions=[];if(!Array.isArray(lo
  };
  return{
   cardsMeta:{name:(cardsMeta&&cardsMeta.name)||'Cards',icon:(cardsMeta&&cardsMeta.icon)||'🃏'},
-  hubHidden:{rsvp:!!(hubHidden&&hubHidden.rsvp),news:!!(hubHidden&&hubHidden.news)},
+  hubHidden:{cards:!!(hubHidden&&hubHidden.cards),rsvp:!!(hubHidden&&hubHidden.rsvp),news:!!(hubHidden&&hubHidden.news)},
   extraGames:Array.isArray(extraGames)?extraGames.map(g=>({id:g.id,name:g.name||'',icon:g.icon||'🎲',at:g.at||0,by:g.by||''})):[],
   gameBoards:(function(){var o={},src=gameBoards&&typeof gameBoards==='object'?gameBoards:{};Object.keys(src).forEach(function(k){var b=src[k]||{};o[k]={players:Array.isArray(b.players)?b.players:[],sessions:Array.isArray(b.sessions)?b.sessions:[],loans:Array.isArray(b.loans)?b.loans:[],expenses:Array.isArray(b.expenses)?b.expenses:[],game:b.game||null,initLoan:b.initLoan||500,finals:b.finals||{},plays:b.plays||{},excl:b.excl||{},gc:!!b.gc,loanDraft:b.loanDraft||{},settle:b.settle||null,rules:typeof b.rules==='string'?b.rules:null,readme:typeof b.readme==='string'?b.readme:null}});return o})(),
   players:root.players,
@@ -3099,7 +3109,7 @@ function startCloud(){if(!gid)return;
     if(pendingOrgPass){const pw=pendingOrgPass,setG=pendingSetGlobal,ep=pendingEditPw;pendingOrgPass=null;pendingSetGlobal=false;pendingEditPw=null;try{const salt=randHex(16),iter=150000,hash=await hashPass(pw,salt,iter);const payload=JSON.stringify({salt,iter,hash});await cloud.put(gid,'organiser',payload);if(ep){const s2=randHex(16),h2=await hashPass(ep,s2,150000);await cloud.put(gid,'access',JSON.stringify({salt:s2,iter:150000,hash:h2}));access={salt:s2,iter:150000,hash:h2};accessLoaded=true;lastCode=ep.slice(0,4)+'-'+ep.slice(4)}if(setG)await cloud.put(CFG,'createpass',payload);orgInfo={salt,iter,hash};orgLoaded=true;markOrganiser();await registerGroup(gid,groupName);if(gen===connGen)render()}catch(e){toast('Could not save admin password — set it on the Backups tab')}}
     else if(gen===connGen){render();queueMicrotask(()=>{try{persist()}catch(e){}})} })();return}
   if(inflight)return;reconcile(S)},e=>{if(gen!==connGen)return;cloudErr=((e&&e.code)||'error')+': '+((e&&e.message)||'');cs='error';synced=false;render()})}
-function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};bills=[];billSettle=null;billDraft={desc:'',amt:'',paid:'',shared:{}};feed=[];events=[];chipsBookings=[];extraGames=[];gameBoards={};activeBoardId='';cardsMeta={name:'Cards',icon:'🃏'};hubHidden={rsvp:false,news:false};appMode='';billTab='list';xgrp={busy:false,err:'',list:[],picked:{},playerPicked:{},data:{},combined:null};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;ownerEmail='';players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
+function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};bills=[];billSettle=null;billDraft={desc:'',amt:'',paid:'',shared:{}};feed=[];events=[];chipsBookings=[];extraGames=[];gameBoards={};activeBoardId='';cardsMeta={name:'Cards',icon:'🃏'};hubHidden={cards:false,rsvp:false,news:false};appMode='';billTab='list';xgrp={busy:false,err:'',list:[],picked:{},playerPicked:{},data:{},combined:null};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;ownerEmail='';players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
 function setGroup(code,name,opts){const nm=(name!=null?String(name):'').trim().slice(0,40);const doReg=opts&&opts.register;gid=code;saveRecent(code,nm||code.slice(0,8));
  const mode=pendingMode||hashMode||'';
  const evKeep=pendingEv||hashEv||rsvpFocusId||'';
@@ -3146,7 +3156,7 @@ async function checkAppUpdate(){
     return{updated:false,reason:hadWaiting?'activated':'latest'};
   }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
 }
-const CACHE_HINT='session-tracker-v88';
+const CACHE_HINT='session-tracker-v90';
 async function hardReloadApp(){
   // Preserve group + mode in the URL so reload stays put
   try{
