@@ -329,7 +329,8 @@ body.rsvp-focus #drawer{transform:translateX(105%)!important;visibility:hidden!i
 body.rsvp-focus .topbar .hd .ttl{font-size:16px}
 body.rsvp-focus main{padding-bottom:32px}
 
-.hub-card.hub-add{border-style:dashed}
+.hub-card.hub-add{border-style:dashed;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.hub-card.hub-add:active{transform:scale(.97);opacity:.9}
 .hub-card .hub-del{position:absolute;top:8px;right:10px;width:28px;height:28px;border-radius:50%;border:1px solid var(--bd);background:var(--card);font-size:16px;line-height:26px;padding:0;z-index:2;cursor:pointer}
 </style></head><body><div id="welcome"><img src="icon-512.png" alt=""><h2>Welcome Folks! 👑</h2><button id="enterBtn" type="button">Enter</button></div><main>
 <div class="topbar">
@@ -735,7 +736,20 @@ function hubScreen(){
  const gameCards=games.map(g=>{
   return `<button type="button" class="hub-card" data-board="${E(g.id)}"><div class="hub-ico">${E(g.icon||'🎲')}</div><b>${E(g.name||'Game')}</b><span>Sessions · loans · history</span>${canAdd?`<span class="hub-del" data-boarddel="${E(g.id)}" title="Remove">×</span>`:''}</button>`;
  }).join('');
- const addCard=canAdd?`<button type="button" class="hub-card hub-add" id="hub_add_game"><div class="hub-ico">＋</div><b>New game</b><span>Organiser / admin only</span></button>`:'';
+ const addCard=canAdd?(window._hubAddOpen
+  ? `<div class="card" id="hub_add_panel" style="grid-column:1/-1;text-align:left">
+      <b>New game</b>
+      <div class="mut" style="margin:4px 0 10px">Name it — starts empty. Cards stays as it is.</div>
+      <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Name</label>
+      <input id="hub_gname" type="text" maxlength="40" placeholder="e.g. Friday night" style="width:100%;margin-bottom:10px" autocomplete="off">
+      <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Icon (optional)</label>
+      <input id="hub_gicon" type="text" maxlength="4" value="🎲" style="width:100%;margin-bottom:12px">
+      <div style="display:flex;gap:8px">
+        <button type="button" class="pri" id="hub_add_go" style="flex:1">Create</button>
+        <button type="button" id="hub_add_cancel" style="flex:1">Cancel</button>
+      </div>
+    </div>`
+  : `<button type="button" class="hub-card hub-add" id="hub_add_game"><div class="hub-ico">＋</div><b>New game</b><span>Organiser / admin</span></button>`):'';
  return`<div class="hub">
   <button type="button" class="hub-card" data-mode="poker"><div class="hub-ico">🃏</div><b>Cards</b><span>Sessions, loans &amp; game expenses</span></button>
   ${gameCards}${addCard}
@@ -777,7 +791,9 @@ function applyBoardSnap(S){
  loanDraft=(S.loanDraft&&typeof S.loanDraft==='object')?JSON.parse(JSON.stringify(S.loanDraft)):{};
  settle=S.settle?JSON.parse(JSON.stringify(S.settle)):null;
  // Each board has its own rules text (cleared for brand-new games)
- rules=(typeof S.rules==='string')?S.rules:null;
+ if(S.rules==='')rules='';
+ else if(typeof S.rules==='string')rules=S.rules;
+ else rules=null;
  readme=(typeof S.readme==='string')?S.readme:null;
  notesDraft={};
  tab='hist';
@@ -804,7 +820,7 @@ function prepareOpenCustom(id){
  // If we still don't have a Cards snapshot, capture it once (only when leaving Cards)
  if(!gameBoards.__root&&!activeBoardId)gameBoards.__root=snapshotBoard();
  activeBoardId=id;
- if(!gameBoards[id])gameBoards[id]={players:[],sessions:[],loans:[],expenses:[],game:null,initLoan:500,rules:null,readme:null};
+ if(!gameBoards[id])gameBoards[id]={players:[],sessions:[],loans:[],expenses:[],game:null,initLoan:500,rules:'',readme:null};
  applyBoardSnap(gameBoards[id]);
  appMode='poker';tab='hist';
  try{history.replaceState(null,'','#g='+gid+'&mode=poker&board='+id)}catch(e){}
@@ -1409,22 +1425,30 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  if(t.id=='xgrp-fetch'){xgrpFetch();return}
  if(t.id=='xgrp-import'){xgrpImport();return}
  if(t.id=='hub_add_game'){
+  e.preventDefault();e.stopPropagation();
   if(!canOrganise())return toast('Only the organiser or admin can add a game');
-  const name=(prompt('Name for the new game:')||'').trim().slice(0,40);
-  if(!name)return;
-  let icon=(prompt('Emoji icon (optional):','🎲')||'🎲').trim().slice(0,4);
+  window._hubAddOpen=true;render();
+  queueMicrotask(()=>{try{const el=$('#hub_gname');if(el)el.focus()}catch(e){}});
+  return}
+ if(t.id=='hub_add_cancel'){window._hubAddOpen=false;render();return}
+ if(t.id=='hub_add_go'){
+  e.preventDefault();e.stopPropagation();
+  if(window._hubAddBusy)return;
+  if(!canOrganise())return toast('Only the organiser or admin can add a game');
+  const name=(($('#hub_gname')&&$('#hub_gname').value)||'').trim().slice(0,40);
+  if(!name)return toast('Enter a name');
+  let icon=(($('#hub_gicon')&&$('#hub_gicon').value)||'🎲').trim().slice(0,4);
   if(!icon)icon='🎲';
+  window._hubAddBusy=true;window._hubAddOpen=false;
   if(!Array.isArray(extraGames))extraGames=[];
   if(!gameBoards||typeof gameBoards!=='object')gameBoards={};
-  // Save Cards (or current board) BEFORE switching — never wipe Cards
-  stashCurrentBoard();
+  try{stashCurrentBoard()}catch(e){}
   const id=uid();
-  // New game only: empty data + empty Rules tab for THIS board (Cards rules stay in __root)
-  gameBoards[id]={players:[],sessions:[],loans:[],expenses:[],game:null,initLoan:500,finals:{},plays:{},excl:{},gc:false,loanDraft:{},settle:null,rules:null,readme:null};
+  gameBoards[id]={players:[],sessions:[],loans:[],expenses:[],game:null,initLoan:500,finals:{},plays:{},excl:{},gc:false,loanDraft:{},settle:null,rules:'',readme:null};
   extraGames.push({id,name,icon,at:Date.now(),by:(emailUser&&(emailUser.name||emailUser.email))||'organiser'});
   toast('Opening “'+name+'”…');
-  prepareOpenCustom(id);
-  queueMicrotask(()=>{try{persist()}catch(e){console.error(e)}});
+  try{prepareOpenCustom(id)}catch(e){console.error(e);toast('Could not open game')}
+  queueMicrotask(()=>{try{persist()}catch(e){console.error(e)}window._hubAddBusy=false});
   return}
  if(g('data-boarddel')){
   e.preventDefault();e.stopPropagation();
@@ -1561,8 +1585,8 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(t.id=='save'){const ps=players.filter(p=>plays[p]!==false);if(!dd)return toast('Pick the date played');if(!ps.length)return toast('Select at least one player');
   game={date:dd,players:ps};gc=false;finals={};loanDraft={};ld=dd;tab='loans';render();toast('Game started — add fresh loans, then tap Game completion')}
  else if(t.id=='gdisc'){if(confirm('Discard this game and its loans?')){loans=loans.filter(l=>l.done);game=null;gc=false;finals={};loanDraft={};render()}}
- else if(g('data-nedit')){const k=g('data-nedit').dataset.nedit;editing[k]=true;notesDraft[k]=k=='readme'?(readme===null?README_DEFAULT:readme):(rules===null||rules==='')?RULES_DEFAULT:rules;render()}
- else if(g('data-nsave')){const k=g('data-nsave').dataset.nsave,v=notesDraft[k]===undefined?(k=='readme'?(readme===null?README_DEFAULT:readme):(rules===null||rules==='')?RULES_DEFAULT:rules):notesDraft[k];if(k=='readme')readme=v.trim()===README_DEFAULT.trim()?null:v;else rules=v.trim()===RULES_DEFAULT.trim()?null:v;editing[k]=false;delete notesDraft[k];render();toast('Saved for everyone')}
+ else if(g('data-nedit')){const k=g('data-nedit').dataset.nedit;editing[k]=true;notesDraft[k]=k=='readme'?(readme===null?README_DEFAULT:readme):(rules===null?RULES_DEFAULT:rules);render()}
+ else if(g('data-nsave')){const k=g('data-nsave').dataset.nsave,v=notesDraft[k]===undefined?(k=='readme'?(readme===null?README_DEFAULT:readme):(rules===null?RULES_DEFAULT:rules)):notesDraft[k];if(k=='readme')readme=v.trim()===README_DEFAULT.trim()?null:v;else{rules=v.trim()===RULES_DEFAULT.trim()?null:v;if(activeBoardId&&gameBoards&&gameBoards[activeBoardId])gameBoards[activeBoardId].rules=rules}editing[k]=false;delete notesDraft[k];render();toast('Saved');queueMicrotask(()=>{try{persist()}catch(e){}})}
  else if(g('data-ncancel')){const k=g('data-ncancel').dataset.ncancel;editing[k]=false;delete notesDraft[k];render()}
  else if(g('data-nreset')){const k=g('data-nreset').dataset.nreset;if(confirm('Replace the '+k+' with the original text?')){if(k=='readme'){readme=null;editing.readme=false;delete notesDraft.readme}else{rules=null;editing.rules=false;delete notesDraft.rules}render()}}
  else if(t.id=='exadd'){const cand=game?game.players:players,amt=parseFloat(exDraft.amt),paid=exDraft.paid&&players.includes(exDraft.paid)?exDraft.paid:cand[0],sh=cand.filter(p=>exDraft.shared[p]!==false);
@@ -1727,7 +1751,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
    toast(v?'Short link saved':'Short link cleared');render();
   }catch(e){toast('Could not save the link')}
  })();return}
- else if(t.id=='gref'||t.id=='gref2'||t.id=='gref-join'||t.id=='gref-page'){refreshGroup(true);if(tab=='backup')setTimeout(loadBackups,1500)}
+ else if(t.id=='gref'||t.id=='gref2'||t.id=='gref-join'||t.id=='gref-page'){refreshGroup(false);if(tab=='backup')setTimeout(loadBackups,1500)}
  else if(g('data-gleave')){if(confirm('Leave this group on this device? The shared data stays in the cloud.'))leaveGroup()}
  else if(g('data-gswitch')){if(confirm('Switch to another group? You can return later from Recent groups.'))switchGroupUI()}
  else if(g('data-gsw')){openExistingGroup(g('data-gsw').dataset.gsw)}
@@ -1822,6 +1846,8 @@ try{loadEmailSession()}catch(e){}
 ;(async()=>{try{if(await restoreAdminSession()){render()}}catch(e){}})();
 const hashGame=((location.hash||'').match(/game=(\d{4}-\d{2}-\d{2})/)||[])[1]||'';
 const hashMode=((location.hash||'').match(/mode=(rsvp|news|poker|hub)/)||[])[1]||'';
+const sessMode=(function(){try{return sessionStorage.getItem('ptc_mode')||''}catch(e){return ''}})();
+const sessBoard=(function(){try{return sessionStorage.getItem('ptc_board')||''}catch(e){return ''}})();
 const hashEv=((location.hash||'').match(/ev=([A-Za-z0-9_-]+)/)||[])[1]||'';
 let rsvpFocusId=hashEv||(function(){try{return sessionStorage.getItem('ptc_rsvp_focus')||''}catch(e){return ''}})();
 let pendingMode=hashMode||'';
@@ -2559,7 +2585,7 @@ async function removeGroupFromList(code){
 }
 function isOwner(){try{return !!(gid&&emailUser&&emailUser.email&&ownerEmail&&normEmail(emailUser.email)===ownerEmail)}catch(e){return false}}
 async function loadOwner(code){ownerEmail='';try{const l=await loadGroupList();const r=l.find(x=>x.code===code);if(gid===code){ownerEmail=normEmail((r&&r.byEmail)||'');if(ownerEmail)render()}}catch(e){}}
-function canOrganise(){if(isOwner())return true;if(Date.now()<unlockUntil)return true;if(!orgInfo)return false;try{return localStorage.getItem(orgKey())===orgInfo.hash}catch(e){return false}}
+function canOrganise(){if(isOwner())return true;if(Date.now()<unlockUntil)return true;try{if(adminOpen||sessionStorage.getItem('ptc_admin_open')==='1')return true}catch(e){}if(!orgInfo)return false;try{return localStorage.getItem(orgKey())===orgInfo.hash}catch(e){return false}}
 function markOrganiser(){if(orgInfo)try{localStorage.setItem(orgKey(),orgInfo.hash)}catch(e){}unlockUntil=Date.now()+36e5}
 const normCode=c=>String(c||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
 const ALLOW='[data-t],[data-v],[data-x],[data-q],[data-mode],[data-pn],[data-rf],[data-rt],[data-hs],[data-hp],[data-all],[data-xall],#bkref,#gref,#gref-page,#ginvite,#gencode,#allowall,#genview,#allowview,#orgset,#orgrm,#copycode,#copyvcode,#gadmin,[data-sshare],[data-shide],[data-gcopy],[data-glink],[data-gleave],[data-gsw],[data-gopen],[data-gdel],#unlock,#unlockview,#unlockorg';
@@ -2790,7 +2816,7 @@ function mdLite(t){let h='',list=null;const close=()=>{if(list){h+='</'+list+'>'
   if(m=l.match(/^\s*[-•]\s+(.*)/)){if(list!='ul'){close();h+='<ul style="margin:4px 0;padding-left:22px">';list='ul'}h+=`<li style="margin:3px 0">${inl(m[1])}</li>`;return}
   if(m=l.match(/^\s*\d+[.)]\s+(.*)/)){if(list!='ol'){close();h+='<ol style="margin:4px 0;padding-left:22px">';list='ol'}h+=`<li style="margin:3px 0">${inl(m[1])}</li>`;return}
   close();h+=`<p style="margin:6px 0">${inl(l)}</p>`});close();return h}
-function notesTab(k){const title=k=='readme'?'Readme':'Rules',txt=k=='readme'?(readme===null?README_DEFAULT:readme):((rules===null||rules==='')?RULES_DEFAULT:rules);
+function notesTab(k){const title=k=='readme'?'Readme':'Rules',txt=k=='readme'?(readme===null?README_DEFAULT:readme):(rules===null?RULES_DEFAULT:rules);
  if(editing[k]){const d=notesDraft[k]===undefined?txt:notesDraft[k];
   return`<div class="card"><b>Editing ${title}</b><div class="mut" style="margin:4px 0 8px">Use # for headings, - for bullets, 1. for numbered steps and **bold**. Saved for everyone.</div><textarea data-ta="${k}" style="width:100%;min-height:340px;font:inherit;color:inherit;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:10px">${E(d)}</textarea><div class="pw" style="margin-top:8px"><button class="pri" data-nsave="${k}">Save</button><button data-ncancel="${k}">Cancel</button>${(k=='readme'&&readme!==null)||(k=='rules'&&rules!==null&&rules!=='')?'<button data-nreset="'+k+'">Reset to original</button>':''}</div></div>`}
   return`<div class="card">${txt.trim()?mdLite(txt):'<p class="mut">No rules written yet. Tap Edit to add your group\'s rules.</p>'}<div class="pw" style="margin-top:10px"><button data-nedit="${k}">✎ Edit</button></div></div>`}
@@ -2936,33 +2962,41 @@ async function checkAppUpdate(){
     return{updated:false,reason:hadWaiting?'activated':'latest'};
   }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
 }
-const CACHE_HINT='session-tracker-v78';
+const CACHE_HINT='session-tracker-v80';
 async function hardReloadApp(){
+  // Preserve group + mode in the URL so reload stays put
+  try{
+    if(gid){
+      const mode=appMode||'';
+      const board=activeBoardId||'';
+      let h='#g='+gid;
+      if(mode)h+='&mode='+mode;
+      if(board)h+='&board='+board;
+      try{history.replaceState(null,'',h)}catch(e){}
+      try{localStorage.setItem('ptc_group',gid)}catch(e){}
+      try{sessionStorage.setItem('ptc_mode',mode);sessionStorage.setItem('ptc_board',board)}catch(e){}
+    }
+  }catch(e){}
   try{
     if('caches' in window){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}
   }catch(e){}
+  // Don't unregister SW every time — just skip waiting if present (faster, less disorienting)
   try{
     if(navigator.serviceWorker){
-      const regs=await navigator.serviceWorker.getRegistrations();
-      await Promise.all(regs.map(r=>r.unregister()));
+      const reg=await navigator.serviceWorker.getRegistration();
+      if(reg&&reg.waiting)reg.waiting.postMessage({type:'SKIP_WAITING'});
+      try{await reg.update()}catch(e){}
     }
   }catch(e){}
   const u=new URL(location.href);
   u.searchParams.set('_r',String(Date.now()));
-  location.replace(u.toString());
+  // Keep hash
+  location.replace(u.pathname+u.search+(u.hash||location.hash||''));
 }
 async function refreshGroup(forceHard){
-  // Mobile: ↻ always does a full app reload (clear cache + new version)
-  if(forceHard!==false){
-    toast('Refreshing app…');
-    try{await hardReloadApp()}catch(e){location.reload()}
-    return;
-  }
-  toast('Checking for app update…');
-  let upd={updated:false};
-  try{upd=await checkAppUpdate()}catch(e){}
-  if(upd&&upd.updated){toast('Updating app…');return}
-  // Soft path: re-sync cloud; also probe SW version and hard-reload if mismatch
+  // Soft by default: stay on this group and re-sync. Hard only when a new app version is detected.
+  toast('Refreshing…');
+  let needHard=false;
   try{
     if(navigator.serviceWorker){
       const reg=await navigator.serviceWorker.getRegistration();
@@ -2970,13 +3004,14 @@ async function refreshGroup(forceHard){
       const res=await fetch('./sw.js?_='+Date.now(),{cache:'no-store'});
       const txt=await res.text();
       const m=txt.match(/session-tracker-v\d+/);
-      if(m&&m[0]!==CACHE_HINT){
-        toast('New version found — reloading…');
-        await hardReloadApp();
-        return;
-      }
+      if(m&&m[0]!==CACHE_HINT)needHard=true;
     }
   }catch(e){}
+  if(needHard||forceHard===true){
+    toast('Updating app…');
+    try{await hardReloadApp()}catch(e){location.reload()}
+    return;
+  }
   // Admin page: re-sync groups + email OTPs without leaving admin
   if(adminOpen){
     try{
