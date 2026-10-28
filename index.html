@@ -749,25 +749,26 @@ function newsView(){
 function ensureDefaultGames(){
   if(!Array.isArray(extraGames))extraGames=[];
   if(!gameBoards||typeof gameBoards!=='object')gameBoards={};
-  // Already have games — never auto-add Cards back after user deletes
+  // Already has games for THIS group
   if(extraGames.length)return;
-  // User explicitly cleared all games this session / group
+  // This group only: user deleted every game on purpose
   if(hubHidden&&hubHidden.noGames)return;
-  if(window._gamesInitialized)return;
-  // One-time migration: legacy root data → a normal "Cards" game
+  // Per-group seed marker (never global — other groups stay independent)
+  if(!window._seededGroups)window._seededGroups={};
+  if(gid&&window._seededGroups[gid])return;
+  // Migrate legacy root data on THIS group into a Cards game
   const snap=(gameBoards.__root&&(gameBoards.__root.players||gameBoards.__root.sessions||gameBoards.__root.loans))?gameBoards.__root:null;
   const hasRoot=players.length||sessions.length||loans.length||!!game;
-  if(!snap&&!hasRoot){
-    // Brand-new group: still seed one default game so home isn't empty
+  if(snap||hasRoot){
+    const board=snap||snapshotBoard();
+    gameBoards.cards=board;
+    extraGames.push({id:'cards',name:(cardsMeta&&cardsMeta.name)||'Cards',icon:(cardsMeta&&cardsMeta.icon)||'🃏',at:Date.now(),by:'system'});
+  }else{
+    // Empty group: one default Cards board for this group only
     gameBoards.cards={players:[],sessions:[],loans:[],expenses:[],game:null,initLoan:500,rules:'',readme:null};
     extraGames.push({id:'cards',name:'Cards',icon:'🃏',at:Date.now(),by:'system'});
-    window._gamesInitialized=true;
-    return;
   }
-  const board=snap||snapshotBoard();
-  gameBoards.cards=board;
-  extraGames.push({id:'cards',name:(cardsMeta&&cardsMeta.name)||'Cards',icon:(cardsMeta&&cardsMeta.icon)||'🃏',at:Date.now(),by:'system'});
-  window._gamesInitialized=true;
+  if(gid)window._seededGroups[gid]=true;
 }
 
 function hubScreen(){
@@ -1590,7 +1591,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   if(!(extraGames&&extraGames.length)){
     if(!hubHidden)hubHidden={rsvp:false,news:false,noGames:true};
     hubHidden.noGames=true;
-    window._gamesInitialized=true;
+    if(gid){if(!window._seededGroups)window._seededGroups={};window._seededGroups[gid]=true}
   }
   appMode='';
   render();toast('“'+nm+'” deleted');
@@ -3168,7 +3169,7 @@ async function checkAppUpdate(){
     return{updated:false,reason:hadWaiting?'activated':'latest'};
   }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
 }
-const CACHE_HINT='session-tracker-v91';
+const CACHE_HINT='session-tracker-v92';
 async function hardReloadApp(){
   // Preserve group + mode in the URL so reload stays put
   try{
@@ -3303,7 +3304,8 @@ window.addEventListener('online',()=>{if(cloudOn){setSync('live');persist()}});w
       }
       if(!(extraGames&&extraGames.length)){
         if(!hubHidden)hubHidden={rsvp:false,news:false,noGames:true};
-        hubHidden.noGames=true;window._gamesInitialized=true;
+        hubHidden.noGames=true;
+        if(gid){if(!window._seededGroups)window._seededGroups={};window._seededGroups[gid]=true}
       }
       appMode='';
       render();toast('“'+nm+'” deleted');
