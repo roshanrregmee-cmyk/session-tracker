@@ -455,7 +455,7 @@ function rsvpView(){
    h+=`<div class="card"><p class="mut" style="margin:0">This event was removed or the link is outdated. Ask the host for a new invite.</p></div>`;
    return h;
   }
-  const hostLine=ev.by?(` from <b>${E(ev.by)}</b>`):'';
+  const hostLine=ev.by?(` by <b>${E(ev.by)}</b>`):'';
   const titleLine=ev.msg?E(ev.msg):'this event';
   h=`<div class="card" style="text-align:center;padding:14px">
     <b style="font-size:18px">📩 You’re invited${hostLine}</b>
@@ -3191,7 +3191,7 @@ async function checkAppUpdate(){
     return{updated:false,reason:hadWaiting?'activated':'latest'};
   }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
 }
-const CACHE_HINT='session-tracker-v93';
+const CACHE_HINT='session-tracker-v94';
 async function hardReloadApp(){
   // Preserve group + mode in the URL so reload stays put
   try{
