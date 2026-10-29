@@ -347,6 +347,25 @@ body.rsvp-focus main{padding-bottom:32px}
 .hub-swipe-del{flex:0 0 96px;width:96px;min-width:96px;border:0;border-radius:0 22px 22px 0;background:#dc2626;color:#fff;font-weight:800;font-size:14px;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;z-index:2}
 .hub-swipe-del:active{background:#b91c1c}
 .hub-hint-swipe{font-size:12px;text-align:center;color:var(--mut);margin:0 0 8px}
+
+body.mode-ludo .tabs,body.mode-ludo .intro{display:none!important}
+body.mode-ludo .topbar{border-bottom:0;box-shadow:none;margin-bottom:0}
+body.mode-ludo .topbar .tabs{display:none}
+.ludo-board{display:grid;grid-template-columns:repeat(15,1fr);gap:2px;max-width:420px;margin:12px auto;aspect-ratio:1;background:#1e293b;padding:6px;border-radius:16px}
+.ludo-cell{border-radius:4px;background:#334155;min-height:0;position:relative;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:1px}
+.ludo-cell.safe{background:#475569}
+.ludo-cell.home-r{background:#fecdd3}.ludo-cell.home-g{background:#bbf7d0}.ludo-cell.home-y{background:#fef08a}.ludo-cell.home-b{background:#bfdbfe}
+.ludo-cell.path{background:#e2e8f0}
+.ludo-cell.center{background:#0f172a;color:#fff;font-size:10px;font-weight:700}
+.ludo-tok{width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.ludo-tok.R{background:#e11d48}.ludo-tok.G{background:#16a34a}.ludo-tok.Y{background:#ca8a04}.ludo-tok.B{background:#2563eb}
+.ludo-tok.sel{outline:2px solid #fff;transform:scale(1.25)}
+.ludo-dice{font-size:48px;line-height:1;text-align:center;padding:12px}
+.ludo-yard{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px;border-radius:12px;min-height:72px}
+.ludo-yard.R{background:#fecdd3}.ludo-yard.G{background:#bbf7d0}.ludo-yard.Y{background:#fef08a}.ludo-yard.B{background:#bfdbfe}
+.ludo-pills{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.ludo-pill{padding:8px 12px;border-radius:999px;border:2px solid transparent;font-weight:700;font-size:13px}
+.ludo-pill.on{border-color:#0f172a;box-shadow:0 0 0 2px rgba(15,23,42,.15)}
 </style></head><body><div id="welcome"><img src="icon-512.png" alt=""><h2>Welcome Folks! 👑</h2><button id="enterBtn" type="button">Enter</button></div><main>
 <div class="topbar">
 <div class="hd"><h1><img src="icon-192.png" alt="" style="height:1.15em;width:1.15em;border-radius:22%;vertical-align:-0.2em;margin-right:.3em"><span class="ttl" id="ttl"></span></h1><span id="ind" class="ind"></span><button id="gref" class="rbtn" title="Full refresh — reload app and clear cache" aria-label="Refresh">↻</button></div>
@@ -357,7 +376,7 @@ body.rsvp-focus main{padding-bottom:32px}
 <script>
 const $=s=>document.querySelector(s),E=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let adminPw=null,adminOpen=false,adminGroups=[],pendingEditPw=null,adminSection='groups',emailUsers=[],emailUser=null,emailAuthMode='',emailOtpPending=null,pendingGroupMeta=null,ownerEmail='';
-let aiFn,aiTips={},aiKey='',aiBusy=false,aiMsg='',excl={},game=null,gc=false,finals={},plays={},initLoan=500,loans=[],loanDraft={},ld=new Date().toLocaleDateString('en-CA'),hsort='desc',hpl='file',ALLP=[],PERIOD={a:0,b:-1,N:0},rf=0,rt=-1,players=[],sessions=[],draft={},tab='hist',dd=new Date().toLocaleDateString('en-CA'),appMode='',billTab='list',bills=[],billDraft={desc:'',amt:'',paid:'',shared:{}},billSettle=null,feed=[],events=[],chipsBookings=[],extraGames=[],gameBoards={},activeBoardId='',cardsMeta={name:'Cards',icon:'🃏'},hubHidden={cards:false,rsvp:false,news:false,noGames:false},xgrp={busy:false,err:'',list:[],picked:{},data:{},combined:null};
+let aiFn,aiTips={},aiKey='',aiBusy=false,aiMsg='',excl={},game=null,gc=false,finals={},plays={},initLoan=500,loans=[],loanDraft={},ld=new Date().toLocaleDateString('en-CA'),hsort='desc',hpl='file',ALLP=[],PERIOD={a:0,b:-1,N:0},rf=0,rt=-1,players=[],sessions=[],draft={},tab='hist',dd=new Date().toLocaleDateString('en-CA'),appMode='',billTab='list',bills=[],billDraft={desc:'',amt:'',paid:'',shared:{}},billSettle=null,feed=[],events=[],chipsBookings=[],extraGames=[],gameBoards={},activeBoardId='',cardsMeta={name:'Cards',icon:'🃏'},hubHidden={cards:false,rsvp:false,news:false,ludo:false,noGames:false},ludo=null,xgrp={busy:false,err:'',list:[],picked:{},data:{},combined:null};
 const num=v=>typeof v==='number'&&isFinite(v),f=n=>num(n)?n.toLocaleString():'',cls=n=>n>0?'pos':n<0?'neg':'';
 const iso2ser=d=>Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10))/864e5+25569;
 const ser2iso=n=>new Date(Math.round((n-25569)*864e5)).toISOString().slice(0,10);
@@ -771,11 +790,219 @@ function ensureDefaultGames(){
   if(gid)window._seededGroups[gid]=true;
 }
 
+
+/* —— Ludo (shared group board) —— */
+const LUDO_COLS=[
+  {id:'R',name:'Red',hex:'#e11d48'},
+  {id:'G',name:'Green',hex:'#16a34a'},
+  {id:'Y',name:'Yellow',hex:'#ca8a04'},
+  {id:'B',name:'Blue',hex:'#2563eb'}
+];
+// Start index on 52-cell ring for each colour
+const LUDO_START={R:0,G:13,Y:26,B:39};
+const LUDO_SAFE=new Set([0,8,13,21,26,34,39,47]);
+const LUDO_DICE=['⚀','⚁','⚂','⚃','⚄','⚅'];
+function emptyLudo(){
+  return{status:'setup',players:[],turn:0,dice:null,canRoll:true,winner:null,log:[],at:Date.now()};
+}
+function ludoNorm(L){
+  if(!L||typeof L!=='object')return emptyLudo();
+  return{
+    status:L.status||'setup',
+    players:Array.isArray(L.players)?L.players.map(p=>({
+      id:p.id||p.color||'R',
+      name:(p.name||'').slice(0,24),
+      color:p.color||p.id||'R',
+      tokens:Array.isArray(p.tokens)&&p.tokens.length===4?p.tokens.map(t=>isFinite(+t)?+t:-1):[-1,-1,-1,-1]
+    })):[],
+    turn:Math.max(0,L.turn|0),
+    dice:(L.dice==null||L.dice==='')?null:(+L.dice),
+    canRoll:L.canRoll!==false,
+    winner:L.winner||null,
+    log:Array.isArray(L.log)?L.log.slice(-20):[],
+    at:L.at||Date.now()
+  };
+}
+function ludoAbs(color,tokenPos){
+  // tokenPos: -1 yard, 0..50 steps on journey (0=just left yard on start), 51..55 home column, 56 finished
+  if(tokenPos<0)return null;
+  if(tokenPos>=56)return{type:'done'};
+  if(tokenPos>=51)return{type:'home',color,step:tokenPos-51};
+  const start=LUDO_START[color]||0;
+  const cell=(start+tokenPos)%52;
+  return{type:'track',cell};
+}
+function ludoMoves(L,pi){
+  const p=L.players[pi];if(!p||L.dice==null)return[];
+  const d=+L.dice;const moves=[];
+  p.tokens.forEach((pos,ti)=>{
+    if(pos<0){if(d===6)moves.push({ti,from:pos,to:0});return}
+    if(pos>=56)return;
+    const to=pos+d;
+    if(pos<=50){
+      // entering home stretch after 51 steps from start... journey length to home entry is 51
+      if(to<=50)moves.push({ti,from:pos,to});
+      else if(to<=56)moves.push({ti,from:pos,to});
+    }else if(pos>=51&&pos<56){
+      if(to<=56)moves.push({ti,from:pos,to});
+    }
+  });
+  return moves;
+}
+function ludoApplyMove(L,pi,ti){
+  L=JSON.parse(JSON.stringify(ludoNorm(L)));
+  const p=L.players[pi];if(!p)return L;
+  const moves=ludoMoves(L,pi).filter(m=>m.ti===ti);
+  if(!moves.length)return L;
+  const m=moves[0];
+  p.tokens[ti]=m.to;
+  // capture on track (not safe, not home)
+  if(m.to>=0&&m.to<=50){
+    const abs=(LUDO_START[p.color]+m.to)%52;
+    if(!LUDO_SAFE.has(abs)){
+      L.players.forEach((op,oj)=>{
+        if(oj===pi)return;
+        op.tokens=op.tokens.map(tp=>{
+          if(tp<0||tp>50)return tp;
+          const oabs=(LUDO_START[op.color]+tp)%52;
+          return oabs===abs?-1:tp;
+        });
+      });
+    }
+  }
+  // win?
+  if(p.tokens.every(t=>t>=56)){
+    L.status='done';L.winner=p.name||p.color;L.canRoll=false;L.dice=null;
+    L.log.push((p.name||p.color)+' wins!');
+    return L;
+  }
+  if(L.dice===6){L.canRoll=true;L.dice=null;L.log.push((p.name||p.color)+' rolled 6 — go again')}
+  else{
+    L.turn=(L.turn+1)%L.players.length;L.canRoll=true;L.dice=null;
+  }
+  return L;
+}
+function ludoRoll(L){
+  L=JSON.parse(JSON.stringify(ludoNorm(L)));
+  if(L.status!=='playing'||!L.canRoll)return L;
+  const d=1+Math.floor(Math.random()*6);
+  L.dice=d;L.canRoll=false;
+  const pi=L.turn%L.players.length;
+  const p=L.players[pi];
+  L.log.push((p&&p.name||'Player')+' rolled '+d);
+  const moves=ludoMoves(L,pi);
+  if(!moves.length){
+    // pass turn unless 6 with no move (still pass after 6 if nothing)
+    L.turn=(L.turn+1)%L.players.length;L.canRoll=true;L.dice=null;
+    L.log.push('No moves — next player');
+  }
+  return L;
+}
+function persistLudo(){
+  try{
+    if(!gid||!window.cloud)return;
+    const L=getState();
+    persist(); // full state includes ludo
+  }catch(e){console.error(e)}
+}
+function ludoView(){
+  const L=ludoNorm(ludo);
+  let h=sectionNav();
+  h+=`<div class="card"><b>🎲 Ludo</b><div class="mut" style="margin:4px 0 0">Shared board for this group — take turns on any device</div></div>`;
+  if(L.status==='setup'||!L.players.length){
+    h+=`<div class="card"><b>New game</b>
+    <div class="mut" style="margin:6px 0 10px">2–4 players. Pick a colour and name.</div>`;
+    LUDO_COLS.forEach(c=>{
+      const taken=(L.players||[]).find(p=>p.color===c.id);
+      h+=`<div class="row" style="margin-bottom:8px;align-items:center">
+        <span class="ludo-pill" style="background:${c.hex};color:#fff;min-width:72px;text-align:center">${c.name}</span>
+        ${taken?`<span style="flex:1;font-weight:700">${E(taken.name)}</span><button type="button" data-ludo-kick="${c.id}">Remove</button>`:
+        `<input type="text" id="ludo_name_${c.id}" placeholder="Name" maxlength="24" style="flex:1" list="ludo_plist">
+         <button type="button" class="pri" data-ludo-join="${c.id}">Join</button>`}
+      </div>`;
+    });
+    if(players.length)h+=`<datalist id="ludo_plist">${players.map(p=>`<option value="${E(p)}">`).join('')}</datalist>`;
+    h+=`<button type="button" class="pri" id="ludo_start" style="width:100%;margin-top:10px" ${L.players.length<2?'disabled':''}>Start game (${L.players.length}/4)</button>
+    </div>`;
+    return h;
+  }
+  // Playing / done
+  const cur=L.players[L.turn%L.players.length];
+  h+=`<div class="card">`;
+  if(L.status==='done'){
+    h+=`<b>🏆 ${E(L.winner||'Someone')} wins!</b>
+    <button type="button" class="pri" id="ludo_reset" style="width:100%;margin-top:12px">New game</button>`;
+  }else{
+    h+=`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+      <div><span class="mut">Turn</span><div style="font-weight:800;font-size:18px;color:${(LUDO_COLS.find(c=>c.id===cur.color)||{}).hex||'#000'}">${E(cur.name||cur.color)}</div></div>
+      <div class="ludo-dice">${L.dice!=null?LUDO_DICE[L.dice-1]:'🎲'}</div>
+    </div>`;
+    if(L.canRoll)h+=`<button type="button" class="pri" id="ludo_roll" style="width:100%;margin-top:10px">Roll dice</button>`;
+    else if(L.dice!=null){
+      const moves=ludoMoves(L,L.turn%L.players.length);
+      if(moves.length){
+        h+=`<div class="mut" style="margin:10px 0 6px">Tap a highlighted token to move (${L.dice})</div>`;
+      }
+    }
+  }
+  // Yards
+  h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">`;
+  L.players.forEach((p,pi)=>{
+    const col=LUDO_COLS.find(c=>c.id===p.color)||LUDO_COLS[0];
+    const moves=(L.status==='playing'&&!L.canRoll&&L.dice!=null&&pi===(L.turn%L.players.length))?ludoMoves(L,pi):[];
+    const moveTis=new Set(moves.map(m=>m.ti));
+    h+=`<div class="ludo-yard ${p.color}"><div style="grid-column:1/-1;font-weight:700;font-size:12px">${E(p.name)} · ${p.tokens.filter(t=>t>=56).length}/4 home</div>`;
+    p.tokens.forEach((pos,ti)=>{
+      const inYard=pos<0;
+      const can=moveTis.has(ti);
+      if(inYard||can||pos>=56){
+        h+=`<button type="button" class="ludo-tok ${p.color}${can?' sel':''}" data-ludo-tok="${pi}:${ti}" ${can?'':'disabled'} title="${pos<0?'Yard':pos>=56?'Finished':'On board'}" style="${can?'':'opacity:.85'}"></button>`;
+      }else{
+        h+=`<span class="ludo-tok ${p.color}" style="opacity:.35"></span>`;
+      }
+    });
+    h+=`</div>`;
+  });
+  h+=`</div>`;
+  // Simple track strip
+  h+=`<div class="mut" style="margin-top:12px;font-size:12px">Track positions (simplified view)</div>
+  <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">`;
+  for(let cell=0;cell<52;cell++){
+    const toks=[];
+    L.players.forEach((p,pi)=>{
+      p.tokens.forEach((pos,ti)=>{
+        if(pos<0||pos>50)return;
+        if((LUDO_START[p.color]+pos)%52===cell)toks.push({p,pi,ti,can:false});
+      });
+    });
+    const curPi=L.turn%L.players.length;
+    if(L.dice!=null&&!L.canRoll){
+      ludoMoves(L,curPi).forEach(m=>{
+        const p=L.players[curPi];
+        if(m.to<=50&&(LUDO_START[p.color]+m.to)%52===cell){
+          /* highlight destination handled via token tap */
+        }
+      });
+    }
+    const safe=LUDO_SAFE.has(cell);
+    h+=`<div style="width:28px;height:28px;border-radius:6px;background:${safe?'#94a3b8':'#e2e8f0'};display:flex;align-items:center;justify-content:center;gap:1px">`;
+    toks.forEach(t=>{h+=`<span class="ludo-tok ${t.p.color}" style="width:10px;height:10px"></span>`});
+    h+=`</div>`;
+  }
+  h+=`</div>`;
+  if(L.log&&L.log.length){
+    h+=`<div class="mut" style="margin-top:12px;font-size:12px;max-height:80px;overflow:auto">${L.log.slice().reverse().map(x=>E(x)).join('<br>')}</div>`;
+  }
+  if(L.status==='playing')h+=`<button type="button" id="ludo_reset" style="width:100%;margin-top:12px">Reset board</button>`;
+  h+=`</div>`;
+  return h;
+}
+
 function hubScreen(){
  ensureDefaultGames();
  const canRm=!!((typeof canOrganise==='function'&&canOrganise())||(typeof isSessionAdmin==='function'&&isSessionAdmin()));
  const games=Array.isArray(extraGames)?extraGames:[];
- const hid=hubHidden||{rsvp:false,news:false};
+ const hid=hubHidden||{rsvp:false,news:false,ludo:false};
  const wrap=(id,cardHtml,label)=>{
   if(!canRm)return cardHtml;
   return `<div class="hub-swipe" data-swipe="${E(id)}"><div class="hub-swipe-track">
@@ -813,6 +1040,7 @@ function hubScreen(){
       <button type="button" class="pri" id="hub_opt_game" style="width:100%;margin-bottom:8px">＋ New game</button>
       ${hid.rsvp?`<button type="button" id="hub_opt_rsvp" style="width:100%;margin-bottom:8px">📅 Restore RSVP</button>`:''}
       ${hid.news?`<button type="button" id="hub_opt_news" style="width:100%;margin-bottom:8px">📰 Restore Newsletter</button>`:''}
+      ${hid.ludo?`<button type="button" id="hub_opt_ludo" style="width:100%;margin-bottom:8px">🎲 Restore Ludo</button>`:''}
       <button type="button" id="hub_add_cancel" style="width:100%">Cancel</button>
     </div>`;
   }else{
@@ -821,10 +1049,12 @@ function hubScreen(){
  }
  const rsvpCard=`<button type="button" class="hub-card" data-mode="rsvp"><div class="hub-ico">📅</div><b>RSVP</b></button>`;
  const newsCard=`<button type="button" class="hub-card" data-mode="news"><div class="hub-ico">📰</div><b>Newsletter</b></button>`;
+ const ludoCard=`<button type="button" class="hub-card" data-mode="ludo"><div class="hub-ico">🎲</div><b>Ludo</b></button>`;
  return`${canRm?`<p class="hub-hint-swipe">Organiser: swipe left to remove</p>`:''}<div class="hub">
   ${gameCards}
   ${!hid.rsvp?wrap('rsvp',rsvpCard,'RSVP'):''}
   ${!hid.news?wrap('news',newsCard,'Newsletter'):''}
+  ${!hid.ludo?wrap('ludo',ludoCard,'Ludo'):''}
   ${addCard}
  </div>`;
 }
@@ -1492,6 +1722,39 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  if(rsvpFocusId&&appMode==='rsvp'){
   if(t.closest('.hub-card')||t.id=='rsvp_show_all'||g('data-gleave')||t.closest('[data-app]')){e.preventDefault();toast('This invite link is for RSVP only');return}
  }
+
+ if(t.closest('[data-ludo-join]')){
+  const col=t.closest('[data-ludo-join]').getAttribute('data-ludo-join');
+  const inp=$('#ludo_name_'+col);const name=((inp&&inp.value)||'').trim().slice(0,24);
+  if(!name)return toast('Enter a name');
+  ludo=ludoNorm(ludo);
+  if(ludo.players.some(p=>p.color===col))return toast('Colour taken');
+  if(ludo.players.length>=4)return toast('Max 4 players');
+  ludo.players.push({id:col,color:col,name,tokens:[-1,-1,-1,-1]});
+  ludo.status='setup';render();queueMicrotask(()=>{try{persist()}catch(e){}});return}
+ if(t.closest('[data-ludo-kick]')){
+  const col=t.closest('[data-ludo-kick]').getAttribute('data-ludo-kick');
+  ludo=ludoNorm(ludo);
+  if(ludo.status==='playing')return toast('Finish or reset the game first');
+  ludo.players=ludo.players.filter(p=>p.color!==col);
+  render();queueMicrotask(()=>{try{persist()}catch(e){}});return}
+ if(t.id=='ludo_start'){
+  ludo=ludoNorm(ludo);
+  if(ludo.players.length<2)return toast('Need at least 2 players');
+  ludo.status='playing';ludo.turn=0;ludo.dice=null;ludo.canRoll=true;ludo.winner=null;ludo.log=['Game started'];
+  render();queueMicrotask(()=>{try{persist()}catch(e){}});return}
+ if(t.id=='ludo_roll'){
+  ludo=ludoRoll(ludoNorm(ludo));render();queueMicrotask(()=>{try{persist()}catch(e){}});return}
+ if(t.closest('[data-ludo-tok]')){
+  const raw=t.closest('[data-ludo-tok]').getAttribute('data-ludo-tok')||'';
+  const parts=raw.split(':');const pi=+parts[0],ti=+parts[1];
+  if(!isFinite(pi)||!isFinite(ti))return;
+  ludo=ludoApplyMove(ludoNorm(ludo),pi,ti);
+  render();queueMicrotask(()=>{try{persist()}catch(e){}});return}
+ if(t.id=='ludo_reset'){
+  if(!confirm('Reset Ludo board?'))return;
+  ludo=emptyLudo();render();queueMicrotask(()=>{try{persist()}catch(e){}});return}
+
  if(t.id=='xgrp-load'){xgrpLoadList();return}
  if(t.id=='xgrp-fetch'){xgrpFetch();return}
  if(t.id=='xgrp-import'){xgrpImport();return}
@@ -1517,9 +1780,16 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   return}
  if(t.closest('#hub_opt_news')){
   e.preventDefault();
-  if(!hubHidden)hubHidden={cards:false,rsvp:false,news:false,noGames:false};
+  if(!hubHidden)hubHidden={cards:false,rsvp:false,news:false,ludo:false,noGames:false};
   hubHidden.news=false;window._hubAddOpen=false;
   render();toast('Newsletter restored');
+  queueMicrotask(()=>{try{persist()}catch(e){}});
+  return}
+ if(t.closest('#hub_opt_ludo')){
+  e.preventDefault();
+  if(!hubHidden)hubHidden={rsvp:false,news:false,ludo:false};
+  hubHidden.ludo=false;window._hubAddOpen=false;
+  render();toast('Ludo restored');
   queueMicrotask(()=>{try{persist()}catch(e){}});
   return}
  if(t.closest('[data-hubico]')){
@@ -1598,7 +1868,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   queueMicrotask(()=>{try{persist()}catch(e){console.error(e)}});
   return}
  if(g('data-board')&&!t.closest('[data-hubrm]')){prepareOpenCustom(g('data-board').dataset.board);return}
- if(g('data-mode')&&g('data-mode').tagName!=='SELECT'&&['hub','poker','rsvp','news'].includes(g('data-mode').dataset.mode)){
+ if(g('data-mode')&&g('data-mode').tagName!=='SELECT'&&['hub','poker','rsvp','news','ludo'].includes(g('data-mode').dataset.mode)){
   const md=g('data-mode').dataset.mode;
   if(md==='poker'){openCardsFromHub();return}
   if(md==='hub'){if(activeBoardId){stashCurrentBoard();if(gameBoards&&gameBoards.__root)applyBoardSnap(gameBoards.__root);activeBoardId=''}appMode=''}
@@ -2032,7 +2302,7 @@ let rsvpFocusId=hashEv||(function(){try{return sessionStorage.getItem('ptc_rsvp_
 let pendingMode=hashMode||'';
 let pendingEv=hashEv||'';
 // rsvpFocusId set above from hash
-const EMPTY=()=>({players:[],sessions:[],loans:[],expenses:[],settle:null,initLoan:500,game:null,readme:null,rules:null,groupName:'',bills:[],billSettle:null,feed:[],events:[],chipsBookings:[],extraGames:[],gameBoards:{},cardsMeta:{name:'Cards',icon:'🃏'},hubHidden:{cards:false,rsvp:false,news:false,noGames:false}});
+const EMPTY=()=>({players:[],sessions:[],loans:[],expenses:[],settle:null,initLoan:500,game:null,readme:null,rules:null,groupName:'',bills:[],billSettle:null,feed:[],events:[],ludo:null,chipsBookings:[],extraGames:[],gameBoards:{},cardsMeta:{name:'Cards',icon:'🃏'},hubHidden:{cards:false,rsvp:false,news:false,noGames:false}});
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
 
 function activeGameLabel(){
@@ -2069,7 +2339,7 @@ function hashWithMode(code,mode,ev){
 }
 
 const canon=x=>JSON.stringify(x,(k,v)=>v&&typeof v=='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(q=>[q,v[q]])):v);
-const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],expenses:S.expenses||[],settle:S.settle||null,initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:null,groupName:typeof S.groupName=='string'?S.groupName:'',bills:(S.bills||[]),billSettle:S.billSettle||null,feed:Array.isArray(S.feed)?S.feed:[],events:Array.isArray(S.events)?S.events:[],chipsBookings:Array.isArray(S.chipsBookings)?S.chipsBookings:[],extraGames:Array.isArray(S.extraGames)?S.extraGames:[],gameBoards:(S.gameBoards&&typeof S.gameBoards==='object')?S.gameBoards:{},cardsMeta:(S.cardsMeta&&typeof S.cardsMeta==='object')?{name:S.cardsMeta.name||'Cards',icon:S.cardsMeta.icon||'🃏'}:{name:'Cards',icon:'🃏'},hubHidden:(S.hubHidden&&typeof S.hubHidden==='object')?{cards:!!S.hubHidden.cards,rsvp:!!S.hubHidden.rsvp,news:!!S.hubHidden.news,noGames:!!S.hubHidden.noGames}:{rsvp:false,news:false}});
+const norm=S=>({players:S.players||[],sessions:S.sessions||[],loans:S.loans||[],expenses:S.expenses||[],settle:S.settle||null,initLoan:num(S.initLoan)?S.initLoan:500,game:S.game||null,readme:typeof S.readme=='string'?S.readme:null,rules:typeof S.rules=='string'?S.rules:null,groupName:typeof S.groupName=='string'?S.groupName:'',bills:(S.bills||[]),billSettle:S.billSettle||null,feed:Array.isArray(S.feed)?S.feed:[],events:Array.isArray(S.events)?S.events:[],ludo:S.ludo?ludoNorm(S.ludo):null,chipsBookings:Array.isArray(S.chipsBookings)?S.chipsBookings:[],extraGames:Array.isArray(S.extraGames)?S.extraGames:[],gameBoards:(S.gameBoards&&typeof S.gameBoards==='object')?S.gameBoards:{},cardsMeta:(S.cardsMeta&&typeof S.cardsMeta==='object')?{name:S.cardsMeta.name||'Cards',icon:S.cardsMeta.icon||'🃏'}:{name:'Cards',icon:'🃏'},hubHidden:(S.hubHidden&&typeof S.hubHidden==='object')?{cards:!!S.hubHidden.cards,rsvp:!!S.hubHidden.rsvp,news:!!S.hubHidden.news,ludo:!!S.hubHidden.ludo,noGames:!!S.hubHidden.noGames}:{rsvp:false,news:false}});
 function getState(){if(!Array.isArray(sessions))sessions=[];if(!Array.isArray(loans))loans=[];if(!Array.isArray(expenses))expenses=[];if(!Array.isArray(bills))bills=[];if(!Array.isArray(feed))feed=[];if(!Array.isArray(events))events=[];if(!Array.isArray(chipsBookings))chipsBookings=[];if(!Array.isArray(players))players=[];sessions.forEach(x=>{if(!x.id)x.id=uid()});loans.forEach(l=>{if(!l.id)l.id=uid()});expenses.forEach(e=>{if(!e.id)e.id=uid()});
  // Keep Cards and custom boards separate: stash UI into the active board, then
  // always write root players/sessions/... from Cards (__root), never from a custom board.
@@ -2121,7 +2391,7 @@ function getState(){if(!Array.isArray(sessions))sessions=[];if(!Array.isArray(lo
  };
  return{
   cardsMeta:{name:(cardsMeta&&cardsMeta.name)||'Cards',icon:(cardsMeta&&cardsMeta.icon)||'🃏'},
-  hubHidden:{cards:!!(hubHidden&&hubHidden.cards),rsvp:!!(hubHidden&&hubHidden.rsvp),news:!!(hubHidden&&hubHidden.news),noGames:!!(hubHidden&&hubHidden.noGames)},
+  hubHidden:{cards:!!(hubHidden&&hubHidden.cards),rsvp:!!(hubHidden&&hubHidden.rsvp),news:!!(hubHidden&&hubHidden.news),ludo:!!(hubHidden&&hubHidden.ludo),noGames:!!(hubHidden&&hubHidden.noGames)},
   extraGames:Array.isArray(extraGames)?extraGames.map(g=>({id:g.id,name:g.name||'',icon:g.icon||'🎲',at:g.at||0,by:g.by||''})):[],
   gameBoards:(function(){var o={},src=gameBoards&&typeof gameBoards==='object'?gameBoards:{};Object.keys(src).forEach(function(k){var b=src[k]||{};o[k]={players:Array.isArray(b.players)?b.players:[],sessions:Array.isArray(b.sessions)?b.sessions:[],loans:Array.isArray(b.loans)?b.loans:[],expenses:Array.isArray(b.expenses)?b.expenses:[],game:b.game||null,initLoan:b.initLoan||500,finals:b.finals||{},plays:b.plays||{},excl:b.excl||{},gc:!!b.gc,loanDraft:b.loanDraft||{},settle:b.settle||null,rules:typeof b.rules==='string'?b.rules:null,readme:typeof b.readme==='string'?b.readme:null}});return o})(),
   players:root.players,
@@ -2591,6 +2861,7 @@ function render(){try{
  </div>`;setSync(cs);['#xl','#pdf','#jpg'].forEach(s=>{const el=$(s);if(el)el.disabled=true});return}
  if(appMode==='bills'||appMode==='chips')appMode='';
  document.body.classList.toggle('mode-news',appMode==='news');
+ document.body.classList.toggle('mode-ludo',appMode==='ludo');
  document.body.classList.toggle('mode-hub',!appMode);
  document.body.classList.toggle('mode-poker',appMode==='poker');
  document.body.classList.toggle('mode-bills',appMode==='bills');
@@ -2620,6 +2891,9 @@ function render(){try{
   try{syncUploadBtn()}catch(e){}
   queueMicrotask(()=>{try{persist()}catch(e){console.error(e)}});return;
  }
+ if(appMode==='ludo'){
+  try{if(ttl)$('#ttl').textContent=(groupName||'Group')+' · Ludo'}catch(e){}
+  vEl.innerHTML=ludoView();setSync(cs);return}
  if(appMode==='rsvp'){
   document.body.classList.remove('viewonly');
   $('#v').innerHTML=rsvpView();
@@ -3144,7 +3418,7 @@ function startCloud(){if(!gid)return;
     if(pendingOrgPass){const pw=pendingOrgPass,setG=pendingSetGlobal,ep=pendingEditPw;pendingOrgPass=null;pendingSetGlobal=false;pendingEditPw=null;try{const salt=randHex(16),iter=150000,hash=await hashPass(pw,salt,iter);const payload=JSON.stringify({salt,iter,hash});await cloud.put(gid,'organiser',payload);if(ep){const s2=randHex(16),h2=await hashPass(ep,s2,150000);await cloud.put(gid,'access',JSON.stringify({salt:s2,iter:150000,hash:h2}));access={salt:s2,iter:150000,hash:h2};accessLoaded=true;lastCode=ep.slice(0,4)+'-'+ep.slice(4)}if(setG)await cloud.put(CFG,'createpass',payload);orgInfo={salt,iter,hash};orgLoaded=true;markOrganiser();await registerGroup(gid,groupName);if(gen===connGen)render()}catch(e){toast('Could not save admin password — set it on the Backups tab')}}
     else if(gen===connGen){render();queueMicrotask(()=>{try{persist()}catch(e){}})} })();return}
   if(inflight)return;reconcile(S)},e=>{if(gen!==connGen)return;cloudErr=((e&&e.code)||'error')+': '+((e&&e.message)||'');cs='error';synced=false;render()})}
-function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};bills=[];billSettle=null;billDraft={desc:'',amt:'',paid:'',shared:{}};feed=[];events=[];chipsBookings=[];extraGames=[];gameBoards={};activeBoardId='';cardsMeta={name:'Cards',icon:'🃏'};hubHidden={cards:false,rsvp:false,news:false,noGames:false};appMode='';billTab='list';xgrp={busy:false,err:'',list:[],picked:{},playerPicked:{},data:{},combined:null};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;ownerEmail='';players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
+function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};bills=[];billSettle=null;billDraft={desc:'',amt:'',paid:'',shared:{}};feed=[];events=[];ludo=null;chipsBookings=[];extraGames=[];gameBoards={};activeBoardId='';cardsMeta={name:'Cards',icon:'🃏'};hubHidden={cards:false,rsvp:false,news:false,noGames:false};appMode='';billTab='list';xgrp={busy:false,err:'',list:[],picked:{},playerPicked:{},data:{},combined:null};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;ownerEmail='';players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
 function setGroup(code,name,opts){const nm=(name!=null?String(name):'').trim().slice(0,40);const doReg=opts&&opts.register;gid=code;saveRecent(code,nm||code.slice(0,8));
  const mode=pendingMode||hashMode||'';
  const evKeep=pendingEv||hashEv||rsvpFocusId||'';
@@ -3191,7 +3465,7 @@ async function checkAppUpdate(){
     return{updated:false,reason:hadWaiting?'activated':'latest'};
   }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
 }
-const CACHE_HINT='session-tracker-v94';
+const CACHE_HINT='session-tracker-v95';
 async function hardReloadApp(){
   // Preserve group + mode in the URL so reload stays put
   try{
