@@ -3463,7 +3463,7 @@ function backupTab(){
  <div class="card"><b>Current standing backup · ${gnm}</b>${b}</div>
  ${bk.err?`<p class="neg">Could not load cloud backups (${E(bk.err)}). Tap ↻ to try again.</p>`:''}`;
 }
-const CACHE_HINT='session-tracker-v104';
+const CACHE_HINT='session-tracker-v105';
 
 async function deployAppUpdate(){
   toast('Saving data, then updating…');
@@ -3535,6 +3535,52 @@ async function refreshGroup(forceHard){
   }catch(e){}
   try{await hardReloadApp()}catch(e){try{location.reload()}catch(e2){}}
 }
+function startCloud(){if(!gid)return;
+ const gen=++connGen;
+ if(!window.cloud){window.addEventListener('cloudready',()=>{if(gen===connGen)startCloud()},{once:true});setTimeout(()=>{if(gen!==connGen)return;if(!window.cloud){cloudErr='Could not load Google services. Check your internet connection and reload.';cs='error';render()}},8000);return}
+ cloudOn=true;cs='connecting';cloudErr='';access=null;accessLoaded=false;viewAccess=null;viewLoaded=false;
+ if(window._connTimer)clearTimeout(window._connTimer);
+ window._connTimer=setTimeout(()=>{if(gen!==connGen)return;if(!synced&&gid&&cs==='connecting'){cloudErr='Taking too long to reach this group. Check internet or try another group.';cs='error';render()}},8000);
+ (async()=>{try{const a=await cloud.get(gid,'access');access=(a&&a.json&&a.json!=='null')?JSON.parse(a.json):null}catch(e){access=null}accessLoaded=true;if(gen===connGen&&synced)renderSafe()})();
+ (async()=>{try{const v=await cloud.get(gid,'viewaccess');viewAccess=(v&&v.json&&v.json!=='null')?JSON.parse(v.json):null}catch(e){viewAccess=null}viewLoaded=true;if(gen===connGen&&synced)renderSafe()})();
+ if(cloud.watch)cloud.watch(gid,'access',json=>{if(gen!==connGen||json===undefined)return;access=(json&&json!=='null')?JSON.parse(json):null;accessLoaded=true;if(synced)renderSafe()});
+ if(cloud.watch)cloud.watch(gid,'viewaccess',json=>{if(gen!==connGen||json===undefined)return;viewAccess=(json&&json!=='null')?JSON.parse(json):null;viewLoaded=true;if(synced)renderSafe()});
+ cloud.listen(gid,json=>{if(gen!==connGen)return;let S;
+  try{S=json?norm(JSON.parse(json)):EMPTY()}catch(e){console.error('Bad group data',e);cloudErr='Group data could not be read. It may be damaged.';cs='error';synced=false;render();return}
+  if(!synced){synced=true;cs='live';if(window._connTimer){clearTimeout(window._connTimer);window._connTimer=null}const keepName=groupName;base=S;lastSent='';applying=true;try{applyState(S);if(keepName&&!groupName){groupName=keepName;if(gid)saveRecent(gid,groupName)}}catch(e){console.error('applyState',e);cloudErr='Could not load this group\'s data.';cs='error';synced=false;applying=false;render();return}applying=false;if(hashGame){if(game&&game.date===hashGame){tab='loans';appMode='poker';toast('Opened the game of '+hashGame)}else if(game)toast('A different game is in progress ('+game.date+')')}
+  if(pendingMode||hashMode){const m=pendingMode||hashMode;pendingMode='';
+  if(m==='rsvp'||m==='news'||m==='poker'){
+   appMode=m;if(m==='poker')tab='hist';
+   if(m==='rsvp'){
+    if(pendingEv)rsvpFocusId=pendingEv;
+    readRsvpFocusFromHash();
+    try{if(rsvpFocusId)sessionStorage.setItem('ptc_rsvp_focus',rsvpFocusId)}catch(e){}
+   }else{rsvpFocusId='';try{sessionStorage.removeItem('ptc_rsvp_focus')}catch(e){}}
+   try{history.replaceState(null,'',hashWithMode(gid,m,m==='rsvp'?rsvpFocusId:''))}catch(e){}
+   if(m==='rsvp')toast(rsvpFocusId?'Opened event RSVP':'Opened RSVP');
+   else if(m==='news')toast('Opened Newsletter');
+   else toast('Opened Cards');
+  }
+  pendingEv='';
+ }
+   ;(async()=>{try{const del=await cloud.get(gid,'deleted');if(del&&del.json&&del.json!=='null'&&!pendingOrgPass){removeRecent(gid);const gone=gid;leaveGroup();toast('Group '+(gone.slice(0,8))+'… no longer exists (deleted by the admin).');return}}catch(e){}
+    loadOrg().then(()=>{if(gen===connGen)render()});
+    if(pendingOrgPass){const pw=pendingOrgPass,setG=pendingSetGlobal,ep=pendingEditPw;pendingOrgPass=null;pendingSetGlobal=false;pendingEditPw=null;try{const salt=randHex(16),iter=150000,hash=await hashPass(pw,salt,iter);const payload=JSON.stringify({salt,iter,hash});await cloud.put(gid,'organiser',payload);if(ep){const s2=randHex(16),h2=await hashPass(ep,s2,150000);await cloud.put(gid,'access',JSON.stringify({salt:s2,iter:150000,hash:h2}));access={salt:s2,iter:150000,hash:h2};accessLoaded=true;lastCode=ep.slice(0,4)+'-'+ep.slice(4)}if(setG)await cloud.put(CFG,'createpass',payload);orgInfo={salt,iter,hash};orgLoaded=true;markOrganiser();await registerGroup(gid,groupName);if(gen===connGen)render()}catch(e){toast('Could not save admin password — set it on the Backups tab')}}
+    else if(gen===connGen){render();queueMicrotask(()=>{try{persist()}catch(e){}})} })();return}
+  if(inflight)return;reconcile(S)},e=>{if(gen!==connGen)return;cloudErr=((e&&e.code)||'error')+': '+((e&&e.message)||'');cs='error';synced=false;render()})}
+function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};bills=[];billSettle=null;billDraft={desc:'',amt:'',paid:'',shared:{}};feed=[];events=[];chipsBookings=[];extraGames=[];gameBoards={};activeBoardId='';cardsMeta={name:'Cards',icon:'🃏'};hubHidden={cards:false,rsvp:false,news:false,noGames:false};appMode='';billTab='list';xgrp={busy:false,err:'',list:[],picked:{},playerPicked:{},data:{},combined:null};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;ownerEmail='';players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
+function setGroup(code,name,opts){const nm=(name!=null?String(name):'').trim().slice(0,40);const doReg=opts&&opts.register;gid=code;saveRecent(code,nm||code.slice(0,8));
+ const mode=pendingMode||hashMode||'';
+ const evKeep=pendingEv||hashEv||rsvpFocusId||'';
+ try{localStorage.setItem('ptc_group',code);history.replaceState(null,'',hashWithMode(code,mode,mode==='rsvp'?evKeep:''))}catch(e){}
+ clearLocal();groupName=nm;cs='connecting';synced=false;
+ if(mode==='rsvp'||pendingMode==='rsvp'||hashMode==='rsvp'){
+  appMode='rsvp';
+  rsvpFocusId=evKeep||readRsvpFocusFromHash()||'';
+  try{if(rsvpFocusId)sessionStorage.setItem('ptc_rsvp_focus',rsvpFocusId)}catch(e){}
+ }else if(mode==='news'||pendingMode==='news'||hashMode==='news'){appMode='news';rsvpFocusId=''}
+ else if(mode==='poker'||pendingMode==='poker'||hashMode==='poker'){appMode='poker';tab='hist';rsvpFocusId=''}
+ if(window.cloud&&cloud.stop){try{cloud.stop()}catch(e){}}startCloud();render();loadOwner(code);if(doReg)queueMicrotask(()=>registerGroup(code,nm).catch(()=>{}))}
 function leaveGroup(){rsvpFocusId='';try{sessionStorage.removeItem('ptc_rsvp_focus')}catch(e){}window._glLoaded=false;connGen++;if(window._connTimer){clearTimeout(window._connTimer);window._connTimer=null}const keepAdmin=(()=>{try{return sessionStorage.getItem('ptc_admin_open')==='1'}catch(e){return false}})();if(keepAdmin){adminOpen=true;adminPw=adminPw||'session';adminSection=adminSection||'groups';loadGroupList().then(l=>{adminGroups=l;render()}).catch(()=>{})}else{adminOpen=false;adminPw=null}if(gid){saveRecent(gid,groupName||gid.slice(0,8));try{localStorage.removeItem(viewKey());localStorage.removeItem(editKey())}catch(e){}}if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;gid='';try{localStorage.removeItem('ptc_group');history.replaceState(null,'',location.pathname)}catch(e){}clearLocal();render()}
 function switchGroupUI(){tab='hist';leaveGroup()}
 function randCode(){const a='abcdefghjkmnpqrstuvwxyz23456789';let s='';crypto.getRandomValues(new Uint8Array(18)).forEach(x=>{s+=a[x%a.length]});return s}
