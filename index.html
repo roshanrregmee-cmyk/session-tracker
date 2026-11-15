@@ -974,6 +974,46 @@ function sectionNav(extra){
   ${extra||''}
   </div>`;
 }
+
+function expensesTab(){
+ if(!players.length)return'<p class="mut">Add players first (New session tab).</p>';
+ const cand=game&&Array.isArray(game.players)&&game.players.length?game.players:players;
+ const open=expenses.filter(e=>!e.done),done=expenses.filter(e=>e.done);
+ const paid=exDraft.paid&&players.includes(exDraft.paid)?exDraft.paid:(cand[0]||'');
+ const names=[...new Set([...cand,...open.flatMap(e=>[e.paidBy,...(e.split||[])]).filter(Boolean)])];
+ const sp=expenseSplit(cand,open);
+ const row=e=>`<tr><td>${E(e.date||'')}</td><td>${E(e.desc||'')}</td><td>${E(e.paidBy||'')}</td><td>${fmtA(e.amt)}</td><td>${e.split&&e.split.length?E(e.split.join(', ')):'Everyone'}</td><td>${e.done?'<span class="mut">settled</span>':`<button type="button" class="x" data-exdel="${E(e.id)}" title="Delete">✕</button>`}</td></tr>`;
+ let h=`<div class="card"><b>Add expense</b>
+  <div class="mut" style="margin:4px 0 10px">Food, room, tips, etc. Separate from session balances — included in settlement when you complete a game.</div>
+  <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">What for</label>
+  <input type="text" data-ed placeholder="Dinner / room / tips…" maxlength="80" value="${E(exDraft.desc||'')}" style="width:100%;margin-bottom:8px">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+   <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Amount</label>
+    <input type="number" inputmode="decimal" data-ea placeholder="0" value="${E(exDraft.amt||'')}" style="width:100%"></div>
+   <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Paid by</label>
+    <select data-ep style="width:100%">${cand.map(p=>`<option value="${E(p)}" ${p===paid?'selected':''}>${E(p)}</option>`).join('')}</select></div>
+  </div>
+  <div style="font-size:13px;font-weight:700;margin-bottom:6px">Split among</div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+   ${cand.map(p=>`<label class="chip"><input type="checkbox" data-esh="${E(p)}" ${exDraft.shared&&exDraft.shared[p]===false?'':'checked'}> ${E(p)}</label>`).join('')}
+  </div>
+  <button type="button" class="pri" id="exadd" style="width:100%">Add expense</button>
+ </div>`;
+ if(open.length){
+  h+=`<div class="card"><b>Open expenses</b><div class="sc" style="margin-top:8px"><table><thead><tr><th>Date</th><th>What</th><th>Paid by</th><th>Amt</th><th>Split</th><th></th></tr></thead><tbody>${open.map(row).join('')}</tbody></table></div>`;
+  if(names.length){
+   h+=`<div class="mut" style="margin:10px 0 6px">Running split (open only)</div><div class="sc"><table><thead><tr><th>Player</th><th>Paid</th><th>Share</th><th>Net</th></tr></thead><tbody>`;
+   h+=names.map(p=>{const a=(sp.paid[p]||0)/100,b=(sp.share[p]||0)/100,n=Math.round((a-b)*100)/100;return`<tr><td>${E(p)}</td><td>${fmtA(a)}</td><td>${fmtA(b)}</td><td class="${cls(n)}"><b>${n>0?'+':''}${fmtA(n)}</b></td></tr>`}).join('');
+   h+=`</tbody></table></div>`;
+  }
+  h+=`<button type="button" class="pri" id="billsettle" style="width:100%;margin-top:12px">Settle open expenses</button></div>`;
+ }else h+=`<div class="card"><p class="mut" style="margin:0">No open expenses.</p></div>`;
+ if(done.length){
+  h+=`<details style="margin-top:8px"><summary class="mut" style="cursor:pointer">Settled (${done.length})</summary><div class="sc" style="margin-top:8px"><table><thead><tr><th>Date</th><th>What</th><th>Paid by</th><th>Amt</th><th>Split</th><th></th></tr></thead><tbody>${done.map(row).join('')}</tbody></table></div></details>`;
+ }
+ return h;
+}
+
 function billsNav(){
  return sectionNav(`<button type="button" data-btab="list" class="${billTab=='list'?'on':''}">Expenses</button>
   <button type="button" data-btab="dash" class="${billTab=='dash'?'on':''}">Dashboard</button>`);
@@ -1803,7 +1843,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   while(window._chipsCalM>11){window._chipsCalM-=12;window._chipsCalY++}
   render();return}
  if(g('data-btab')){billTab=g('data-btab').dataset.btab;render();return}
- if(g('data-t')){const nt=g('data-t').dataset.t;if(nt===tab)return;tab=nt;swapView(()=>{render0();upd();syncUploadBtn();if(tab=='backup')loadBackups()});document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t==tab))}
+ if(g('data-t')){e.preventDefault();e.stopPropagation();const nt=g('data-t').dataset.t;if(!nt)return;if(nt===tab&&tab!=='backup')return;tab=nt;document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t==tab));try{render0();try{upd()}catch(e){}try{syncUploadBtn()}catch(e){}if(tab==='backup')try{loadBackups()}catch(e){console.error(e)}}catch(err){console.error(err);toast('Could not open tab: '+(err&&err.message||err));try{$('#v').innerHTML='<div class="card"><b>Tab error</b><p class="mut">'+E(String(err&&err.message||err))+'</p></div>'}catch(e){}}}
  else if(g('data-all')){const v=+g('data-all').dataset.all;OPTS.forEach(o=>sel[o[0]]=v);render()}
  else if(g('data-nq')){const q=g('data-nq').dataset.nq.split(':');newsMode=q[0];if(+q[1])newsN=+q[1];render();return}
  else if(g('data-ncopy')){const tx=window._newsText||'';if(navigator.share){navigator.share({title:'The Table Times',text:tx}).catch(()=>{})}else if(navigator.clipboard){navigator.clipboard.writeText(tx).then(()=>toast('Newsletter copied')).catch(()=>prompt('Copy the newsletter',tx))}else prompt('Copy the newsletter',tx);return}
@@ -1875,6 +1915,7 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(t.id=='gadminlogin'){adminLogin()}
  else if(t.id=='gnew2'){adminCreate()}
  else if(g('data-asec')){adminSection=g('data-asec').dataset.asec||'groups';persistAdminSession(true);render();return}
+ else if(t.id=='admin_deploy'){if(!(adminOpen||isSessionAdmin()))return toast('Admin only');if(!confirm('Clear cache and load the latest app version on this device?'))return;deployAppUpdate();return}
  else if(t.id=='admin_chg_pass'){(async()=>{
   if(!(await ensureCloud()))return toast('Could not connect');
   let info=null;try{info=await loadCreatePass()}catch(e){return toast('Could not load admin password')}
@@ -2086,7 +2127,7 @@ document.addEventListener('change',e=>{const t=e.target;
  else if(t.id=='lg'&&t.files&&t.files[0]){if(!canEdit()){t.value='';return toast('View only: enter the password first')}loadSessionFile(t.files[0]).catch(e=>toast('Could not read file: '+(e&&e.message||e)));t.value=''}
  else if(t.dataset.pl!==undefined){plays[t.dataset.pl]=t.checked}
  else if(t.dataset.ep!==undefined){exDraft.paid=t.value}
- else if(t.dataset.es!==undefined){exDraft.shared[t.dataset.es]=t.checked}
+ else if(t.dataset.esh!==undefined||t.dataset.es!==undefined){const p=t.dataset.esh||t.dataset.es;if(!exDraft.shared)exDraft.shared={};exDraft.shared[p]=t.checked}
  else if(t.dataset.bp!==undefined){billDraft.paid=t.value}
  else if(t.dataset.bs!==undefined){billDraft.shared[t.dataset.bs]=t.checked}
  else if(t.dataset.xpick!==undefined){xgrp.picked[t.dataset.xpick]=t.checked}
@@ -2334,7 +2375,7 @@ function saveRecent(code,label){let r=getRecent().filter(x=>x.code!==code);r.uns
 function indHtml(){if(!gid)return'';const m={live:['#15803d','Live'],saving:['#d97706','Saving'],connecting:['#d97706','Connecting'],offline:['#dc2626','Offline'],error:['#dc2626','Error']}[cs]||['#6b7686',''];
  const mode=!accessLoaded?'':canOrganise()?(isOwner()?'✏️ Organiser':'✏️ Admin'):canEdit()?'✏️ Write':'👁 View';return`<span style="color:${m[0]}">●</span> ${m[1]}${mode?' · '+mode:''}`}
 function gbarHtml(){if(!gid)return'';
- return`<button data-mode="hub">🏠 Home</button><button data-gcopy>📋 Copy Group Code</button><button data-glink>🔗 Copy link</button>${canEdit()?'<button data-grename>✎ Rename group</button>':''}<button data-gleave>🚪 Leave</button>`}
+ return`<button data-mode="hub">🏠 Home</button><button data-gcopy>📋 Copy Group Code</button><button data-glink>🔗 Copy link</button>${canEdit()?'<button data-grename>✎ Rename group</button>':''}${(adminOpen||(typeof isSessionAdmin==='function'&&isSessionAdmin()))?'<button type="button" id="admin_deploy">🚀 Deploy latest app</button>':''}<button data-gleave>🚪 Leave</button>`}
 function setSync(c){cs=c;try{const tb=document.querySelector('.topbar');if(tb)document.documentElement.style.setProperty('--tbh',tb.offsetHeight+'px')}catch(e){}const g=$('#gbar');if(g)g.innerHTML=gbarHtml();const ii=$('#ind');if(ii)ii.innerHTML=indHtml();const t=$('#ttl');if(t)t.textContent=gid?(groupName||gid.slice(0,6)+'…'):'';const dn=$('#dname');if(dn)dn.textContent=gid?(groupName||gid.slice(0,6)+'…'):''}
 function normEmail(e){return String(e||'').trim().toLowerCase()}
 function saveEmailSession(u){
@@ -2487,6 +2528,8 @@ function adminPasswordSection(){
    <b>🔑 Admin password</b>
    <div class="mut" style="margin:4px 0 12px">Used to open this Admin area and to unlock organiser actions in a group. Not the same as a player group password (those are removed).</div>
    <button type="button" class="pri" id="admin_chg_pass" style="width:100%">Change admin password</button>
+<button type="button" class="pri" id="admin_deploy" style="width:100%;margin-top:10px">🚀 Deploy latest app</button>
+<div class="mut" style="font-size:12px;margin-top:6px;text-align:center">Admin only · clears cache and reloads the newest version for this device</div>
    <div class="mut" style="margin-top:10px;font-size:12px">You will need the current password, then choose a new one.</div>
   </div>`;
 }
@@ -3220,9 +3263,9 @@ async function loadBackups(){if(!window.cloud||!gid)return;bk.busy=true;bk.err='
 function backupTab(){const when=x=>new Date(x.savedAt).toLocaleString();
  if(bk.busy&&bk.full===undefined)return'<p class="mut">Loading backups…</p>';
  let a,b;
- if(bk.full){const d=norm(JSON.parse(bk.full.json));a=`<div class="mut">Saved ${E(when(bk.full))} · ${d.sessions.length} sessions · ${d.players.length} players</div><button class="pri" id="bkfull" style="margin-top:8px">Restore this backup</button>`}
+ if(bk.full){try{const d=norm(JSON.parse(bk.full.json)||{});a=`<div class="mut">Saved ${E(when(bk.full))} · ${(d.sessions||[]).length} sessions · ${(d.players||[]).length} players</div><button class="pri" id="bkfull" style="margin-top:8px">Restore this backup</button>`}catch(e){a='<div class="mut">Backup could not be read.</div>'}}
  else a='<div class="mut">No backup yet.</div>';
- if(bk.standing){const d=JSON.parse(bk.standing.json);b=`<div class="mut">Saved ${E(when(bk.standing))} · game of ${E(d.game.date)} · ${d.game.players.length} players · ${d.loans.length} loan entries</div><button class="pri" id="bkstd" style="margin-top:8px">Restore this standing</button>`}
+ if(bk.standing){try{const d=JSON.parse(bk.standing.json)||{};const g=d.game||{};const pl=Array.isArray(g.players)?g.players:[];const ln=Array.isArray(d.loans)?d.loans:[];b=`<div class="mut">Saved ${E(when(bk.standing))} · game of ${E(g.date||'—')} · ${pl.length} players · ${ln.length} loan entries</div><button class="pri" id="bkstd" style="margin-top:8px">Restore this standing</button>`}catch(e){b='<div class="mut">Standing backup could not be read.</div>'}}
  else b='<div class="mut">No standing saved yet.</div>';
  const gnm=E(activeGameLabel());
  return`<div class="card"><b>Upload Excel · ${gnm}</b><div class="mut" style="margin:4px 0 10px">Applies only to <b>${gnm}</b> — other games keep their own files and data.</div>
@@ -3311,7 +3354,32 @@ async function checkAppUpdate(){
     return{updated:false,reason:hadWaiting?'activated':'latest'};
   }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
 }
-const CACHE_HINT='session-tracker-v100';
+const CACHE_HINT='session-tracker-v101';
+
+async function deployAppUpdate(){
+  toast('Deploying latest app… clearing cache');
+  try{
+    if('caches' in window){
+      const ks=await caches.keys();
+      await Promise.all(ks.map(k=>caches.delete(k)));
+    }
+  }catch(e){}
+  try{
+    if(navigator.serviceWorker){
+      const regs=await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r=>r.unregister()));
+    }
+  }catch(e){}
+  try{sessionStorage.removeItem('sw_reloaded');sessionStorage.removeItem('sw_updated')}catch(e){}
+  try{localStorage.setItem('ptc_force_deploy',String(Date.now()))}catch(e){}
+  // Bust URL and reload
+  try{
+    const u=new URL(location.href);
+    u.searchParams.set('_deploy',String(Date.now()));
+    location.replace(u.pathname+u.search+(u.hash||''));
+  }catch(e){location.reload()}
+}
+
 async function hardReloadApp(){
   // Preserve group + mode in the URL so reload stays put
   try{
