@@ -2266,6 +2266,25 @@ function getState(){if(!Array.isArray(sessions))sessions=[];if(!Array.isArray(lo
   gc:!activeBoardId?!!gc:!!(gameBoards.__root&&gameBoards.__root.gc),
   loanDraft:!activeBoardId?JSON.parse(JSON.stringify(loanDraft||{})):(gameBoards.__root&&gameBoards.__root.loanDraft)||{}
  };
+
+ // GUARD: never export empty History when a board still has sessions
+ try{
+  const richer=[gameBoards&&gameBoards.cards,gameBoards&&gameBoards.__root,base].filter(Boolean);
+  richer.forEach(R=>{
+   const rs=Array.isArray(R.sessions)?R.sessions:[];
+   if(rs.length>(root.sessions||[]).length){
+    root.sessions=rs.map(x=>({id:x.id,date:(x.date||''),label:(x.label||''),v:(x.v&&typeof x.v==='object')?{...x.v}:{}}));
+    if(Array.isArray(R.players)&&R.players.length>(root.players||[]).length)root.players=[...R.players];
+    if(Array.isArray(R.loans)&&R.loans.length>(root.loans||[]).length)root.loans=R.loans.map(l=>({id:l.id,date:l.date,who:l.who,amt:l.amt,src:l.src||null,g:l.g||'',done:!!l.done}));
+    if(R.settle&&!root.settle)root.settle=JSON.parse(JSON.stringify(R.settle));
+   }
+  });
+  // Keep memory in sync if we recovered
+  if((root.sessions||[]).length>(sessions||[]).length){
+   sessions=root.sessions.map(x=>({...x,v:{...(x.v||{})}}));
+   if((root.players||[]).length)players=[...root.players];
+  }
+ }catch(e){console.error(e)}
  return{
   cardsMeta:{name:(cardsMeta&&cardsMeta.name)||'Cards',icon:(cardsMeta&&cardsMeta.icon)||'🃏'},
   hubHidden:{cards:!!(hubHidden&&hubHidden.cards),rsvp:!!(hubHidden&&hubHidden.rsvp),news:!!(hubHidden&&hubHidden.news),noGames:!!(hubHidden&&hubHidden.noGames)},
@@ -2355,6 +2374,12 @@ function mergeState(b,l,r){const o=norm(JSON.parse(JSON.stringify(r)));b=norm(b)
  ['sessions','loans','expenses','bills','events','chipsBookings'].forEach(k=>{const bm=new Map(b[k].map(x=>[x.id,canon(x)])),lm=new Set(l[k].map(x=>x.id));
   l[k].forEach(x=>{const i=o[k].findIndex(y=>y.id===x.id),was=bm.get(x.id);if(was===undefined){if(i<0)o[k].push(x)}else if(was!==canon(x)){if(i>=0)o[k][i]=x;else o[k].push(x)}});
   b[k].forEach(x=>{if(!lm.has(x.id)){const i=o[k].findIndex(y=>y.id===x.id);if(i>=0)o[k].splice(i,1)}})});
+
+ // Prefer richer History (more sessions) if one side would wipe the other
+ try{
+  const ls=(l.sessions||[]).length,rs=(o.sessions||[]).length,bs=(b.sessions||[]).length;
+  if(ls>rs&&ls>=bs)o.sessions=JSON.parse(JSON.stringify(l.sessions));
+ }catch(e){}
  if(l.initLoan!==b.initLoan)o.initLoan=l.initLoan;if(canon(l.settle)!==canon(b.settle))o.settle=l.settle;if(l.readme!==b.readme)o.readme=l.readme;if(l.rules!==b.rules)o.rules=l.rules;if(l.groupName!==b.groupName)o.groupName=l.groupName;if(canon(l.game)!==canon(b.game))o.game=l.game;if(canon(l.billSettle)!==canon(b.billSettle))o.billSettle=l.billSettle;
  // Custom game boards: prefer local list of games; merge board data by id
  if(Array.isArray(l.extraGames)){
@@ -2900,7 +2925,21 @@ function stateWithoutSocial(S){
   o.events=[];o.chipsBookings=[];
   return o;
 }
-async function persist(){if(!cloudOn||!synced||applying||!window.cloud)return;let L,c;try{L=getState();c=canon(L)}catch(e){console.error('getState',e);return}if(c===canon(base||EMPTY())||c===lastSent)return;
+async function persist(){if(!cloudOn||!synced||applying||!window.cloud)return;let L,c;try{L=getState();c=canon(L)}catch(e){console.error('getState',e);return}
+ // Never push a total History wipe over existing cloud data
+ try{
+  const bs=(base&&Array.isArray(base.sessions))?base.sessions:[];
+  const ls=Array.isArray(L.sessions)?L.sessions:[];
+  if(bs.length>0&&ls.length===0){
+   console.warn('persist: blocked empty sessions overwrite');
+   L.sessions=bs.map(x=>({...x,v:{...(x.v||{})}}));
+   if(Array.isArray(base.players)&&base.players.length)L.players=[...base.players];
+   if(Array.isArray(base.loans))L.loans=base.loans.map(x=>({...x}));
+   if(base.settle&&!L.settle)L.settle=base.settle;
+   c=canon(L);
+  }
+ }catch(e){}
+ if(c===canon(base||EMPTY())||c===lastSent)return;
  if(!canEdit()){
   const B=base||EMPTY();
   if(canon(stateWithoutSocial(L))!==canon(stateWithoutSocial(B))){
@@ -3249,17 +3288,72 @@ function settleCard(){
  </div></div>`;
  return h;
 }
-async function loadBackups(){if(!window.cloud||!gid)return;bk.busy=true;bk.err='';render();loadOrg();
+
+async function saveBackups(){
+ if(!window.cloud||!gid||!cloudOn)return;
  try{
+  const sf=backupSlot('full'),ss=backupSlot('standing');
+  // Full history backup after game complete (or explicit wantFull)
+  if(wantFull){
+   wantFull=false;
+   const payload={
+    players:Array.isArray(players)?players:[],
+    sessions:Array.isArray(sessions)?sessions:[],
+    loans:Array.isArray(loans)?loans:[],
+    expenses:Array.isArray(expenses)?expenses:[],
+    settle:settle||null,
+    initLoan:initLoan,
+    game:null,
+    rules:(typeof rules==='string')?rules:null,
+    readme:(typeof readme==='string')?readme:null,
+    groupName:groupName||''
+   };
+   const json=JSON.stringify(payload);
+   await cloud.put(gid,sf,json);
+   // Legacy unscoped key so Backups always finds Cards history
+   if(!activeBoardId||activeBoardId==='cards'){
+    try{await cloud.put(gid,'full',json)}catch(e){}
+   }
+  }
+  // Standing while a game is in progress
+  if(game){
+   const standing={
+    game:{date:game.date,players:Array.isArray(game.players)?[...game.players]:[]},
+    loans:(loans||[]).filter(l=>!l.done).map(l=>({...l})),
+    expenses:(expenses||[]).filter(e=>!e.done).map(e=>({...e})),
+    initLoan:initLoan
+   };
+   const sj=JSON.stringify(standing);
+   await cloud.put(gid,ss,sj);
+   if(!activeBoardId||activeBoardId==='cards'){
+    try{await cloud.put(gid,'standing',sj)}catch(e){}
+   }
+  }
+ }catch(e){console.error('saveBackups',e)}
+}
+
+async function loadBackups(){
+ if(!gid){toast('Join a group first');return}
+ bk.busy=true;bk.err='';bk.full=undefined;bk.standing=undefined;
+ try{if(typeof render0==='function')render0();else render()}catch(e){}
+ try{loadOrg()}catch(e){}
+ try{
+  if(!(await ensureCloud())){bk.err='offline';bk.full=null;bk.standing=null;bk.busy=false;try{render0()}catch(e){}toast('Connect to load backups');return}
   const sf=backupSlot('full'),ss=backupSlot('standing');
   bk.full=await withTimeout(cloud.get(gid,sf));
   bk.standing=await withTimeout(cloud.get(gid,ss));
-  // Cards only: fall back to legacy unscoped keys once
-  if(!activeBoardId){
-    if(!bk.full)bk.full=await withTimeout(cloud.get(gid,'full'));
-    if(!bk.standing)bk.standing=await withTimeout(cloud.get(gid,'standing'));
-  }
- }catch(e){bk.err=(e&&e.code)||'error';if(bk.full===undefined)bk.full=null;if(bk.standing===undefined)bk.standing=null}bk.busy=false;render()}
+  // Always try legacy keys too (Cards / older builds)
+  if(!bk.full)bk.full=await withTimeout(cloud.get(gid,'full'));
+  if(!bk.standing)bk.standing=await withTimeout(cloud.get(gid,'standing'));
+  // Board-scoped alternate id when on cards with activeBoardId set
+  if(!bk.full&&activeBoardId)bk.full=await withTimeout(cloud.get(gid,'full_b_cards'));
+  if(!bk.standing&&activeBoardId)bk.standing=await withTimeout(cloud.get(gid,'standing_b_cards'));
+  if(bk.full===undefined)bk.full=null;
+  if(bk.standing===undefined)bk.standing=null;
+ }catch(e){bk.err=(e&&e.code)||(e&&e.message)||'error';if(bk.full===undefined)bk.full=null;if(bk.standing===undefined)bk.standing=null}
+ bk.busy=false;
+ try{if(tab==='backup'&&appMode==='poker')render0();else render()}catch(e){console.error(e)}
+}
 function backupTab(){const when=x=>new Date(x.savedAt).toLocaleString();
  if(bk.busy&&bk.full===undefined)return'<p class="mut">Loading backups…</p>';
  let a,b;
@@ -3354,9 +3448,11 @@ async function checkAppUpdate(){
     return{updated:false,reason:hadWaiting?'activated':'latest'};
   }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
 }
-const CACHE_HINT='session-tracker-v101';
+const CACHE_HINT='session-tracker-v102';
 
 async function deployAppUpdate(){
+  toast('Saving data, then updating…');
+  try{if(gid&&cloudOn){wantFull=true;await persist();await saveBackups()}}catch(e){console.error(e)}
   toast('Deploying latest app… clearing cache');
   try{
     if('caches' in window){
@@ -3381,7 +3477,8 @@ async function deployAppUpdate(){
 }
 
 async function hardReloadApp(){
-  // Preserve group + mode in the URL so reload stays put
+  // Flush cloud write before reload so History is not lost
+  try{if(gid&&cloudOn&&typeof persist==='function'){wantFull=true;await persist();if(typeof saveBackups==='function')await saveBackups()}}catch(e){console.error(e)}
   try{
     if(gid){
       const mode=appMode||'';
