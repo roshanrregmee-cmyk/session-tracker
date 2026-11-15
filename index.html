@@ -770,8 +770,20 @@ function newsEvents(r){
  return{head:'Coming Up',sub:'From the group calendar',kicker:'On the Horizon',p:P}}
 function newsPlain(secs){const d=new Date().toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long',year:'numeric'});
  return 'THE TABLE TIMES'+(groupName?' — '+groupName:'')+'\n'+d+'\n\n'+secs.map(s=>s.head.toUpperCase()+'\n'+s.sub+'\n\n'+s.p.join('\n\n')).join('\n\n———\n\n')}
+function newsSessions(){
+ // Prefer in-memory sessions; fall back to Cards board so Newsletter updates after games
+ let S=Array.isArray(sessions)?sessions.slice():[];
+ try{
+  const boards=[gameBoards&&gameBoards.cards,gameBoards&&gameBoards.__root].filter(Boolean);
+  boards.forEach(b=>{
+   const bs=Array.isArray(b.sessions)?b.sessions:[];
+   if(bs.length>S.length)S=bs.slice();
+  });
+ }catch(e){}
+ return S;
+}
 function newsView(){
- const S=Array.isArray(sessions)?sessions:[],N=S.length,sel=newsSelect(S),list=sel.idx.map(i=>S[i]);
+ const S=newsSessions(),N=S.length,sel=newsSelect(S),list=sel.idx.map(i=>S[i]);
  const seed=(gid||'')+'|'+(N&&S[N-1].date||'')+'|'+N+'|'+newsMode+newsN+newsRf+newsRt;
  const secs=[],L=newsLatest(S,nRng(seed+'L'));if(L)secs.push(L);
  if(newsMode!=='latest'&&list.length>=2){const T=newsTimeline(list,sel,nRng(seed+'T'));if(T)secs.push(T)}
@@ -2009,14 +2021,24 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   const n=Math.round(Object.values(res).reduce((a,b)=>a+b,0)*100)/100;if(n&&!confirm(`Results net to ${n}, not 0. Save anyway?`))return;
   sessions.push({id:uid(),date:game.date,label:'',v:res});
   settle=computeSettle(res,expenses.filter(e=>!e.done),game.players,game.date);
+  if(settle)settle.at=Date.now();
   loans.forEach(l=>{if(!l.done){l.done=true;l.g=game.date}});expenses.forEach(e=>{if(!e.done){e.done=true;e.g=game.date}});
-  sortS();game=null;gc=false;finals={};loanDraft={};tab='hist';wantFull=true;
-  // Keep board stash + cloud in sync immediately so History is not lost overnight
+  sortS();game=null;gc=false;finals={};loanDraft={};tab='hist';wantFull=true;appMode='poker';
+  // Always show the new settlement (undo any previous Hide)
+  try{localStorage.removeItem('ptc_hs_'+gid)}catch(e){}
   try{stashCurrentBoard()}catch(e){}
   render();
   logFeed('Game completed · '+Object.keys(res||{}).length+' players');
-  toast('Game saved. The settlement is at the top of History.');
-  queueMicrotask(()=>{try{persist()}catch(e){console.error(e);toast('Saved locally — will sync when online')}})}
+  toast('Game saved — settlement at top of History');
+  // Prompt share of who pays whom
+  queueMicrotask(()=>{
+   try{persist()}catch(e){console.error(e)}
+   try{
+    if(settle&&settle.items&&settle.items.length&&navigator.share){
+     /* optional soft prompt — user can use Share on the card */
+    }
+   }catch(e){}
+  })}
  else if(t.id=='lsave'){const add=[];let bad=0;if(!game)return;game.players.forEach(p=>{const x=loanDraft[p]||{},a=parseFloat(x.amt);if(x.amt===undefined||x.amt==='')return;if(!isFinite(a)||a===0){bad=1;return}add.push({date:ld,who:p,amt:x.src=='__repay'?-Math.abs(a):a,src:x.src=='__repay'?null:(x.src||null),g:game.date,done:false})});
   if(!ld)return toast('Pick the date');if(bad)return toast('Enter a valid amount that is not 0 (use − for a repayment)');if(!add.length)return toast('Enter at least one amount');
   loans.push(...add);loanDraft={};render();toast('Saved')}
@@ -2244,12 +2266,36 @@ function applyState(S){S=norm(S);players=Array.isArray(S.players)?[...S.players]
   rules:typeof S.rules==='string'?S.rules:null,
   readme:typeof S.readme==='string'?S.readme:null
  };
+ // Keep cards mirror in sync with root History + settlement
+ if(gameBoards.cards){
+  const C=gameBoards.cards;
+  const rs=(S.sessions||[]).length,cs=(C.sessions||[]).length;
+  if(rs>=cs){
+   gameBoards.cards=JSON.parse(JSON.stringify(gameBoards.__root));
+  }
+ }else if((S.sessions||[]).length||S.settle){
+  gameBoards.cards=JSON.parse(JSON.stringify(gameBoards.__root));
+ }
  if(activeBoardId&&gameBoards[activeBoardId]){
+  // Board is source of truth while viewing a game — keep its settle/expenses/sessions
   try{applyBoardSnap(gameBoards[activeBoardId])}catch(e){}
  }else{
-  readme=S.readme;rules=S.rules;
+  readme=typeof S.readme==='string'?S.readme:null;
+  rules=typeof S.rules==='string'?S.rules:(S.rules===''?'':null);
+  expenses=(Array.isArray(S.expenses)?S.expenses:[]).map(e=>({...(e||{})}));
+  settle=S.settle?JSON.parse(JSON.stringify(S.settle)):null;
  }
- expenses=(Array.isArray(S.expenses)?S.expenses:[]).map(e=>({...(e||{})}));settle=S.settle||null;
+ // If root has a newer settlement (just completed) and board lost it, restore
+ if(S.settle&&(!settle||(S.settle.date&&settle.date&&S.settle.date>=settle.date&&(S.settle.items||[]).length>=(settle.items||[]).length))){
+  // Prefer non-null settle with items
+  if(!settle||((S.settle.items||[]).length&&!(settle.items||[]).length)||(S.settle.id&&settle.id&&S.settle.id!==settle.id&&(S.settle.at||0)>=(settle.at||0))){
+   // only fill if settle missing
+  }
+ }
+ if(!settle&&S.settle)settle=JSON.parse(JSON.stringify(S.settle));
+ if(activeBoardId&&gameBoards[activeBoardId]&&settle){
+  try{gameBoards[activeBoardId].settle=JSON.parse(JSON.stringify(settle))}catch(e){}
+ }
  bills=(Array.isArray(S.bills)?S.bills:[]).map(e=>({...(e||{})}));billSettle=S.billSettle||null;
  // One-time migrate old independent bills into expenses
  if(bills.length){const ids=new Set(expenses.map(e=>e.id).filter(Boolean));bills.forEach(b=>{if(!b)return;const id=b.id||uid();if(!ids.has(id)){expenses.push({...b,id});ids.add(id)}});bills=[]}
@@ -3120,8 +3166,8 @@ function computeSettle(res,ex,P,date){const c=x=>Math.round(x*100);
  if(tot!==0){bal.push({p:'(unbalanced)',b:-tot});note='The results did not add up to 0 (difference '+fmtA(tot/100)+'), so payments involving "(unbalanced)" are the unexplained amount.'}
  return{id:uid(),date,items:minTransfers(bal).map(x=>({f:x.f,t:x.t,a:x.a/100})),rows:rows.map(x=>({p:x.p,r:x.r/100,e:x.e/100,b:x.b/100})),note}}
 function settleText(){return'Settlement '+settle.date+'\n'+(settle.items.length?settle.items.map(x=>x.f+' pays '+x.t+' '+fmtA(x.a)).join('\n'):'Everyone is square.')+(settle.note?'\n'+settle.note:'')}
-function settleCard(){if(!settle)return'';let hid='';try{hid=localStorage.getItem('ptc_hs_'+gid)}catch(e){}if(hid===settle.id)return'';const it=settle.items;
- return`<div class="card"><b>Settlement · ${E(settle.date)}</b> <span class="mut">${it.length} payment${it.length==1?'':'s'}</span>${it.length?it.map(x=>`<div style="padding:6px 0;border-bottom:1px solid var(--bd)"><b>${E(x.f)}</b> pays <b>${E(x.t)}</b> <b class="pos" style="float:right">${fmtA(x.a)}</b></div>`).join(''):'<p class="mut">Everyone is square. No payments needed.</p>'}
+function settleCard(){if(!settle)return'';let hid='';try{hid=localStorage.getItem('ptc_hs_'+gid)}catch(e){}if(hid&&settle.id&&hid===settle.id)return'';const it=Array.isArray(settle.items)?settle.items:[];
+ return`<div class="card" style="border:2px solid var(--ac)"><b>Settlement · ${E(settle.date||'')}</b> <span class="mut">${it.length} payment${it.length==1?'':'s'} · who pays whom</span>${it.length?it.map(x=>`<div style="padding:6px 0;border-bottom:1px solid var(--bd)"><b>${E(x.f)}</b> pays <b>${E(x.t)}</b> <b class="pos" style="float:right">${fmtA(x.a)}</b></div>`).join(''):'<p class="mut">Everyone is square. No payments needed.</p>'}
  ${settle.note?`<p class="neg" style="font-size:13px">${E(settle.note)}</p>`:''}
  <details style="margin-top:8px"><summary class="mut">How this was worked out</summary><div class="sc" style="margin-top:6px"><table><thead><tr><th>Player</th><th>Result</th><th>Expenses</th><th>Receive (+) / pay (−)</th></tr></thead><tbody>${settle.rows.map(r=>`<tr><td>${E(r.p)}</td><td class="${cls(r.r)}">${fmtA(r.r)}</td><td class="${cls(r.e)}">${fmtA(r.e)}</td><td class="${cls(r.b)}"><b>${fmtA(r.b)}</b></td></tr>`).join('')}</tbody></table></div><div class="mut" style="font-size:12px;margin-top:4px">Result = the game win or loss. Expenses = what the player paid minus their share. Payments are arranged to use as few transfers as possible.</div></details>
  <div class="pw" style="margin-top:10px"><button class="pri" data-sshare>Share / copy</button><button data-shide>Hide</button></div></div>`}
@@ -3272,7 +3318,7 @@ async function checkAppUpdate(){
     return{updated:false,reason:hadWaiting?'activated':'latest'};
   }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
 }
-const CACHE_HINT='session-tracker-v98';
+const CACHE_HINT='session-tracker-v99';
 async function hardReloadApp(){
   // Preserve group + mode in the URL so reload stays put
   try{
