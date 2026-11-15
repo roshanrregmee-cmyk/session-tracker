@@ -1854,8 +1854,8 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   billSettle={id:uid(),date:new Date().toLocaleDateString('en-CA'),items:minTransfers(bal).map(x=>({f:x.f,t:x.t,a:x.a/100}))};
   expenses.forEach(e=>{if(!e.done)e.done=true});logFeed('Expenses settled');render();toast('Settled')}
  else if(g('data-exdel')){const id=g('data-exdel').dataset.exdel;if(confirm('Delete this expense?')){expenses=expenses.filter(e=>e.id!==id);render()}}
- else if(g('data-sshare')){if(settle){const t0=settleText();if(navigator.share)navigator.share({text:t0}).catch(()=>{});else if(navigator.clipboard)navigator.clipboard.writeText(t0).then(()=>toast('Copied'));else prompt('Copy this',t0)}}
- else if(g('data-shide')){if(settle){try{localStorage.setItem('ptc_hs_'+gid,settle.id)}catch(e){}render()}}
+ else if(g('data-sshare')){const t0=settleText();if(!t0)return toast('No settlement to share');if(navigator.share)navigator.share({text:t0}).catch(()=>{});else if(navigator.clipboard)navigator.clipboard.writeText(t0).then(()=>toast('Copied'));else prompt('Copy this',t0)}
+ else if(g('data-shide')){const s=settle||(function(){try{return JSON.parse(sessionStorage.getItem('ptc_last_settle_'+(gid||''))||'null')}catch(e){return null}})();if(s&&s.id){try{localStorage.setItem('ptc_hs_'+gid,String(s.id))}catch(e){}}render()}
  else if(t.id=='bkref'){loadBackups()}
  else if(t.id=='orgset'){setPass()}
  else if(t.id=='gencode'){genCode()}
@@ -2021,7 +2021,9 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   const n=Math.round(Object.values(res).reduce((a,b)=>a+b,0)*100)/100;if(n&&!confirm(`Results net to ${n}, not 0. Save anyway?`))return;
   sessions.push({id:uid(),date:game.date,label:'',v:res});
   settle=computeSettle(res,expenses.filter(e=>!e.done),game.players,game.date);
-  if(settle)settle.at=Date.now();
+  if(settle){settle.at=Date.now();
+  try{sessionStorage.setItem('ptc_last_settle_'+(gid||''),JSON.stringify(settle))}catch(e){}
+  try{localStorage.removeItem('ptc_hs_'+(gid||''))}catch(e){}}
   loans.forEach(l=>{if(!l.done){l.done=true;l.g=game.date}});expenses.forEach(e=>{if(!e.done){e.done=true;e.g=game.date}});
   sortS();game=null;gc=false;finals={};loanDraft={};tab='hist';wantFull=true;appMode='poker';
   // Always show the new settlement (undo any previous Hide)
@@ -2029,7 +2031,8 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   try{stashCurrentBoard()}catch(e){}
   render();
   logFeed('Game completed · '+Object.keys(res||{}).length+' players');
-  toast('Game saved — settlement at top of History');
+  toast('Game saved — see who pays whom above');
+  queueMicrotask(()=>{try{const el=document.getElementById('settle_card');if(el)el.scrollIntoView({behavior:'smooth',block:'start'})}catch(e){}});
   // Prompt share of who pays whom
   queueMicrotask(()=>{
    try{persist()}catch(e){console.error(e)}
@@ -2293,6 +2296,8 @@ function applyState(S){S=norm(S);players=Array.isArray(S.players)?[...S.players]
   }
  }
  if(!settle&&S.settle)settle=JSON.parse(JSON.stringify(S.settle));
+ if(!settle){try{const j=sessionStorage.getItem('ptc_last_settle_'+(gid||''));if(j)settle=JSON.parse(j)}catch(e){}}
+ if(settle){try{sessionStorage.setItem('ptc_last_settle_'+(gid||''),JSON.stringify(settle))}catch(e){}}
  if(activeBoardId&&gameBoards[activeBoardId]&&settle){
   try{gameBoards[activeBoardId].settle=JSON.parse(JSON.stringify(settle))}catch(e){}
  }
@@ -3165,54 +3170,42 @@ function computeSettle(res,ex,P,date){const c=x=>Math.round(x*100);
  const tot=rows.reduce((a,x)=>a+x.b,0),bal=rows.map(x=>({p:x.p,b:x.b}));let note='';
  if(tot!==0){bal.push({p:'(unbalanced)',b:-tot});note='The results did not add up to 0 (difference '+fmtA(tot/100)+'), so payments involving "(unbalanced)" are the unexplained amount.'}
  return{id:uid(),date,items:minTransfers(bal).map(x=>({f:x.f,t:x.t,a:x.a/100})),rows:rows.map(x=>({p:x.p,r:x.r/100,e:x.e/100,b:x.b/100})),note}}
-function settleText(){return'Settlement '+settle.date+'\n'+(settle.items.length?settle.items.map(x=>x.f+' pays '+x.t+' '+fmtA(x.a)).join('\n'):'Everyone is square.')+(settle.note?'\n'+settle.note:'')}
-function settleCard(){if(!settle)return'';let hid='';try{hid=localStorage.getItem('ptc_hs_'+gid)}catch(e){}if(hid&&settle.id&&hid===settle.id)return'';const it=Array.isArray(settle.items)?settle.items:[];
- return`<div class="card" style="border:2px solid var(--ac)"><b>Settlement · ${E(settle.date||'')}</b> <span class="mut">${it.length} payment${it.length==1?'':'s'} · who pays whom</span>${it.length?it.map(x=>`<div style="padding:6px 0;border-bottom:1px solid var(--bd)"><b>${E(x.f)}</b> pays <b>${E(x.t)}</b> <b class="pos" style="float:right">${fmtA(x.a)}</b></div>`).join(''):'<p class="mut">Everyone is square. No payments needed.</p>'}
- ${settle.note?`<p class="neg" style="font-size:13px">${E(settle.note)}</p>`:''}
- <details style="margin-top:8px"><summary class="mut">How this was worked out</summary><div class="sc" style="margin-top:6px"><table><thead><tr><th>Player</th><th>Result</th><th>Expenses</th><th>Receive (+) / pay (−)</th></tr></thead><tbody>${settle.rows.map(r=>`<tr><td>${E(r.p)}</td><td class="${cls(r.r)}">${fmtA(r.r)}</td><td class="${cls(r.e)}">${fmtA(r.e)}</td><td class="${cls(r.b)}"><b>${fmtA(r.b)}</b></td></tr>`).join('')}</tbody></table></div><div class="mut" style="font-size:12px;margin-top:4px">Result = the game win or loss. Expenses = what the player paid minus their share. Payments are arranged to use as few transfers as possible.</div></details>
- <div class="pw" style="margin-top:10px"><button class="pri" data-sshare>Share / copy</button><button data-shide>Hide</button></div></div>`}
-function expensesTab(){if(!players.length)return'<p class="mut">Add players first (New session tab).</p>';
- const cand=game?game.players:players,open=expenses.filter(e=>!e.done),done=expenses.filter(e=>e.done),paid=exDraft.paid&&players.includes(exDraft.paid)?exDraft.paid:cand[0];
- const names=[...new Set([...cand,...open.flatMap(e=>[e.paidBy,...(e.split||[])])])],sp=expenseSplit(cand,open),row=e=>`<tr><td>${E(e.date)}</td><td>${E(e.desc)}</td><td>${E(e.paidBy)}</td><td>${fmtA(e.amt)}</td><td>${e.split&&e.split.length?E(e.split.join(', ')):'Everyone'}</td><td>${e.done?'<span class="mut">settled</span>':`<button class="x" data-exdel="${e.id}" title="Delete">✕</button>`}</td></tr>`;
- const tot=k=>names.reduce((a,p)=>a+(sp[k][p]||0),0)/100;
- return`<div class="mut" style="margin:0 0 10px">Same expenses as <b>Home → Expenses</b>. Changes sync for everyone.</div><div class="card"><b>Add an expense</b>
- <div class="row"><input data-ed placeholder="What for? (e.g. snacks)" style="text-align:left;flex:1;width:auto" value="${E(exDraft.desc)}"></div>
- <div class="row"><input data-ea inputmode="decimal" placeholder="Amount" value="${E(exDraft.amt)}"></div>
- <div style="margin:10px 0 4px"><b>Who paid?</b></div>
- <div class="row"><select data-ep style="flex:1">${players.map(p=>`<option value="${E(p)}" ${p==paid?'selected':''}>${E(p)}</option>`).join('')}</select></div>
- <div style="margin:10px 0 4px"><b>Who should share the cost?</b></div>
- <div class="pw">${cand.map(p=>`<label class="chip"><input type="checkbox" data-es="${E(p)}" ${exDraft.shared[p]===false?'':'checked'}> ${E(p)}</label>`).join('')}</div>
- <button class="pri" id="exadd" style="width:100%;margin-top:12px">Add expense</button></div>
- <p><b>Open expenses</b>${game?` <span class="mut">${E(game.date)}</span>`:''}</p>
- ${open.length?`<div class="sc"><table><thead><tr><th>Date</th><th>What</th><th>Who paid</th><th>Amount</th><th>Shared by</th><th></th></tr></thead><tbody>${open.map(row).join('')}</tbody></table></div>
- <p><b>Expense summary</b></p><div class="sc"><table><thead><tr><th>Player</th><th>Paid</th><th>Their share</th><th>Net</th></tr></thead><tbody>${names.map(p=>{const a=(sp.paid[p]||0)/100,b=(sp.share[p]||0)/100,n=Math.round((a-b)*100)/100;return`<tr><td>${E(p)}</td><td>${fmtA(a)}</td><td>${fmtA(b)}</td><td class="${cls(n)}"><b>${n>0?'+':''}${fmtA(n)}</b></td></tr>`}).join('')}</tbody><tfoot><tr><td>Total</td><td>${fmtA(tot('paid'))}</td><td>${fmtA(tot('share'))}</td><td></td></tr></tfoot></table></div>`:'<p class="mut">No open expenses.</p>'}
- ${done.length?`<details style="margin-top:10px"><summary class="mut">Earlier settled expenses (${done.length})</summary><div class="sc" style="margin-top:6px"><table><tbody>${done.map(row).join('')}</tbody></table></div></details>`:''}`}
-function exSheet(openOnly){const rows=expenses.filter(e=>!openOnly||!e.done);return XLSX.utils.aoa_to_sheet([['Date','Description','Paid by','Amount','Shared by','Game','Status'],...rows.map(e=>[iso2ser(e.date||'1970-01-01'),e.desc,e.paidBy,e.amt,e.split&&e.split.length?e.split.join(','):'All',e.g?iso2ser(e.g):null,e.done?'Settled':'Open'])])}
-function readExpenses(ws,openOnly){const out=[];XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null}).slice(1).forEach(r=>{const d=num(r[0])?ser2iso(r[0]):(typeof r[0]=='string'?r[0].slice(0,10):''),a=Number(r[3]),p=typeof r[2]=='string'?r[2].trim():'',sh=typeof r[4]=='string'?r[4].trim():'All',op=/^open/i.test(String(r[6]||''));
- if(!(p&&a>0&&d))return;if(openOnly&&!op)return;out.push({id:uid(),date:d,desc:typeof r[1]=='string'?r[1]:'Expense',paidBy:p,amt:a,split:(!sh||/^all$/i.test(sh))?null:sh.split(',').map(x=>x.trim()).filter(Boolean),g:num(r[5])?ser2iso(r[5]):'',done:!op})});return out}
-let bk={full:undefined,standing:undefined,busy:false,err:''},wantFull=false,lastStd='';
-async function saveBackups(){try{
- // Always snapshot the active board's live data into its own backup slots
- const slotFull=backupSlot('full');
- const slotStd=backupSlot('standing');
- // Build board-local state for backup (what is on screen now)
- const local={
-  players:[...players],sessions:sessions.map(x=>({...x,v:{...(x.v||{})}})),
-  loans:loans.map(l=>({...l})),expenses:expenses.map(e=>({...e})),
-  game:game?JSON.parse(JSON.stringify(game)):null,initLoan,settle:settle?JSON.parse(JSON.stringify(settle)):null,
-  rules:(typeof rules==='string')?rules:null,readme:(typeof readme==='string')?readme:null,
-  groupName,extraGames,gameBoards
- };
- if(wantFull&&!local.game){
-  await cloud.put(gid,slotFull,JSON.stringify(local));
-  wantFull=false;
+function settleText(){let s=settle;if(!s){try{s=JSON.parse(sessionStorage.getItem('ptc_last_settle_'+(gid||''))||'null')}catch(e){}s=s||settle}if(!s)return'';const it=Array.isArray(s.items)?s.items:[];return'Settlement '+(s.date||'')+'\n'+(it.length?it.map(x=>x.f+' pays '+x.t+' '+fmtA(x.a)).join('\n'):'Everyone is square.')+(s.note?'\n'+s.note:'')}
+function settleCard(){
+ let s=settle;
+ if(!s){
+  try{const j=sessionStorage.getItem('ptc_last_settle_'+(gid||''));if(j)s=JSON.parse(j)}catch(e){}
  }
- if(local.game){
-  const st=JSON.stringify({game:local.game,loans:local.loans.filter(l=>!l.done),expenses:local.expenses.filter(e=>!e.done),initLoan:local.initLoan,board:activeBoardId||'cards',boardName:activeGameLabel()});
-  const c=canon(JSON.parse(st));
-  if(c!==lastStd){await cloud.put(gid,slotStd,st);lastStd=c}
+ if(!s)return'';
+ let hid='';try{hid=localStorage.getItem('ptc_hs_'+gid)}catch(e){}
+ if(hid&&s.id&&hid===String(s.id))return'';
+ const it=Array.isArray(s.items)?s.items:[];
+ const rows=Array.isArray(s.rows)?s.rows:[];
+ let h=`<div class="card" id="settle_card" style="border:2px solid var(--ac);box-shadow:0 8px 24px -10px rgba(255,61,129,.45)">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+   <b style="font-size:17px">💸 Settlement · ${E(s.date||'')}</b>
+   <span class="mut">${it.length} payment${it.length===1?'':'s'}</span>
+  </div>
+  <div class="mut" style="margin:4px 0 10px;font-size:13px">Who pays whom after this game</div>`;
+ if(it.length){
+  h+=it.map(x=>`<div style="padding:10px 0;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><span><b>${E(x.f)}</b> pays <b>${E(x.t)}</b></span><b class="pos">${fmtA(x.a)}</b></div>`).join('');
+ }else{
+  h+=`<p class="mut">Everyone is square. No payments needed.</p>`;
  }
-}catch(e){}}
+ if(rows.length){
+  h+=`<details style="margin-top:10px"><summary class="mut" style="cursor:pointer">Net result per player</summary><div style="margin-top:8px">`;
+  rows.forEach(r=>{
+   h+=`<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px"><span>${E(r.p)}</span><span class="${cls(r.b)}">${fmtA(r.b)}</span></div>`;
+  });
+  h+=`</div></details>`;
+ }
+ if(s.note)h+=`<p class="neg" style="font-size:13px;margin-top:8px">${E(s.note)}</p>`;
+ h+=`<div class="pw" style="margin-top:12px">
+  <button type="button" class="pri" data-sshare style="flex:1">📤 Share who pays whom</button>
+  <button type="button" data-shide>Hide</button>
+ </div></div>`;
+ return h;
+}
 async function loadBackups(){if(!window.cloud||!gid)return;bk.busy=true;bk.err='';render();loadOrg();
  try{
   const sf=backupSlot('full'),ss=backupSlot('standing');
@@ -3318,7 +3311,7 @@ async function checkAppUpdate(){
     return{updated:false,reason:hadWaiting?'activated':'latest'};
   }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
 }
-const CACHE_HINT='session-tracker-v99';
+const CACHE_HINT='session-tracker-v100';
 async function hardReloadApp(){
   // Preserve group + mode in the URL so reload stays put
   try{
@@ -3350,53 +3343,17 @@ async function hardReloadApp(){
   location.replace(u.pathname+u.search+(u.hash||location.hash||''));
 }
 async function refreshGroup(forceHard){
-  // Soft by default: stay on this group and re-sync. Hard only when a new app version is detected.
-  toast('Refreshing…');
-  let needHard=false;
+  toast('Updating app…');
   try{
     if(navigator.serviceWorker){
       const reg=await navigator.serviceWorker.getRegistration();
-      if(reg)await reg.update();
-      const res=await fetch('./sw.js?_='+Date.now(),{cache:'no-store'});
-      const txt=await res.text();
-      const m=txt.match(/session-tracker-v\d+/);
-      if(m&&m[0]!==CACHE_HINT)needHard=true;
+      if(reg){
+        try{await reg.update()}catch(e){}
+        if(reg.waiting)try{reg.waiting.postMessage({type:'SKIP_WAITING'})}catch(e){}
+      }
     }
   }catch(e){}
-  if(needHard||forceHard===true){
-    toast('Updating app…');
-    try{await hardReloadApp()}catch(e){location.reload()}
-    return;
-  }
-  // Admin page: re-sync groups + email OTPs without leaving admin
-  if(adminOpen){
-    try{
-      await ensureCloud();
-      adminGroups=await loadGroupList();
-      await loadEmailUsers();
-      persistAdminSession(true);
-      render();
-      toast('Admin data synced (groups & OTPs)');
-    }catch(e){toast('Could not sync admin data')}
-    return;
-  }
-  // Email user home: refresh group list
-  if(emailUser&&emailUser.email&&!gid){
-    try{
-      await ensureCloud();
-      await loadEmailUsers();
-      const u=findEmailUser(emailUser.email);
-      if(u)saveEmailSession({email:u.email,name:u.name||emailUser.name||'',groups:u.groups||[]});
-      try{adminGroups=await loadGroupList()}catch(e){}
-      render();
-      toast('Your groups refreshed');
-    }catch(e){toast('Could not refresh')}
-    return;
-  }
-  if(!gid){toast('App is up to date');try{await hardReloadApp()}catch(e){location.reload()};return}
-  if(window.cloud&&cloud.stop)try{cloud.stop()}catch(e){}
-  cloudOn=false;synced=false;cs='connecting';base=null;lastSent='';inflight=0;
-  startCloud();render();toast('Live data refreshed')
+  try{await hardReloadApp()}catch(e){try{location.reload()}catch(e2){}}
 }
 function leaveGroup(){rsvpFocusId='';try{sessionStorage.removeItem('ptc_rsvp_focus')}catch(e){}window._glLoaded=false;connGen++;if(window._connTimer){clearTimeout(window._connTimer);window._connTimer=null}const keepAdmin=(()=>{try{return sessionStorage.getItem('ptc_admin_open')==='1'}catch(e){return false}})();if(keepAdmin){adminOpen=true;adminPw=adminPw||'session';adminSection=adminSection||'groups';loadGroupList().then(l=>{adminGroups=l;render()}).catch(()=>{})}else{adminOpen=false;adminPw=null}if(gid){saveRecent(gid,groupName||gid.slice(0,8));try{localStorage.removeItem(viewKey());localStorage.removeItem(editKey())}catch(e){}}if(window.cloud&&cloud.stop)cloud.stop();cloudOn=false;gid='';try{localStorage.removeItem('ptc_group');history.replaceState(null,'',location.pathname)}catch(e){}clearLocal();render()}
 function switchGroupUI(){tab='hist';leaveGroup()}
