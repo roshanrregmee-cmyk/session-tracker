@@ -1895,7 +1895,8 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   expenses.forEach(e=>{if(!e.done)e.done=true});logFeed('Expenses settled');render();toast('Settled')}
  else if(g('data-exdel')){const id=g('data-exdel').dataset.exdel;if(confirm('Delete this expense?')){expenses=expenses.filter(e=>e.id!==id);render()}}
  else if(g('data-sshare')){const t0=settleText();if(!t0)return toast('No settlement to share');if(navigator.share)navigator.share({text:t0}).catch(()=>{});else if(navigator.clipboard)navigator.clipboard.writeText(t0).then(()=>toast('Copied'));else prompt('Copy this',t0)}
- else if(g('data-shide')){const s=settle||(function(){try{return JSON.parse(sessionStorage.getItem('ptc_last_settle_'+(gid||''))||'null')}catch(e){return null}})();if(s&&s.id){try{localStorage.setItem('ptc_hs_'+gid,String(s.id))}catch(e){}}render()}
+ else if(g('data-shide')){const s=settle||(function(){try{return JSON.parse(sessionStorage.getItem('ptc_last_settle_'+(gid||''))||'null')}catch(e){return null}})();if(s&&s.id){try{localStorage.setItem('ptc_hs_'+(gid||''),String(s.id))}catch(e){}}render()}
+ else if(g('data-sunhide')){try{localStorage.removeItem('ptc_hs_'+(gid||''))}catch(e){}render();toast('Settlement shown')}
  else if(t.id=='bkref'){loadBackups()}
  else if(t.id=='orgset'){setPass()}
  else if(t.id=='gencode'){genCode()}
@@ -1908,6 +1909,11 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
  else if(t.id=='copyvcode'){if(navigator.clipboard)navigator.clipboard.writeText(lastViewCode).then(()=>toast('View code copied'));else prompt('Copy this view code',lastViewCode)}
  else if(t.id=='copycode'){if(navigator.clipboard)navigator.clipboard.writeText(lastCode).then(()=>toast('Code copied'));else prompt('Copy this code',lastCode)}
  else if(t.id=='orgrm'){removePass()}
+ 
+ else if(t.id=='bk_local_create'){
+  if(!(canOrganise()||(typeof isSessionAdmin==='function'&&isSessionAdmin())))return toast('Organiser or admin only');
+  downloadLocalBackup();return}
+
  else if(t.id=='bkfull'){guard('restore a backup',()=>{if(bk.full&&confirm('Replace data for “'+activeGameLabel()+'” only (sessions, loans, players)? Other games are not changed.')){const d=JSON.parse(bk.full.json);players=Array.isArray(d.players)?d.players:[];sessions=Array.isArray(d.sessions)?d.sessions:[];loans=Array.isArray(d.loans)?d.loans:[];expenses=Array.isArray(d.expenses)?d.expenses:[];game=d.game||null;initLoan=d.initLoan||500;if(typeof d.rules==='string'||d.rules==='')rules=d.rules;try{stashCurrentBoard()}catch(e){}tab='hist';render();toast('Backup restored for '+activeGameLabel());queueMicrotask(()=>{try{persist()}catch(e){}})}})}
  else if(t.id=='bkstd'){guard('restore the standing',()=>{if(bk.standing&&confirm('Replace the current game and its loans with this saved standing?')){const d=JSON.parse(bk.standing.json);loans=loans.filter(l=>l.done).concat(d.loans.map(l=>({...l})));expenses=expenses.filter(e=>e.done).concat((d.expenses||[]).map(e=>({...e,id:e.id||uid()})));game={date:d.game.date,players:[...d.game.players]};initLoan=d.initLoan;d.game.players.forEach(q=>{if(!players.includes(q))players.push(q)});gc=false;finals={};loanDraft={};tab='loans';render();toast('Standing restored')}})}
  else if(t.id=='gjoin'){const c=($('#gc_in').value||'').trim();if(!/^[A-Za-z0-9_-]{8,40}$/.test(c))return toast('Use 8 to 40 letters, numbers, - or _');const btn=$('#gjoin');if(btn){btn.disabled=true;btn.textContent='Connecting…'}toast('Connecting to group…');Promise.resolve(openExistingGroup(c,$('#gp_in')?$('#gp_in').value:'')).finally(()=>{const b=$('#gjoin');if(b){b.disabled=false;b.textContent='Join the table ✨'}})}
@@ -2072,16 +2078,26 @@ document.addEventListener('click',e=>{const t=e.target,g=a=>t.closest('['+a+']')
   try{stashCurrentBoard()}catch(e){}
   render();
   logFeed('Game completed · '+Object.keys(res||{}).length+' players');
-  toast('Game saved — see who pays whom above');
-  queueMicrotask(()=>{try{const el=document.getElementById('settle_card');if(el)el.scrollIntoView({behavior:'smooth',block:'start'})}catch(e){}});
-  // Prompt share of who pays whom
+  toast('Game saved — settlement ready to share');
   queueMicrotask(()=>{
+   try{const el=document.getElementById('settle_card');if(el)el.scrollIntoView({behavior:'smooth',block:'start'})}catch(e){}
    try{persist()}catch(e){console.error(e)}
    try{
-    if(settle&&settle.items&&settle.items.length&&navigator.share){
-     /* optional soft prompt — user can use Share on the card */
+    if(!settle)return;
+    const t0=settleText();
+    if(!t0)return;
+    // Prompt: share who pays whom
+    if(confirm('Share settlement now?\n\n(Who pays whom after this game)')){
+     if(navigator.share){
+      navigator.share({title:'Settlement',text:t0}).catch(()=>{
+       if(navigator.clipboard)navigator.clipboard.writeText(t0).then(()=>toast('Settlement copied')).catch(()=>prompt('Copy settlement',t0));
+       else prompt('Copy settlement',t0);
+      });
+     }else if(navigator.clipboard){
+      navigator.clipboard.writeText(t0).then(()=>toast('Settlement copied')).catch(()=>prompt('Copy settlement',t0));
+     }else prompt('Copy settlement',t0);
     }
-   }catch(e){}
+   }catch(e){console.error(e)}
   })}
  else if(t.id=='lsave'){const add=[];let bad=0;if(!game)return;game.players.forEach(p=>{const x=loanDraft[p]||{},a=parseFloat(x.amt);if(x.amt===undefined||x.amt==='')return;if(!isFinite(a)||a===0){bad=1;return}add.push({date:ld,who:p,amt:x.src=='__repay'?-Math.abs(a):a,src:x.src=='__repay'?null:(x.src||null),g:game.date,done:false})});
   if(!ld)return toast('Pick the date');if(bad)return toast('Enter a valid amount that is not 0 (use − for a repayment)');if(!add.length)return toast('Enter at least one amount');
@@ -3003,7 +3019,7 @@ async function loadOwner(code){ownerEmail='';try{const l=await loadGroupList();c
 function canOrganise(){if(isOwner())return true;if(Date.now()<unlockUntil)return true;try{if(adminOpen||sessionStorage.getItem('ptc_admin_open')==='1')return true}catch(e){}if(!orgInfo)return false;try{return localStorage.getItem(orgKey())===orgInfo.hash}catch(e){return false}}
 function markOrganiser(){if(orgInfo)try{localStorage.setItem(orgKey(),orgInfo.hash)}catch(e){}unlockUntil=Date.now()+36e5}
 const normCode=c=>String(c||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
-const ALLOW='[data-t],[data-v],[data-x],[data-q],[data-mode],[data-pn],[data-rf],[data-rt],[data-hs],[data-hp],[data-all],[data-xall],#bkref,#gref,#gref-page,#ginvite,#gencode,#allowall,#genview,#allowview,#orgset,#orgrm,#copycode,#copyvcode,#gadmin,[data-sshare],[data-shide],[data-gcopy],[data-glink],[data-gleave],[data-gsw],[data-gopen],[data-gdel],#unlock,#unlockview,#unlockorg';
+const ALLOW='[data-t],[data-v],[data-x],[data-q],[data-mode],[data-pn],[data-rf],[data-rt],[data-hs],[data-hp],[data-all],[data-xall],#bkref,#gref,#gref-page,#ginvite,#gencode,#allowall,#genview,#allowview,#orgset,#orgrm,#copycode,#copyvcode,#gadmin,[data-sshare],[data-shide],[data-sunhide],[data-gcopy],[data-glink],[data-gleave],[data-gsw],[data-gopen],[data-gdel],#unlock,#unlockview,#unlockorg';
 function lockUI(){document.querySelectorAll('#v input,#v select,#v textarea,#v button,#v label.btn').forEach(el=>{if(!el.matches(ALLOW)){el.disabled=true;el.style.opacity='.5'}})}
 async function unlockEdit(){if(!access)return;const c=await askPw('Enter the group password',{title:'Password',ok:'Unlock'});if(c===null)return;
  for(const x of [c,normCode(c)]){const hh=await hashPass(x,access.salt,access.iter);if(hh===access.hash){try{localStorage.setItem(editKey(),hh)}catch(e){}toast('Editing enabled on this device');render();return}}
@@ -3259,8 +3275,19 @@ function settleCard(){
   try{const j=sessionStorage.getItem('ptc_last_settle_'+(gid||''));if(j)s=JSON.parse(j)}catch(e){}
  }
  if(!s)return'';
- let hid='';try{hid=localStorage.getItem('ptc_hs_'+gid)}catch(e){}
- if(hid&&s.id&&hid===String(s.id))return'';
+ let hid='';try{hid=localStorage.getItem('ptc_hs_'+(gid||''))}catch(e){}
+ const isHidden=!!(hid&&s.id&&hid===String(s.id));
+ if(isHidden){
+  return`<div class="card" id="settle_card" style="border:1px dashed var(--bd)">
+   <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+    <div><b>Settlement hidden</b><div class="mut" style="font-size:13px;margin-top:2px">${E(s.date||'Latest')} · ${(Array.isArray(s.items)?s.items:[]).length} payment(s)</div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+     <button type="button" class="pri" data-sunhide>Unhide</button>
+     <button type="button" data-sshare>Share</button>
+    </div>
+   </div>
+  </div>`;
+ }
  const it=Array.isArray(s.items)?s.items:[];
  const rows=Array.isArray(s.rows)?s.rows:[];
  let h=`<div class="card" id="settle_card" style="border:2px solid var(--ac);box-shadow:0 8px 24px -10px rgba(255,61,129,.45)">
@@ -3354,101 +3381,89 @@ async function loadBackups(){
  bk.busy=false;
  try{if(tab==='backup'&&appMode==='poker')render0();else render()}catch(e){console.error(e)}
 }
-function backupTab(){const when=x=>new Date(x.savedAt).toLocaleString();
+
+function buildLocalBackup(){
+ try{stashCurrentBoard()}catch(e){}
+ return{
+  v:1,
+  type:'session-tracker-local-backup',
+  at:Date.now(),
+  group:gid||'',
+  groupName:groupName||'',
+  boardId:activeBoardId||'cards',
+  boardName:activeGameLabel(),
+  players:Array.isArray(players)?[...players]:[],
+  sessions:Array.isArray(sessions)?sessions.map(x=>({id:x.id,date:x.date||'',label:x.label||'',v:(x.v&&typeof x.v==='object')?{...x.v}:{}})):[],
+  loans:Array.isArray(loans)?loans.map(l=>({...l})):[],
+  expenses:Array.isArray(expenses)?expenses.map(e=>({...e})):[],
+  settle:settle?JSON.parse(JSON.stringify(settle)):null,
+  game:game?JSON.parse(JSON.stringify(game)):null,
+  initLoan:initLoan,
+  rules:(typeof rules==='string')?rules:null,
+  readme:(typeof readme==='string')?readme:null
+ };
+}
+function downloadLocalBackup(){
+ if(!(canOrganise()||(typeof isSessionAdmin==='function'&&isSessionAdmin())))return toast('Organiser or admin only');
+ const data=buildLocalBackup();
+ const name=(data.boardName||'game').replace(/[^\w\-]+/g,'_').slice(0,24);
+ const stamp=new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+ const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+ const a=document.createElement('a');
+ a.href=URL.createObjectURL(blob);
+ a.download='backup_'+name+'_'+stamp+'.json';
+ document.body.appendChild(a);a.click();
+ setTimeout(()=>{try{URL.revokeObjectURL(a.href);a.remove()}catch(e){}},1500);
+ toast('Backup file saved · '+(data.sessions||[]).length+' sessions');
+}
+function applyLocalBackup(data){
+ if(!data||data.type!=='session-tracker-local-backup')throw new Error('Not a Session Tracker backup file');
+ players=Array.isArray(data.players)?[...data.players]:[];
+ sessions=Array.isArray(data.sessions)?data.sessions.map(x=>({...(x||{}),v:(x&&x.v&&typeof x.v==='object')?{...x.v}:{}})):[];
+ loans=Array.isArray(data.loans)?data.loans.map(l=>({...(l||{})})):[];
+ expenses=Array.isArray(data.expenses)?data.expenses.map(e=>({...(e||{})})):[];
+ settle=data.settle?JSON.parse(JSON.stringify(data.settle)):null;
+ game=data.game?JSON.parse(JSON.stringify(data.game)):null;
+ initLoan=(typeof data.initLoan==='number'&&isFinite(data.initLoan))?data.initLoan:500;
+ if(typeof data.rules==='string'||data.rules==='')rules=data.rules;
+ if(typeof data.readme==='string')readme=data.readme;
+ sortS();
+ try{stashCurrentBoard()}catch(e){}
+ if(settle){try{sessionStorage.setItem('ptc_last_settle_'+(gid||''),JSON.stringify(settle));localStorage.removeItem('ptc_hs_'+(gid||''))}catch(e){}}
+}
+
+function backupTab(){
+ const when=x=>{try{return new Date(x.savedAt).toLocaleString()}catch(e){return '-'}};
  if(bk.busy&&bk.full===undefined)return'<p class="mut">Loading backups…</p>';
  let a,b;
  if(bk.full){try{const d=norm(JSON.parse(bk.full.json)||{});a=`<div class="mut">Saved ${E(when(bk.full))} · ${(d.sessions||[]).length} sessions · ${(d.players||[]).length} players</div><button class="pri" id="bkfull" style="margin-top:8px">Restore this backup</button>`}catch(e){a='<div class="mut">Backup could not be read.</div>'}}
- else a='<div class="mut">No backup yet.</div>';
+ else a='<div class="mut">No cloud backup yet. Complete a game or use Create backup below.</div>';
  if(bk.standing){try{const d=JSON.parse(bk.standing.json)||{};const g=d.game||{};const pl=Array.isArray(g.players)?g.players:[];const ln=Array.isArray(d.loans)?d.loans:[];b=`<div class="mut">Saved ${E(when(bk.standing))} · game of ${E(g.date||'—')} · ${pl.length} players · ${ln.length} loan entries</div><button class="pri" id="bkstd" style="margin-top:8px">Restore this standing</button>`}catch(e){b='<div class="mut">Standing backup could not be read.</div>'}}
  else b='<div class="mut">No standing saved yet.</div>';
  const gnm=E(activeGameLabel());
- return`<div class="card"><b>Upload Excel · ${gnm}</b><div class="mut" style="margin:4px 0 10px">Applies only to <b>${gnm}</b> — other games keep their own files and data.</div>
+ const isOrg=!!((typeof canOrganise==='function'&&canOrganise())||(typeof isSessionAdmin==='function'&&isSessionAdmin()));
+ let localCard='';
+ if(isOrg){
+  localCard=`<div class="card" style="border:2px solid var(--ac)">
+   <b>💾 Local backup · ${gnm}</b>
+   <div class="mut" style="margin:6px 0 12px">Organiser / admin only. Saves this game’s data as a file on your device, or restores from a file you choose.</div>
+   <button type="button" class="pri" id="bk_local_create" style="width:100%;margin-bottom:10px">Create backup</button>
+   <label class="btn" id="bk_local_load_lbl" for="bk_local_file" style="display:flex;justify-content:center;align-items:center;width:100%;cursor:pointer;padding:12px;border-radius:999px;border:1px solid var(--bd);background:var(--card);font-weight:700">Load backup</label>
+   <input id="bk_local_file" type="file" accept=".json,application/json" style="position:absolute;width:1px;height:1px;opacity:0">
+   <div class="mut" style="margin-top:8px;font-size:12px;text-align:center">File stays on this phone/computer — not uploaded unless you restore it here.</div>
+  </div>`;
+ }else{
+  localCard=`<div class="card"><b>Local backup</b><p class="mut" style="margin:6px 0 0">Only the organiser or admin can create or load a local backup.</p></div>`;
+ }
+ return`${localCard}
+ <div class="card"><b>Upload Excel · ${gnm}</b><div class="mut" style="margin:4px 0 10px">Applies only to <b>${gnm}</b> — other games keep their own files and data.</div>
   <label class="btn pri" id="uplbl" for="up" style="display:inline-flex;cursor:pointer">📤 Upload Excel</label>
   <input id="up" type="file" accept=".xlsx,.xls" style="position:absolute;width:1px;height:1px;opacity:0"></div>
  <div class="card"><b>Last completed game backup · ${gnm}</b>${a}</div>
  <div class="card"><b>Current standing backup · ${gnm}</b>${b}</div>
- ${bk.err?`<p class="neg">Could not load backups (${E(bk.err)}). Tap ↻ Refresh at the top to try again.</p>`:''}`}
-function startCloud(){if(!gid)return;
- const gen=++connGen;
- if(!window.cloud){window.addEventListener('cloudready',()=>{if(gen===connGen)startCloud()},{once:true});setTimeout(()=>{if(gen!==connGen)return;if(!window.cloud){cloudErr='Could not load Google services. Check your internet connection and reload.';cs='error';render()}},8000);return}
- cloudOn=true;cs='connecting';cloudErr='';access=null;accessLoaded=false;viewAccess=null;viewLoaded=false;
- if(window._connTimer)clearTimeout(window._connTimer);
- window._connTimer=setTimeout(()=>{if(gen!==connGen)return;if(!synced&&gid&&cs==='connecting'){cloudErr='Taking too long to reach this group. Check internet or try another group.';cs='error';render()}},8000);
- (async()=>{try{const a=await cloud.get(gid,'access');access=(a&&a.json&&a.json!=='null')?JSON.parse(a.json):null}catch(e){access=null}accessLoaded=true;if(gen===connGen&&synced)renderSafe()})();
- (async()=>{try{const v=await cloud.get(gid,'viewaccess');viewAccess=(v&&v.json&&v.json!=='null')?JSON.parse(v.json):null}catch(e){viewAccess=null}viewLoaded=true;if(gen===connGen&&synced)renderSafe()})();
- if(cloud.watch)cloud.watch(gid,'access',json=>{if(gen!==connGen||json===undefined)return;access=(json&&json!=='null')?JSON.parse(json):null;accessLoaded=true;if(synced)renderSafe()});
- if(cloud.watch)cloud.watch(gid,'viewaccess',json=>{if(gen!==connGen||json===undefined)return;viewAccess=(json&&json!=='null')?JSON.parse(json):null;viewLoaded=true;if(synced)renderSafe()});
- cloud.listen(gid,json=>{if(gen!==connGen)return;let S;
-  try{S=json?norm(JSON.parse(json)):EMPTY()}catch(e){console.error('Bad group data',e);cloudErr='Group data could not be read. It may be damaged.';cs='error';synced=false;render();return}
-  if(!synced){synced=true;cs='live';if(window._connTimer){clearTimeout(window._connTimer);window._connTimer=null}const keepName=groupName;base=S;lastSent='';applying=true;try{applyState(S);if(keepName&&!groupName){groupName=keepName;if(gid)saveRecent(gid,groupName)}}catch(e){console.error('applyState',e);cloudErr='Could not load this group\'s data.';cs='error';synced=false;applying=false;render();return}applying=false;if(hashGame){if(game&&game.date===hashGame){tab='loans';appMode='poker';toast('Opened the game of '+hashGame)}else if(game)toast('A different game is in progress ('+game.date+')')}
-  if(pendingMode||hashMode){const m=pendingMode||hashMode;pendingMode='';
-  if(m==='rsvp'||m==='news'||m==='poker'){
-   appMode=m;if(m==='poker')tab='hist';
-   if(m==='rsvp'){
-    if(pendingEv)rsvpFocusId=pendingEv;
-    readRsvpFocusFromHash();
-    try{if(rsvpFocusId)sessionStorage.setItem('ptc_rsvp_focus',rsvpFocusId)}catch(e){}
-   }else{rsvpFocusId='';try{sessionStorage.removeItem('ptc_rsvp_focus')}catch(e){}}
-   try{history.replaceState(null,'',hashWithMode(gid,m,m==='rsvp'?rsvpFocusId:''))}catch(e){}
-   if(m==='rsvp')toast(rsvpFocusId?'Opened event RSVP':'Opened RSVP');
-   else if(m==='news')toast('Opened Newsletter');
-   else toast('Opened Cards');
-  }
-  pendingEv='';
- }
-   ;(async()=>{try{const del=await cloud.get(gid,'deleted');if(del&&del.json&&del.json!=='null'&&!pendingOrgPass){removeRecent(gid);const gone=gid;leaveGroup();toast('Group '+(gone.slice(0,8))+'… no longer exists (deleted by the admin).');return}}catch(e){}
-    loadOrg().then(()=>{if(gen===connGen)render()});
-    if(pendingOrgPass){const pw=pendingOrgPass,setG=pendingSetGlobal,ep=pendingEditPw;pendingOrgPass=null;pendingSetGlobal=false;pendingEditPw=null;try{const salt=randHex(16),iter=150000,hash=await hashPass(pw,salt,iter);const payload=JSON.stringify({salt,iter,hash});await cloud.put(gid,'organiser',payload);if(ep){const s2=randHex(16),h2=await hashPass(ep,s2,150000);await cloud.put(gid,'access',JSON.stringify({salt:s2,iter:150000,hash:h2}));access={salt:s2,iter:150000,hash:h2};accessLoaded=true;lastCode=ep.slice(0,4)+'-'+ep.slice(4)}if(setG)await cloud.put(CFG,'createpass',payload);orgInfo={salt,iter,hash};orgLoaded=true;markOrganiser();await registerGroup(gid,groupName);if(gen===connGen)render()}catch(e){toast('Could not save admin password — set it on the Backups tab')}}
-    else if(gen===connGen){render();queueMicrotask(()=>{try{persist()}catch(e){}})} })();return}
-  if(inflight)return;reconcile(S)},e=>{if(gen!==connGen)return;cloudErr=((e&&e.code)||'error')+': '+((e&&e.message)||'');cs='error';synced=false;render()})}
-function clearLocal(){readme=null;rules=null;groupName='';editing={};notesDraft={};expenses=[];settle=null;exDraft={desc:'',amt:'',paid:'',shared:{}};bills=[];billSettle=null;billDraft={desc:'',amt:'',paid:'',shared:{}};feed=[];events=[];chipsBookings=[];extraGames=[];gameBoards={};activeBoardId='';cardsMeta={name:'Cards',icon:'🃏'};hubHidden={cards:false,rsvp:false,news:false,noGames:false};appMode='';billTab='list';xgrp={busy:false,err:'',list:[],picked:{},playerPicked:{},data:{},combined:null};access=null;accessLoaded=false;lastCode='';viewAccess=null;viewLoaded=false;lastViewCode='';orgInfo=null;orgLoaded=false;unlockUntil=0;ownerEmail='';players=[];sessions=[];loans=[];game=null;initLoan=500;gc=false;finals={};loanDraft={};plays={};excl={};base=null;synced=false;cloudErr='';lastSent='';inflight=0}
-function setGroup(code,name,opts){const nm=(name!=null?String(name):'').trim().slice(0,40);const doReg=opts&&opts.register;gid=code;saveRecent(code,nm||code.slice(0,8));
- const mode=pendingMode||hashMode||'';
- const evKeep=pendingEv||hashEv||rsvpFocusId||'';
- try{localStorage.setItem('ptc_group',code);history.replaceState(null,'',hashWithMode(code,mode,mode==='rsvp'?evKeep:''))}catch(e){}
- clearLocal();groupName=nm;cs='connecting';synced=false;
- if(mode==='rsvp'||pendingMode==='rsvp'||hashMode==='rsvp'){
-  appMode='rsvp';
-  rsvpFocusId=evKeep||readRsvpFocusFromHash()||'';
-  try{if(rsvpFocusId)sessionStorage.setItem('ptc_rsvp_focus',rsvpFocusId)}catch(e){}
- }else if(mode==='news'||pendingMode==='news'||hashMode==='news'){appMode='news';rsvpFocusId=''}
- else if(mode==='poker'||pendingMode==='poker'||hashMode==='poker'){appMode='poker';tab='hist';rsvpFocusId=''}
- if(window.cloud&&cloud.stop){try{cloud.stop()}catch(e){}}startCloud();render();loadOwner(code);if(doReg)queueMicrotask(()=>registerGroup(code,nm).catch(()=>{}))}
-async function checkAppUpdate(){
-  if(!('serviceWorker' in navigator))return{updated:false,reason:'no-sw'};
-  try{
-    let reg=await navigator.serviceWorker.getRegistration();
-    if(!reg){try{reg=await navigator.serviceWorker.register('./sw.js')}catch(e){return{updated:false,reason:'reg-fail'}}}
-    const hadWaiting=!!reg.waiting;
-    try{await reg.update()}catch(e){}
-    const waiting=reg.waiting||(reg.installing&&null);
-    if(reg.waiting){
-      return await new Promise(resolve=>{
-        let done=false;
-        const finish=()=>{if(done)return;done=true;resolve({updated:true,reason:'new-sw'})};
-        navigator.serviceWorker.addEventListener('controllerchange',()=>{finish();window.location.reload()}, {once:true});
-        try{reg.waiting.postMessage({type:'SKIP_WAITING'})}catch(e){}
-        setTimeout(()=>{if(!done){done=true;try{caches.keys().then(ks=>Promise.all(ks.map(k=>caches.delete(k)))).finally(()=>location.reload())}catch(e){location.reload()}resolve({updated:true,reason:'timeout-reload'})}},2500);
-      });
-    }
-    // No waiting worker — fetch live sw.js; if cache name differs, clear caches & reload
-    try{
-      const res=await fetch('./sw.js?_=' + Date.now(),{cache:'no-store'});
-      if(res&&res.ok){
-        const text=await res.text();
-        const mNew=(text.match(/session-tracker-v\d+/)||[])[0];
-        if(mNew&&mNew!==CACHE_HINT){
-          if('caches' in window){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)))}
-          try{const regs=await navigator.serviceWorker.getRegistrations();await Promise.all(regs.map(r=>r.unregister()))}catch(e){}
-          location.reload();
-          return{updated:true,reason:'new-deploy'};
-        }
-      }
-    }catch(e){}
-    return{updated:false,reason:hadWaiting?'activated':'latest'};
-  }catch(e){return{updated:false,reason:String(e&&e.message||e)}}
+ ${bk.err?`<p class="neg">Could not load cloud backups (${E(bk.err)}). Tap ↻ to try again.</p>`:''}`;
 }
-const CACHE_HINT='session-tracker-v102';
+const CACHE_HINT='session-tracker-v104';
 
 async function deployAppUpdate(){
   toast('Saving data, then updating…');
@@ -3633,6 +3648,37 @@ window.addEventListener('online',()=>{if(cloudOn){setSync('live');persist()}});w
     if(openEl&&!e.target.closest('.hub-swipe'))closeOpen();
   },true);
 })();
+
+
+document.addEventListener('change',function(e){
+  const t=e.target;
+  if(!t)return;
+  if(t.id==='bk_local_file'&&t.files&&t.files[0]){
+    if(!(typeof canOrganise==='function'&&canOrganise())&&!(typeof isSessionAdmin==='function'&&isSessionAdmin())){
+      toast('Organiser or admin only');t.value='';return;
+    }
+    const file=t.files[0];
+    const reader=new FileReader();
+    reader.onload=function(){
+      try{
+        const data=JSON.parse(String(reader.result||''));
+        if(!confirm('Load local backup “'+(data.boardName||file.name)+'”?\n\nThis replaces data for the current game ('+(typeof activeGameLabel==='function'?activeGameLabel():'game')+') only.\n\n'+(Array.isArray(data.sessions)?data.sessions.length:0)+' sessions in file.')){t.value='';return}
+        applyLocalBackup(data);
+        tab='hist';appMode='poker';
+        render();
+        toast('Local backup loaded · '+(sessions||[]).length+' sessions');
+        queueMicrotask(function(){try{persist()}catch(err){}});
+      }catch(err){
+        console.error(err);
+        toast('Could not read backup: '+(err&&err.message||err));
+      }
+      t.value='';
+    };
+    reader.onerror=function(){toast('Could not read file');t.value=''};
+    reader.readAsText(file);
+    return;
+  }
+},true);
 
 ;(function bootApp(){
   const bootGid=gid;
